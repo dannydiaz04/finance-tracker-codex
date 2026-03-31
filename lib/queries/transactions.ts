@@ -5,7 +5,7 @@ import {
   buildTransactionQueryParams,
   uniqueSearchSuggestions,
 } from "@/lib/bigquery/params";
-import { runBigQueryQuery } from "@/lib/bigquery/client";
+import { getBigQueryProjectId, runBigQueryQuery } from "@/lib/bigquery/client";
 import {
   sampleTransactionDetails,
   sampleTransactions,
@@ -104,6 +104,8 @@ function matchesFilters(transaction: Transaction, filters: TransactionFilters) {
   return true;
 }
 
+const projectId = getBigQueryProjectId() ?? "project";
+
 const transactionBaseQuery = `
   SELECT
     transaction_id AS transactionId,
@@ -135,7 +137,7 @@ const transactionBaseQuery = `
     keyword_array AS keywordArray,
     raw_payload_json AS rawPayloadJson,
     classification_history AS classificationHistory
-  FROM \`${process.env.BIGQUERY_PROJECT_ID ?? "project"}.core_finance.fact_transaction_current\`
+  FROM \`${projectId}.core_finance.fact_transaction_current\`
   WHERE (@query IS NULL OR SEARCH(description_norm, @query) OR SEARCH(merchant_norm, @query))
     AND (ARRAY_LENGTH(@accountIds) = 0 OR account_id IN UNNEST(@accountIds))
     AND (ARRAY_LENGTH(@categoryIds) = 0 OR derived_category_id IN UNNEST(@categoryIds))
@@ -189,7 +191,7 @@ export async function getTransactionById(transactionId: string) {
   const rows = await runBigQueryQuery<TransactionDetail>(
     `
       SELECT *
-      FROM \`${process.env.BIGQUERY_PROJECT_ID ?? "project"}.core_finance.fact_transaction_current\`
+      FROM \`${projectId}.core_finance.fact_transaction_current\`
       WHERE transaction_id = @transactionId
       LIMIT 1
     `,
@@ -207,7 +209,7 @@ export async function getTransactionSearchSuggestions(query: string) {
   const rows = await runBigQueryQuery<TransactionSearchSuggestion>(
     `
       SELECT label, type
-      FROM \`${process.env.BIGQUERY_PROJECT_ID ?? "project"}.mart_finance.search_suggestions\`
+      FROM \`${projectId}.mart_finance.search_suggestions\`
       WHERE SEARCH(label, @query)
       LIMIT 8
     `,

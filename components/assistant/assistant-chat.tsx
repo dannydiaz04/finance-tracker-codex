@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { ArrowUp, LoaderCircle, Sparkles } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -37,6 +37,76 @@ function createMessageId() {
 
 function trimConversation(messages: LocalMessage[]) {
   return messages.slice(-12);
+}
+
+const assistantHighlightClassName = "font-medium text-sky-300";
+
+function sanitizeAssistantContent(content: string) {
+  return content
+    .replace(/^\s*#{1,6}\s*/gm, "")
+    .replace(/^\s*>+\s?/gm, "")
+    .replace(/\[(.*?)\]\((.*?)\)/g, "$1")
+    .replace(/`([^`\n]+)`/g, "$1")
+    .replace(/\*\*([^*]+?)\*\*|__([^_]+?)__/g, "<hl>$1$2</hl>")
+    .trim();
+}
+
+function createHighlightNode(value: string, key: string) {
+  return (
+    <span key={key} data-anchor="assistant-value" className={assistantHighlightClassName}>
+      {value}
+    </span>
+  );
+}
+
+function renderCurrencyAnchors(text: string, keyPrefix: string) {
+  const currencyPattern = /(-?\$[\d,]+(?:\.\d{2})?)/g;
+  const parts = text.split(currencyPattern);
+
+  if (parts.length === 1) {
+    return [text];
+  }
+
+  return parts.map((part, index) => {
+    const isCurrencyValue = /^-?\$[\d,]+(?:\.\d{2})?$/.test(part);
+
+    if (!isCurrencyValue) {
+      return <span key={`${keyPrefix}-text-${index}`}>{part}</span>;
+    }
+
+    return createHighlightNode(part, `${keyPrefix}-currency-${index}`);
+  });
+}
+
+function renderMessageContent(content: string) {
+  const sanitizedContent = sanitizeAssistantContent(content);
+  const highlightedValuePattern = /<hl>([\s\S]+?)<\/hl>/g;
+  const nodes: ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  let i = 0;
+
+  while ((match = highlightedValuePattern.exec(sanitizedContent)) !== null) {
+    const anchorValue = (match[1] ?? "").trim();
+
+    if (match.index > lastIndex) {
+      nodes.push(...renderCurrencyAnchors(sanitizedContent.slice(lastIndex, match.index), `segment-${i}`));
+    }
+
+    nodes.push(createHighlightNode(anchorValue, `anchor-${i}`));
+    i += 1;
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (nodes.length === 0) {
+    return <>{renderCurrencyAnchors(sanitizedContent, "message")}</>;
+  }
+
+  if (lastIndex < sanitizedContent.length) {
+    nodes.push(...renderCurrencyAnchors(sanitizedContent.slice(lastIndex), "tail"));
+  }
+
+  return <>{nodes}</>;
 }
 
 function toApiMessages(messages: LocalMessage[]): AssistantChatMessage[] {
@@ -231,7 +301,7 @@ export function AssistantChat({
               <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500">
                 {message.role === "assistant" ? "Assistant" : "You"}
               </p>
-              <div className="whitespace-pre-wrap">{message.content}</div>
+              <div className="whitespace-pre-wrap">{renderMessageContent(message.content)}</div>
             </div>
           ))}
 

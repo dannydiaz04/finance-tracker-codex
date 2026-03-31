@@ -68,6 +68,12 @@ export default async function AssistantPage() {
             <CardContent className="grid gap-3">
               <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                  Data source
+                </p>
+                <p className="mt-2 font-medium text-white">{context.sourceDetail}</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
                   Available cash
                 </p>
                 <p className="mt-2 text-3xl font-semibold text-white">

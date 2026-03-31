@@ -29,6 +29,7 @@ export type AssistantGuide = {
 export type DashboardAssistantContext = {
   generatedAt: string;
   sourceMode: AssistantDataSourceMode;
+  sourceDetail: string;
   overview: OverviewSnapshot;
   categories: CategoryInsight[];
   merchants: MerchantInsight[];

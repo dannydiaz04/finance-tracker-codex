@@ -1,10 +1,11 @@
 import "server-only";
 
-import { runBigQueryQuery } from "@/lib/bigquery/client";
+import { getBigQueryProjectId, runBigQueryQuery } from "@/lib/bigquery/client";
 import { sampleMerchantInsights } from "@/lib/sample-data";
 import type { MerchantInsight } from "@/lib/types/finance";
 
 export async function getMerchantInsights() {
+  const projectId = getBigQueryProjectId() ?? "project";
   const rows = await runBigQueryQuery<MerchantInsight>(
     `
       SELECT
@@ -13,7 +14,7 @@ export async function getMerchantInsights() {
         transactions,
         change_vs_prior AS trend,
         likely_recurring AS likelyRecurring
-      FROM \`${process.env.BIGQUERY_PROJECT_ID ?? "project"}.mart_finance.merchant_spend_90d\`
+      FROM \`${projectId}.mart_finance.merchant_spend_90d\`
       ORDER BY spend DESC
       LIMIT 20
     `,

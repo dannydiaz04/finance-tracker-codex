@@ -9,7 +9,7 @@ import {
   DEFAULT_ASSISTANT_MODEL,
   type DashboardAssistantContext,
 } from "@/lib/assistant/types";
-import { isBigQueryConfigured } from "@/lib/bigquery/client";
+import { getBigQueryStatus } from "@/lib/bigquery/client";
 import { getCategoryInsights, getReviewQueue } from "@/lib/queries/categories";
 import { getMerchantInsights } from "@/lib/queries/merchants";
 import { getOverviewSnapshot } from "@/lib/queries/overview";
@@ -27,14 +27,20 @@ import { formatCurrency, formatPercent } from "@/lib/utils";
 
 async function safeLoad<T>(loader: () => Promise<T>, fallback: T) {
   try {
-    return await loader();
+    return {
+      value: await loader(),
+      fromFallback: false,
+    };
   } catch {
-    return fallback;
+    return {
+      value: fallback,
+      fromFallback: true,
+    };
   }
 }
 
 export async function getDashboardAssistantContext(): Promise<DashboardAssistantContext> {
-  const warehouseConfigured = isBigQueryConfigured();
+  const bigQueryStatus = getBigQueryStatus();
   const [overview, categories, merchants, rules, reviewQueue, recentTransactions] =
     await Promise.all([
       safeLoad(getOverviewSnapshot, sampleOverview),
@@ -44,16 +50,31 @@ export async function getDashboardAssistantContext(): Promise<DashboardAssistant
       safeLoad(getReviewQueue, sampleReviewQueue),
       safeLoad(() => getRecentTransactions(8), sampleTransactions.slice(0, 8)),
     ]);
-
-  return {
-    generatedAt: new Date().toISOString(),
-    sourceMode: warehouseConfigured ? "warehouse" : "sample",
+  const datasets = [
     overview,
     categories,
     merchants,
     rules,
     reviewQueue,
     recentTransactions,
+  ];
+  const usingSampleFallback =
+    !bigQueryStatus.configured || datasets.some((dataset) => dataset.fromFallback);
+
+  return {
+    generatedAt: new Date().toISOString(),
+    sourceMode: usingSampleFallback ? "sample" : "warehouse",
+    sourceDetail: !bigQueryStatus.configured
+      ? bigQueryStatus.reason ?? "BigQuery is not configured."
+      : usingSampleFallback
+        ? "A BigQuery read failed, so the assistant fell back to sample dashboard data."
+        : `Using BigQuery project ${bigQueryStatus.projectId} in ${bigQueryStatus.location}.`,
+    overview: overview.value,
+    categories: categories.value,
+    merchants: merchants.value,
+    rules: rules.value,
+    reviewQueue: reviewQueue.value,
+    recentTransactions: recentTransactions.value,
     pageGuides: dashboardGuides,
     internalGuides: internalFunctionGuides,
   };
@@ -69,14 +90,14 @@ export function buildAssistantWelcomeMessage(context: DashboardAssistantContext)
     "I can explain the dashboard, summarize the current finance picture, and walk through imports, rules, overrides, and review workflows.",
     `Right now I see ${formatCurrency(context.overview.availableCash)} in available cash, ${context.reviewQueue.length} items in the review queue, and ${topCategory ? `${topCategory.label} at ${formatPercent(topCategory.share)} of spend` : "no category concentration yet"}.`,
     `The current largest expense is ${context.overview.largestExpense.merchant} at ${formatCurrency(-Math.abs(context.overview.largestExpense.amount))}, and ${topMerchant ? `${topMerchant.merchant} is the top merchant concentration.` : "merchant insight data is light right now."}`,
-    `The assistant is reading ${sampleLabel}. Ask for a quick read, page walkthrough, or an explanation of how the internal classification flow works.`,
+    `The assistant is reading ${sampleLabel}. ${context.sourceDetail} Ask for a quick read, page walkthrough, or an explanation of how the internal classification flow works.`,
   ].join("\n\n");
 }
 
 export function getAssistantRuntimeStatus() {
   return {
     openAiConfigured: Boolean(process.env.OPENAI_API_KEY),
-    openAiModel: process.env.OPENAI_MODEL ?? DEFAULT_ASSISTANT_MODEL,
+    openAiModel: process.env.OPENAI_MODEL?.trim() || DEFAULT_ASSISTANT_MODEL,
     starterPrompts: [...assistantStarterPrompts],
   };
 }

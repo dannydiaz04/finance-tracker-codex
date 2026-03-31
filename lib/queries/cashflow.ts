@@ -1,10 +1,11 @@
 import "server-only";
 
-import { runBigQueryQuery } from "@/lib/bigquery/client";
+import { getBigQueryProjectId, runBigQueryQuery } from "@/lib/bigquery/client";
 import { sampleCashflow } from "@/lib/sample-data";
 import type { CashflowPoint } from "@/lib/types/finance";
 
 export async function getCashflowSeries() {
+  const projectId = getBigQueryProjectId() ?? "project";
   const rows = await runBigQueryQuery<CashflowPoint>(
     `
       SELECT
@@ -12,7 +13,7 @@ export async function getCashflowSeries() {
         inflow,
         outflow,
         net
-      FROM \`${process.env.BIGQUERY_PROJECT_ID ?? "project"}.mart_finance.daily_cashflow\`
+      FROM \`${projectId}.mart_finance.daily_cashflow\`
       ORDER BY date DESC
       LIMIT 90
     `,

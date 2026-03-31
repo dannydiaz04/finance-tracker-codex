@@ -1,10 +1,11 @@
 import "server-only";
 
-import { runBigQueryQuery } from "@/lib/bigquery/client";
+import { getBigQueryProjectId, runBigQueryQuery } from "@/lib/bigquery/client";
 import { sampleReviewQueue, sampleRules } from "@/lib/sample-data";
 import type { ReviewQueueItem, Rule } from "@/lib/types/finance";
 
 export async function getRules() {
+  const projectId = getBigQueryProjectId() ?? "project";
   const rows = await runBigQueryQuery<Rule>(
     `
       SELECT
@@ -20,7 +21,7 @@ export async function getRules() {
         confidence_boost AS confidenceBoost,
         hit_rate AS hitRate,
         last_matched_at AS lastMatchedAt
-      FROM \`${process.env.BIGQUERY_PROJECT_ID ?? "project"}.ops_finance.category_rules\`
+      FROM \`${projectId}.ops_finance.category_rules\`
       ORDER BY priority DESC
     `,
   );
@@ -29,6 +30,7 @@ export async function getRules() {
 }
 
 export async function getLowConfidenceReviewItems() {
+  const projectId = getBigQueryProjectId() ?? "project";
   const rows = await runBigQueryQuery<ReviewQueueItem>(
     `
       SELECT
@@ -40,7 +42,7 @@ export async function getLowConfidenceReviewItems() {
         suggested_category AS suggestedCategory,
         confidence_score AS confidenceScore,
         reason
-      FROM \`${process.env.BIGQUERY_PROJECT_ID ?? "project"}.ops_finance.review_queue\`
+      FROM \`${projectId}.ops_finance.review_queue\`
       ORDER BY confidence_score ASC
       LIMIT 25
     `,

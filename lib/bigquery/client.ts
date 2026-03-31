@@ -4,13 +4,45 @@ import { BigQuery, type BigQueryOptions } from "@google-cloud/bigquery";
 
 let bigQueryClient: BigQuery | null | undefined;
 
+function readEnvValue(...keys: string[]) {
+  for (const key of keys) {
+    const value = process.env[key]?.trim();
+
+    if (value) {
+      return value;
+    }
+  }
+
+  return null;
+}
+
+export function getBigQueryProjectId() {
+  return readEnvValue("BIGQUERY_PROJECT_ID", "GOOGLE_CLOUD_PROJECT");
+}
+
+export function getBigQueryLocation() {
+  return readEnvValue("BIGQUERY_LOCATION") ?? "US";
+}
+
+export function getBigQueryStatus() {
+  const projectId = getBigQueryProjectId();
+
+  return {
+    configured: Boolean(projectId),
+    projectId,
+    location: getBigQueryLocation(),
+    reason: projectId
+      ? null
+      : "BIGQUERY_PROJECT_ID or GOOGLE_CLOUD_PROJECT is missing or blank.",
+  };
+}
+
 export function getBigQueryClient() {
   if (typeof bigQueryClient !== "undefined") {
     return bigQueryClient;
   }
 
-  const projectId =
-    process.env.BIGQUERY_PROJECT_ID ?? process.env.GOOGLE_CLOUD_PROJECT;
+  const projectId = getBigQueryProjectId();
 
   if (!projectId) {
     bigQueryClient = null;
@@ -19,7 +51,7 @@ export function getBigQueryClient() {
 
   const options: BigQueryOptions = {
     projectId,
-    location: process.env.BIGQUERY_LOCATION ?? "US",
+    location: getBigQueryLocation(),
   };
 
   bigQueryClient = new BigQuery(options);
@@ -44,7 +76,7 @@ export async function runBigQueryQuery<T>(
     query,
     params,
     useLegacySql: false,
-    location: process.env.BIGQUERY_LOCATION ?? "US",
+    location: getBigQueryLocation(),
   });
 
   return rows as T[];

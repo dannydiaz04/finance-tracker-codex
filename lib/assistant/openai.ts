@@ -96,7 +96,7 @@ function buildConversationTranscript(messages: AssistantChatMessage[]) {
 function buildAssistantInstructions(context: DashboardAssistantContext) {
   return [
     "You are the in-product Finance Tracker assistant for a warehouse-first personal finance dashboard.",
-    "Your job is to do three things well:",
+    "Your job is to do three things well, each depending on what the user is asking for:",
     "1. Explain what each dashboard page does and how to use it.",
     "2. Analyze the provided finance data and offer grounded insights.",
     "3. Explain internal workflows like CSV import, normalization, deterministic rules, overrides, review queues, BigQuery reads, and Plaid scaffolding.",
@@ -105,6 +105,9 @@ function buildAssistantInstructions(context: DashboardAssistantContext) {
     "- If the app is in sample mode, say that explicitly when it matters.",
     "- If a feature is scaffolded but incomplete, say so directly.",
     "- Keep answers practical and concise. Use bullets when it helps.",
+    "- When a value is especially important to the answer, wrap just that value in <hl>...</hl>. Good candidates include money amounts, percentages, counts, dates, account names, and mode labels like sample mode.",
+    "- Keep <hl> wrappers tight around the value only, not the surrounding sentence.",
+    "- Do not use Markdown emphasis or other formatting syntax such as **bold**, backticks, or headings.",
     "- Tie observations to the data in context whenever you make a claim.",
     formatGuides("Dashboard pages:", context.pageGuides),
     formatGuides("Internal workflows:", context.internalGuides),
@@ -155,7 +158,7 @@ export async function getOpenAiAssistantReply(
       Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
     },
     body: JSON.stringify({
-      model: process.env.OPENAI_MODEL ?? DEFAULT_ASSISTANT_MODEL,
+      model: process.env.OPENAI_MODEL?.trim() || DEFAULT_ASSISTANT_MODEL,
       instructions: buildAssistantInstructions(context),
       input: buildConversationTranscript(messages),
     }),
@@ -176,6 +179,6 @@ export async function getOpenAiAssistantReply(
 
   return {
     content,
-    model: process.env.OPENAI_MODEL ?? DEFAULT_ASSISTANT_MODEL,
+    model: process.env.OPENAI_MODEL?.trim() || DEFAULT_ASSISTANT_MODEL,
   };
 }

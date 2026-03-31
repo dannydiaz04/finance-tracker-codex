@@ -20,6 +20,20 @@ const assistantRequestSchema = z.object({
     .max(20),
 });
 
+function sanitizeAssistantOutput(content: string) {
+  return (
+    content
+      // Remove common markdown structures
+      .replace(/^\s*#{1,6}\s*/gm, "")
+      .replace(/^\s*>+\s?/gm, "")
+      .replace(/\[(.*?)\]\((.*?)\)/g, "$1")
+      .replace(/`([^`\n]+)`/g, "$1")
+      // Convert emphasis into explicit highlight anchors the UI can style.
+      .replace(/\*\*([^*]+?)\*\*|__([^_]+?)__/g, "<hl>$1$2</hl>")
+      .trim()
+  );
+}
+
 export async function POST(request: NextRequest) {
   try {
     const payload = assistantRequestSchema.parse(await request.json());
@@ -32,7 +46,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
           reply: {
             role: "assistant",
-            content: reply.content,
+            content: sanitizeAssistantOutput(reply.content),
           },
           mode: "openai",
           sourceMode: context.sourceMode,
@@ -44,7 +58,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
           reply: {
             role: "assistant",
-            content: fallback,
+            content: sanitizeAssistantOutput(fallback),
           },
           mode: "local_fallback",
           sourceMode: context.sourceMode,
@@ -60,7 +74,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       reply: {
         role: "assistant",
-        content: generateLocalAssistantReply(payload.messages, context),
+        content: sanitizeAssistantOutput(generateLocalAssistantReply(payload.messages, context)),
       },
       mode: "local_fallback",
       sourceMode: context.sourceMode,

@@ -1,10 +1,11 @@
 import "server-only";
 
-import { runBigQueryQuery } from "@/lib/bigquery/client";
+import { getBigQueryProjectId, runBigQueryQuery } from "@/lib/bigquery/client";
 import { sampleAccounts, sampleCategories } from "@/lib/sample-data";
 import type { Account, Category } from "@/lib/types/finance";
 
 export async function getAccounts() {
+  const projectId = getBigQueryProjectId() ?? "project";
   const rows = await runBigQueryQuery<Account>(
     `
       SELECT
@@ -17,7 +18,7 @@ export async function getAccounts() {
         mask,
         current_balance AS currentBalance,
         available_balance AS availableBalance
-      FROM \`${process.env.BIGQUERY_PROJECT_ID ?? "project"}.core_finance.dim_account\`
+      FROM \`${projectId}.core_finance.dim_account\`
       ORDER BY name
     `,
   );
@@ -26,6 +27,7 @@ export async function getAccounts() {
 }
 
 export async function getCategories() {
+  const projectId = getBigQueryProjectId() ?? "project";
   const rows = await runBigQueryQuery<Category>(
     `
       SELECT
@@ -34,7 +36,7 @@ export async function getCategories() {
         category_l1 AS \`group\`,
         category_l2 AS sublabel,
         color
-      FROM \`${process.env.BIGQUERY_PROJECT_ID ?? "project"}.core_finance.dim_category\`
+      FROM \`${projectId}.core_finance.dim_category\`
       ORDER BY label
     `,
   );
