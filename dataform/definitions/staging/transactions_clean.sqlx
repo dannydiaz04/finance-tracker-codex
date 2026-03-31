@@ -1,0 +1,79 @@
+config {
+  type: "view",
+  schema: "stg_finance",
+  name: "transactions_clean",
+  description: "Latest non-removed representation of each inbound transaction event.",
+  tags: ["staging"]
+}
+
+with ranked_events as (
+  select
+    event_id,
+    import_batch_id,
+    source_name,
+    source_transaction_id,
+    source_account_id,
+    event_type,
+    timestamp(event_timestamp) as event_timestamp,
+    safe_cast(json_value(payload, "$.postedAt") as date) as posted_at,
+    safe_cast(json_value(payload, "$.authorizedAt") as timestamp) as authorized_at,
+    json_value(payload, "$.accountName") as account_name,
+    json_value(payload, "$.descriptionRaw") as description_raw,
+    json_value(payload, "$.descriptionNorm") as description_norm,
+    json_value(payload, "$.merchantRaw") as merchant_raw,
+    json_value(payload, "$.merchantNorm") as merchant_norm,
+    safe_cast(json_value(payload, "$.signedAmount") as numeric) as signed_amount,
+    json_value(payload, "$.direction") as direction,
+    json_value(payload, "$.transactionClass") as transaction_class,
+    json_value(payload, "$.institutionCategory") as institution_category,
+    safe_cast(json_value(payload, "$.pending") as bool) as pending,
+    payload as raw_payload_json,
+    coalesce(
+      json_query_array(payload, "$.keywordArray"),
+      cast([] as array<json>)
+    ) as keyword_array_json,
+    row_number() over (
+      partition by source_transaction_id, source_account_id
+      order by timestamp(event_timestamp) desc
+    ) as latest_rank
+  from ${ref("transaction_events")}
+),
+survivors as (
+  select *
+  from ranked_events
+  where latest_rank = 1
+    and event_type != "removed"
+)
+select
+  to_hex(md5(concat(source_account_id, "::", source_transaction_id))) as transaction_id,
+  source_transaction_id,
+  source_account_id as account_id,
+  coalesce(account_name, source_account_id) as account_name,
+  posted_at,
+  authorized_at,
+  coalesce(description_raw, "") as description_raw,
+  coalesce(description_norm, "") as description_norm,
+  coalesce(merchant_raw, description_raw, "") as merchant_raw,
+  coalesce(merchant_norm, description_norm, "") as merchant_norm,
+  signed_amount,
+  direction,
+  transaction_class,
+  institution_category,
+  pending,
+  keyword_array_json,
+  raw_payload_json,
+  import_batch_id,
+  source_name,
+  event_timestamp,
+  to_hex(
+    md5(
+      concat(
+        coalesce(merchant_norm, merchant_raw, ""),
+        "::",
+        cast(posted_at as string),
+        "::",
+        cast(abs(signed_amount) as string)
+      )
+    )
+  ) as canonical_group_id
+from survivors

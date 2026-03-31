@@ -1,0 +1,15 @@
+config {
+  type: "table",
+  schema: "mart_finance",
+  name: "daily_cashflow",
+  description: "Daily inflow, outflow, and net cash flow excluding internal transfers.",
+  tags: ["mart"]
+}
+
+select
+  posted_at as date,
+  sum(case when direction = "inflow" and not is_transfer then signed_amount else 0 end) as inflow,
+  abs(sum(case when direction = "outflow" and not is_transfer then signed_amount else 0 end)) as outflow,
+  sum(case when not is_transfer then signed_amount else 0 end) as net
+from ${ref("fact_transaction_current")}
+group by posted_at

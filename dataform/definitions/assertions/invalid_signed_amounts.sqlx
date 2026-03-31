@@ -1,0 +1,11 @@
+config {
+  type: "assertion",
+  schema: "assertions_finance",
+  name: "invalid_signed_amounts",
+  description: "Fail when signed amounts are null or equal to zero."
+}
+
+select *
+from ${ref("fact_transaction_current")}
+where signed_amount is null
+   or signed_amount = 0

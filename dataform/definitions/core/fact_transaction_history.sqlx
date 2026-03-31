@@ -1,0 +1,26 @@
+config {
+  type: "table",
+  schema: "core_finance",
+  name: "fact_transaction_history",
+  description: "Event history across added, modified, and removed transaction mutations.",
+  tags: ["core"]
+}
+
+select
+  events.event_id,
+  events.import_batch_id,
+  events.source_name,
+  events.source_transaction_id,
+  events.source_account_id as account_id,
+  events.event_type,
+  timestamp(events.event_timestamp) as event_timestamp,
+  clean.transaction_id,
+  clean.canonical_group_id,
+  clean.posted_at,
+  clean.merchant_norm,
+  clean.signed_amount,
+  events.payload as raw_payload_json
+from ${ref("transaction_events")} as events
+left join ${ref("transactions_clean")} as clean
+  on clean.source_transaction_id = events.source_transaction_id
+ and clean.account_id = events.source_account_id

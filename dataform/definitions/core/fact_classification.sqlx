@@ -1,0 +1,86 @@
+config {
+  type: "table",
+  schema: "core_finance",
+  name: "fact_classification",
+  description: "Deterministic classification ladder combining overrides, rules, and fallback logic.",
+  tags: ["core"]
+}
+
+with base as (
+  select *
+  from ${ref("transactions_clean")}
+),
+overrides as (
+  select
+    transaction_id,
+    category_id,
+    reason,
+    updated_at
+  from ${ref("manual_overrides")}
+),
+matched_rules as (
+  select
+    base.transaction_id,
+    rules.rule_id,
+    rules.category_id,
+    rules.priority,
+    row_number() over (
+      partition by base.transaction_id
+      order by rules.priority desc
+    ) as rule_rank
+  from base
+  join ${ref("category_rules")} as rules
+    on coalesce(rules.enabled, true)
+   and (
+     (rules.match_strategy = "merchant_exact" and lower(base.merchant_norm) = lower(rules.match_value))
+     or (rules.match_strategy = "merchant_contains" and lower(base.merchant_norm) like concat("%", lower(rules.match_value), "%"))
+     or (rules.match_strategy = "description_regex" and regexp_contains(lower(base.description_norm), lower(rules.match_value)))
+   )
+),
+fallbacks as (
+  select
+    transaction_id,
+    case
+      when transaction_class = "transfer" then "transfers"
+      when transaction_class = "fee" then "fees"
+      when transaction_class = "income" then "salary"
+      when institution_category is not null and lower(institution_category) like "%travel%" then "travel"
+      when institution_category is not null and lower(institution_category) like "%grocery%" then "groceries"
+      when institution_category is not null and lower(institution_category) like "%dining%" then "dining"
+      else "uncategorized"
+    end as category_id
+  from base
+)
+select
+  base.transaction_id,
+  coalesce(overrides.category_id, matched_rules.category_id, fallbacks.category_id) as category_id,
+  categories.label as category_label,
+  categories.category_l2 as subcategory_id,
+  case
+    when overrides.category_id is not null then 1.00
+    when matched_rules.rule_id is not null then 0.95
+    when base.institution_category is not null then 0.70
+    else 0.55
+  end as confidence_score,
+  case
+    when overrides.category_id is not null then "manual_override"
+    when matched_rules.rule_id is not null then "merchant_rule"
+    when base.institution_category is not null then "institution_category"
+    else "fallback"
+  end as classification_source,
+  matched_rules.rule_id,
+  coalesce(overrides.updated_at, base.event_timestamp) as classified_at
+from base
+left join overrides
+  on overrides.transaction_id = base.transaction_id
+left join matched_rules
+  on matched_rules.transaction_id = base.transaction_id
+ and matched_rules.rule_rank = 1
+left join fallbacks
+  on fallbacks.transaction_id = base.transaction_id
+left join ${ref("dim_category")} as categories
+  on categories.category_id = coalesce(
+    overrides.category_id,
+    matched_rules.category_id,
+    fallbacks.category_id
+  )

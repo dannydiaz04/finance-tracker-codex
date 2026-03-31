@@ -1,0 +1,11 @@
+config {
+  type: "assertion",
+  schema: "assertions_finance",
+  name: "posted_rows_without_date",
+  description: "Fail when non-pending transactions are missing a posted date."
+}
+
+select *
+from ${ref("fact_transaction_current")}
+where not pending
+  and posted_at is null

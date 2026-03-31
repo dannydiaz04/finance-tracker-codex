@@ -1,0 +1,91 @@
+config {
+  type: "table",
+  schema: "mart_finance",
+  name: "overview_snapshot",
+  description: "Single-row dashboard snapshot with nested arrays for the overview route.",
+  tags: ["mart"]
+}
+
+with base as (
+  select *
+  from ${ref("fact_transaction_current")}
+),
+cashflow as (
+  select * from ${ref("daily_cashflow")}
+),
+merchant_spend as (
+  select * from ${ref("merchant_spend_90d")}
+),
+category_mix as (
+  select
+    derived_category_id as category_id,
+    any_value(category_label) as label,
+    abs(sum(signed_amount)) as amount
+  from base
+  where direction = "outflow"
+    and transaction_class in ("expense", "fee", "adjustment")
+  group by derived_category_id
+)
+select
+  sum(case when direction = "inflow" then signed_amount else 0 end)
+    - abs(sum(case when direction = "outflow" then signed_amount else 0 end)) as total_balance,
+  sum(case when direction = "inflow" then signed_amount else 0 end) as available_cash,
+  abs(sum(case when direction = "outflow" then signed_amount else 0 end)) as month_to_date_spend,
+  sum(case when direction = "inflow" then signed_amount else 0 end) as month_to_date_income,
+  safe_divide(
+    sum(case when direction = "inflow" then signed_amount else 0 end)
+      - abs(sum(case when direction = "outflow" then signed_amount else 0 end)),
+    nullif(sum(case when direction = "inflow" then signed_amount else 0 end), 0)
+  ) as savings_rate,
+  struct(
+    (select merchant_raw from base where direction = "outflow" order by abs(signed_amount) desc limit 1) as merchant,
+    (select abs(signed_amount) from base where direction = "outflow" order by abs(signed_amount) desc limit 1) as amount,
+    (select cast(posted_at as string) from base where direction = "outflow" order by abs(signed_amount) desc limit 1) as posted_at
+  ) as largest_expense,
+  array(
+    select as struct
+      account_id as id,
+      any_value(account_name) as name,
+      "warehouse" as institution,
+      any_value(account_type) as type,
+      any_value(account_type) as subtype,
+      "USD" as currency,
+      substr(account_id, greatest(length(account_id) - 3, 1), 4) as mask,
+      sum(signed_amount) as current_balance,
+      sum(signed_amount) as available_balance
+    from base
+    group by account_id
+  ) as accounts,
+  array(
+    select as struct
+      cast(date as string) as date,
+      inflow,
+      outflow,
+      net
+    from cashflow
+    order by date desc
+    limit 30
+  ) as cashflow,
+  array(
+    select as struct
+      category_id,
+      label,
+      amount,
+      safe_divide(amount, sum(amount) over ()) as share
+    from category_mix
+    order by amount desc
+    limit 8
+  ) as category_mix,
+  array(
+    select as struct
+      merchant,
+      amount,
+      transactions,
+      change_vs_prior
+    from merchant_spend
+    order by amount desc
+    limit 8
+  ) as top_merchants,
+  (select count(*) from ${ref("review_queue")}) as review_queue_count
+from base
+limit 1

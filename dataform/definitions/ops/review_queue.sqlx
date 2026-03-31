@@ -1,0 +1,26 @@
+config {
+  type: "view",
+  schema: "ops_finance",
+  name: "review_queue",
+  description: "Transactions that need explicit review because confidence is low or the row is still pending.",
+  tags: ["ops"]
+}
+
+select
+  transaction_id,
+  merchant_raw as merchant,
+  description_raw as description,
+  abs(signed_amount) as amount,
+  posted_at,
+  category_label as suggested_category,
+  confidence_score,
+  case
+    when pending then "Pending merchant with non-final bank metadata."
+    when confidence_score < 0.7 then "Low-confidence classification."
+    when derived_category_id = "uncategorized" then "No deterministic rule matched."
+    else "Manual review requested."
+  end as reason
+from ${ref("fact_transaction_current")}
+where pending
+   or confidence_score < 0.7
+   or derived_category_id = "uncategorized"

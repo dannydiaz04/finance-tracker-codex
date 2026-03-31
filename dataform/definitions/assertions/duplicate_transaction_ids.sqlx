@@ -1,0 +1,13 @@
+config {
+  type: "assertion",
+  schema: "assertions_finance",
+  name: "duplicate_transaction_ids",
+  description: "Fail when canonical current transaction IDs are duplicated."
+}
+
+select
+  transaction_id,
+  count(*) as row_count
+from ${ref("fact_transaction_current")}
+group by transaction_id
+having count(*) > 1

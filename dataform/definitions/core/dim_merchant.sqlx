@@ -1,0 +1,15 @@
+config {
+  type: "table",
+  schema: "core_finance",
+  name: "dim_merchant",
+  description: "Normalized merchant dimension with raw alias coverage.",
+  tags: ["core"]
+}
+
+select
+  merchant_norm as merchant_id,
+  merchant_norm,
+  any_value(merchant_raw) as merchant_display_name,
+  count(*) as transaction_count
+from ${ref("transactions_clean")}
+group by merchant_norm

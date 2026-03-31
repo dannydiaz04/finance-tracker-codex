@@ -1,0 +1,23 @@
+config {
+  type: "operations",
+  schema: "raw_finance",
+  name: "transaction_events",
+  description: "Append-only inbound transaction mutations from CSV and future Plaid sync.",
+  hasOutput: true
+}
+
+create table if not exists ${self()} (
+  event_id string,
+  import_batch_id string,
+  source_name string,
+  source_transaction_id string,
+  source_account_id string,
+  event_type string,
+  event_timestamp timestamp,
+  payload json
+)
+partition by date(event_timestamp)
+cluster by source_name, source_account_id
+options (
+  description = "Append-only inbound transaction mutations from CSV and future Plaid sync."
+)

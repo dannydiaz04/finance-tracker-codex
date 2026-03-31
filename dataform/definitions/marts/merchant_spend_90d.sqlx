@@ -1,0 +1,39 @@
+config {
+  type: "table",
+  schema: "mart_finance",
+  name: "merchant_spend_90d",
+  description: "Rolling 90-day merchant spend summary for top-merchant analysis.",
+  tags: ["mart"]
+}
+
+with merchant_totals as (
+  select
+    merchant_raw as merchant,
+    abs(sum(signed_amount)) as amount,
+    count(*) as transactions
+  from ${ref("fact_transaction_current")}
+  where direction = "outflow"
+    and posted_at >= date_sub(current_date(), interval 90 day)
+    and transaction_class in ("expense", "fee", "adjustment")
+  group by merchant_raw
+),
+merchant_prior as (
+  select
+    merchant_raw as merchant,
+    abs(sum(signed_amount)) as prior_amount
+  from ${ref("fact_transaction_current")}
+  where direction = "outflow"
+    and posted_at between date_sub(current_date(), interval 180 day)
+      and date_sub(current_date(), interval 91 day)
+    and transaction_class in ("expense", "fee", "adjustment")
+  group by merchant_raw
+)
+select
+  totals.merchant,
+  totals.amount,
+  totals.transactions,
+  safe_divide(totals.amount - prior.prior_amount, prior.prior_amount) as change_vs_prior,
+  totals.transactions >= 2 as likely_recurring
+from merchant_totals as totals
+left join merchant_prior as prior
+  on prior.merchant = totals.merchant

@@ -1,0 +1,20 @@
+config {
+  type: "table",
+  schema: "core_finance",
+  name: "dim_category",
+  description: "Canonical category dimension for deterministic classification and dashboard grouping.",
+  tags: ["core"]
+}
+
+select *
+from unnest([
+  struct("housing-rent" as category_id, "Housing" as label, "Essential" as category_l1, "Rent" as category_l2, "#55d0ff" as color),
+  struct("groceries" as category_id, "Groceries" as label, "Essential" as category_l1, "Food at home" as category_l2, "#8f7cff" as color),
+  struct("dining" as category_id, "Dining" as label, "Lifestyle" as category_l1, "Restaurants" as category_l2, "#4cf2c5" as color),
+  struct("salary" as category_id, "Salary" as label, "Income" as category_l1, "Payroll" as category_l2, "#74ff9f" as color),
+  struct("transfers" as category_id, "Transfers" as label, "Internal" as category_l1, "Linked accounts" as category_l2, "#8992a5" as color),
+  struct("software" as category_id, "Software" as label, "Lifestyle" as category_l1, "Subscriptions" as category_l2, "#f6b73c" as color),
+  struct("travel" as category_id, "Travel" as label, "Lifestyle" as category_l1, "Trips" as category_l2, "#ff7c9d" as color),
+  struct("fees" as category_id, "Fees" as label, "Essential" as category_l1, "Banking" as category_l2, "#f97316" as color),
+  struct("uncategorized" as category_id, "Uncategorized" as label, "Review" as category_l1, "Needs classification" as category_l2, "#64748b" as color)
+])

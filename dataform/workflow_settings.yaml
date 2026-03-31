@@ -1,0 +1,11 @@
+dataformCoreVersion: "3.0.50"
+defaultProject: "finance-tracker-dev"
+defaultDataset: "core_finance"
+defaultLocation: "US"
+defaultAssertionDataset: "assertions_finance"
+vars:
+  rawSchema: "raw_finance"
+  stagingSchema: "stg_finance"
+  coreSchema: "core_finance"
+  opsSchema: "ops_finance"
+  martSchema: "mart_finance"

@@ -1,0 +1,59 @@
+config {
+  type: "table",
+  schema: "core_finance",
+  name: "fact_transaction_current",
+  description: "Canonical current-state transaction fact used by the application UI.",
+  tags: ["core"],
+  bigquery: {
+    partitionBy: "posted_at",
+    clusterBy: ["account_id", "transaction_class", "derived_category_id", "merchant_norm"]
+  }
+}
+
+select
+  staged.transaction_id,
+  staged.source_transaction_id,
+  staged.canonical_group_id,
+  staged.account_id,
+  staged.account_name,
+  accounts.type as account_type,
+  staged.authorized_at,
+  staged.posted_at,
+  staged.pending,
+  staged.direction,
+  staged.transaction_class,
+  staged.signed_amount,
+  staged.merchant_raw,
+  staged.merchant_norm,
+  staged.description_raw,
+  staged.description_norm,
+  staged.institution_category,
+  classification.category_id as derived_category_id,
+  classification.category_label,
+  classification.subcategory_id,
+  classification.confidence_score,
+  classification.classification_source,
+  classification.rule_id,
+  staged.transaction_class = "transfer" as is_transfer,
+  false as is_duplicate,
+  cast([] as array<string>) as notes,
+  array(
+    select json_value(keyword)
+    from unnest(staged.keyword_array_json) as keyword
+  ) as keyword_array,
+  staged.raw_payload_json,
+  [
+    struct(
+      classification.classified_at as timestamp,
+      classification.classification_source as source,
+      classification.confidence_score as confidence_score,
+      classification.category_id as category_id,
+      classification.category_label as category_label,
+      cast(classification.rule_id as string) as note
+    )
+  ] as classification_history
+from ${ref("transactions_clean")} as staged
+left join ${ref("fact_classification")} as classification
+  on classification.transaction_id = staged.transaction_id
+left join ${ref("dim_account")} as accounts
+  on accounts.account_id = staged.account_id

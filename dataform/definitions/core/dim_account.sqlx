@@ -1,0 +1,19 @@
+config {
+  type: "table",
+  schema: "core_finance",
+  name: "dim_account",
+  description: "Account dimension enriched from the staging layer.",
+  tags: ["core"]
+}
+
+select
+  account_id,
+  name,
+  source_name as institution,
+  type,
+  subtype,
+  currency,
+  mask,
+  current_balance,
+  available_balance
+from ${ref("accounts_clean")}

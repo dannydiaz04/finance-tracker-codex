@@ -1,0 +1,15 @@
+config {
+  type: "assertion",
+  schema: "assertions_finance",
+  name: "impossible_transfer_pairs",
+  description: "Fail when a canonical transfer group does not net to zero across both sides."
+}
+
+select
+  canonical_group_id,
+  round(sum(signed_amount), 2) as net_amount,
+  count(*) as row_count
+from ${ref("fact_transaction_current")}
+where is_transfer
+group by canonical_group_id
+having abs(round(sum(signed_amount), 2)) > 0.01

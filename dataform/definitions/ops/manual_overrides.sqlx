@@ -1,0 +1,17 @@
+config {
+  type: "operations",
+  schema: "ops_finance",
+  name: "manual_overrides",
+  description: "User-authored transaction overrides that take precedence over all automated classifications.",
+  hasOutput: true
+}
+
+create table if not exists ${self()} (
+  transaction_id string,
+  category_id string,
+  reason string,
+  updated_at timestamp
+)
+options (
+  description = "User-authored transaction overrides that take precedence over all automated classifications."
+)

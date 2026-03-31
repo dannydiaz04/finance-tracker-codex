@@ -1,0 +1,20 @@
+config {
+  type: "operations",
+  schema: "raw_finance",
+  name: "import_batches",
+  description: "Metadata for inbound CSV and Plaid import batches.",
+  hasOutput: true
+}
+
+create table if not exists ${self()} (
+  import_batch_id string,
+  source_name string,
+  imported_at timestamp,
+  row_count int64,
+  status string,
+  file_name string
+)
+partition by date(imported_at)
+options (
+  description = "Metadata for inbound CSV and Plaid import batches."
+)

@@ -1,0 +1,26 @@
+config {
+  type: "operations",
+  schema: "ops_finance",
+  name: "category_rules",
+  description: "Deterministic categorization rules maintained by the app.",
+  hasOutput: true
+}
+
+create table if not exists ${self()} (
+  rule_id string,
+  name string,
+  description string,
+  priority int64,
+  enabled bool,
+  category_id string,
+  category_label string,
+  match_strategy string,
+  match_value string,
+  confidence_boost float64,
+  hit_rate float64,
+  last_matched_at date,
+  created_at timestamp
+)
+options (
+  description = "Deterministic categorization rules maintained by the app."
+)

@@ -1,0 +1,38 @@
+config {
+  type: "table",
+  schema: "mart_finance",
+  name: "category_spend_daily",
+  description: "Daily categorized spend for expense-style outflows.",
+  tags: ["mart"]
+}
+
+with daily_category_totals as (
+  select
+    posted_at as date,
+    derived_category_id as category_id,
+    category_label as label,
+    abs(sum(signed_amount)) as amount,
+    count(*) as transaction_count
+  from ${ref("fact_transaction_current")}
+  where direction = "outflow"
+    and transaction_class in ("expense", "fee", "adjustment")
+  group by posted_at, derived_category_id, category_label
+)
+select
+  date,
+  category_id,
+  label,
+  amount,
+  transaction_count,
+  safe_divide(amount, sum(amount) over ()) as share,
+  safe_divide(
+    amount - lag(amount) over (
+      partition by category_id
+      order by date
+    ),
+    lag(amount) over (
+      partition by category_id
+      order by date
+    )
+  ) as trend
+from daily_category_totals

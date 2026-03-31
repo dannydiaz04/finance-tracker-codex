@@ -1,0 +1,13 @@
+config {
+  type: "assertion",
+  schema: "assertions_finance",
+  name: "orphaned_category_ids",
+  description: "Fail when classified rows point to a category not present in the dimension."
+}
+
+select current.*
+from ${ref("fact_transaction_current")} as current
+left join ${ref("dim_category")} as categories
+  on categories.category_id = current.derived_category_id
+where current.derived_category_id is not null
+  and categories.category_id is null
