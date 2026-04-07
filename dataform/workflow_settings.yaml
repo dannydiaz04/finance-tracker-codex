@@ -1,5 +1,5 @@
 dataformCoreVersion: "3.0.50"
-defaultProject: "finance-tracker-dev"
+defaultProject: "finance-tracker-cdx"
 defaultDataset: "core_finance"
 defaultLocation: "US"
 defaultAssertionDataset: "assertions_finance"
@@ -9,3 +9,4 @@ vars:
   coreSchema: "core_finance"
   opsSchema: "ops_finance"
   martSchema: "mart_finance"
+  analyticsSchema: "analytics_finance"

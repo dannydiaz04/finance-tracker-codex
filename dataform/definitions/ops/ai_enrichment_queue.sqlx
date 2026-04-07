@@ -1,0 +1,40 @@
+config {
+  type: "view",
+  schema: "ops_finance",
+  name: "ai_enrichment_queue",
+  description: "Posted transactions that are good candidates for OpenAI-powered merchant standardization and category suggestions.",
+  tags: ["ops", "ai"]
+}
+
+select
+  transaction_id,
+  account_id,
+  account_name,
+  posted_at,
+  signed_amount,
+  merchant_raw,
+  merchant_norm,
+  description_raw,
+  description_norm,
+  institution_category,
+  derived_category_id,
+  category_label,
+  transaction_class,
+  classification_source,
+  confidence_score,
+  keyword_array,
+  raw_payload_json,
+  case
+    when derived_category_id = "uncategorized" then "No deterministic category matched."
+    when classification_source = "institution_category" then "Only institution-provided category is available."
+    when confidence_score < 0.85 then "Low-confidence classification."
+    else "Merchant standardization review."
+  end as enrichment_reason
+from ${ref("fact_transaction_current")}
+where not pending
+  and transaction_class not in ("transfer", "credit_payment")
+  and (
+    derived_category_id = "uncategorized"
+    or classification_source = "institution_category"
+    or confidence_score < 0.85
+  )

@@ -60,6 +60,11 @@ GOOGLE_CLOUD_PROJECT=your_project
 Plaid routes are scaffolded but not fully wired yet. CSV import remains the
 fully functional ingestion path today.
 
+## Warehouse ETL
+
+For the current BigQuery setup, ETL roadmap, analytics table design, and
+session-to-session working notes, see `WAREHOUSE_ETL_LIVING_SPEC.md`.
+
 ## Deploy
 
 This app can be deployed like a standard Next.js project. Make sure the runtime
