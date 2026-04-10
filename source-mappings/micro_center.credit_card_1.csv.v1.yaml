@@ -1,0 +1,94 @@
+id: micro_center.credit_card_1.csv.v1
+source_system: micro_center
+feed: credit_card_1
+format: csv
+
+file_match:
+  filename_contains:
+    - "CreditCard1"
+  header_row: absent
+  expected_nonempty_columns:
+    "1": date
+    "2": amount
+    "6": description
+
+field_map:
+  sourceAccountId:
+    from_runtime_context: "sourceAccountId"
+    fallback_default: "micro_center_card"
+
+  accountName:
+    from_runtime_context: "accountName"
+    fallback_default: "Micro Center Card"
+
+  accountType:
+    default: "credit"
+
+  accountSubtype:
+    default: "credit_card"
+
+  postedAt:
+    source_index: 1
+    source_label: "column_1_date"
+    transform:
+      parse_as: "M/D/YY"
+
+  authorizedAt:
+    source_index: 1
+    source_label: "column_1_date"
+    transform:
+      parse_as: "M/D/YY"
+      coerce_to: "timestamp"
+
+  descriptionRaw:
+    source_index: 6
+    source_label: "column_6_description"
+
+  merchantRaw:
+    source_index: 6
+    source_label: "column_6_description"
+
+  signedAmount:
+    source_index: 2
+    source_label: "column_2_amount"
+    transform:
+      use_source_sign: true
+
+defaults:
+  pending: false
+  currencyCode: "USD"
+
+derived:
+  sourceTransactionId:
+    strategy: hash
+    fields:
+      - "sourceAccountId"
+      - "column_1_date"
+      - "column_2_amount"
+      - "column_6_description"
+
+  direction:
+    strategy: from_signed_amount
+
+  transactionClass:
+    strategy: classifier
+
+  merchantNorm:
+    strategy: normalize_text
+
+  descriptionNorm:
+    strategy: normalize_text
+
+  keywordArray:
+    strategy: extract_keywords
+
+  rawPayloadJson:
+    strategy: preserve_entire_row
+
+notes:
+  - "Draft profile for a headerless Micro Center card export."
+  - "The file is matched by shape and filename because no headers are present."
+  - "Source amounts are kept as-is because the sample rows already match warehouse sign conventions."
+  - "The single date column is used as both transaction date and post date."
+  - "The marker column is ignored for semantic mapping."
+  - "This export is confirmed-only and does not include pending rows."

@@ -36,12 +36,52 @@ Do not store secrets in this file. Reference environment variable names only.
 - Flat-file landing-zone workflow is now defined in this spec as the planned first mile for ingestion.
 - Planned landing-zone file types now include delimited text, JSON, Parquet, and Arrow-family files.
 - The landing-zone design is not provisioned in Google Cloud yet.
+- A source-mapping registry now exists in `WAREHOUSE_SOURCE_MAPPINGS.md` with versioned YAML profiles under `source-mappings/`.
+- Six first-pass source profiles are now documented for:
+  - `capital_one_360_checking_5980`
+  - `apple_card`
+  - `chase_card_1325`
+  - `american_express_card`
+  - `micro_center_card`
+  - `discover_card`
+- Account identity is now standardized across these profiles using a stable machine `sourceAccountId` and a human-readable `accountName`.
+- Feed-specific sign and pending semantics are now documented for the six current exports:
+  - Apple Card: blank `Clearing Date` means `pending = true`
+  - Chase: blank `Post Date` means `pending = true`
+  - Discover: blank `Post Date` means `pending = true`
+  - Capital One 360 Checking and Micro Center exports are confirmed-only and should load with `pending = false`
+  - Micro Center uses one headerless date column as both transaction and post date
+  - American Express uses a confirmed `Date` header and prefers `Reference` as the transaction identifier when present
+- The shared CSV import path now resolves explicit YAML source profiles by filename, header signature, and headerless column shape before falling back to generic header alias inference.
+- The shared runtime account context contract is now implemented in the app-side upload path using `sourceAccountId`, `accountName`, and optional `accountMask`.
+- CSV normalization now supports source-specific date parsing, pending detection, sign transforms, deterministic `sourceTransactionId` derivation, and extra canonical raw payload fields such as `currencyCode`, `runningBalance`, `memo`, and `referenceNumber`.
+- Fixture-based replay coverage now exists for the six documented exports plus one generic fallback CSV.
+- The raw CSV persistence path now maps parser output into explicit snake_case BigQuery rows for `raw_finance.import_batches` and `raw_finance.transaction_events`.
+- The checked-in `raw_finance.import_batches` definition now includes mapping-resolution metadata columns for `mapping_profile_id`, `mapping_resolution_strategy`, `mapping_matched_by`, and runtime account context fields.
+- The live `raw_finance.import_batches` table now includes the six mapping-resolution metadata columns defined in the repo schema.
+- The raw `transaction_events.payload` BigQuery JSON insert contract is now implemented by serializing payloads to JSON text before streaming insert.
+- A fixture-backed live verification import using the American Express activity export succeeded against BigQuery and confirmed both batch metadata and event payload persistence.
+- Two earlier verification attempts left metadata-only `import_batches` rows with zero matching `transaction_events` before the JSON payload fix was applied.
+- Validation completed successfully:
+  - `npm run test:imports`
+  - `npm run typecheck`
+  - `npm run dataform:compile`
 
 ## Repository Touchpoints
+- `WAREHOUSE_SOURCE_MAPPINGS.md`
+- `source-mappings/`
 - `app/api/import/csv/route.ts`
 - `lib/import/csv.ts`
 - `lib/import/mapping.ts`
 - `lib/import/normalize.ts`
+- `lib/import/persistence.ts`
+- `lib/assistant/knowledge.ts`
+- `tests/import/parse-csv-import.test.mjs`
+- `tests/import/persistence.test.mjs`
+- `tests/fixtures/imports/`
+- `js-yaml.d.ts`
+- `package.json`
+- `tsconfig.json`
 - `lib/bigquery/client.ts`
 - `lib/categorization/normalize.ts`
 - `lib/categorization/rules.ts`
@@ -115,21 +155,25 @@ The current and intended near-term flow is:
 2. A standalone ingestion runner claims one landed file at a time by moving it into `processing/...`, validates the file, and records landing metadata.
 3. The runner routes each claimed file to the correct format adapter based on extension and structure.
 4. The current implemented adapter is the shared CSV-style parser surfaced at `app/api/import/csv/route.ts`; future adapters should handle JSON, Parquet, Arrow, and related formats while emitting the same canonical row shape.
-5. `lib/import/mapping.ts` can infer or map source column and field names into the canonical contract.
-6. `lib/import/normalize.ts` standardizes dates, amounts, descriptions, merchant text, transaction direction, and keywords.
-7. The ingestion library builds import-batch metadata plus transaction events for BigQuery insertion. Today this lives in `lib/import/csv.ts`.
-8. `raw_finance.transaction_events` stores event-level transaction payloads as JSON.
-9. `stg_finance.transactions_clean` extracts the latest non-removed version of each transaction.
-10. `core_finance.fact_classification` applies overrides, deterministic rules, institution hints, and fallback logic.
-11. `core_finance.fact_transaction_current` becomes the main canonical transaction fact for the app.
-12. `ops_finance.review_queue` identifies rows needing manual review.
-13. `analytics_finance.transaction_analytics_base` widens the modeled data for descriptive and predictive analytics.
-14. `ops_finance.ai_enrichment_queue` identifies posted rows that are good candidates for future OpenAI-assisted standardization and categorization.
+5. The shared CSV parser now resolves a versioned source-mapping profile from `source-mappings/` using filename, header signature, or headerless column shape, then injects runtime account context such as `sourceAccountId`, `accountName`, and optional `accountMask` when the file does not identify the account directly.
+6. `lib/import/mapping.ts` now prefers explicit source-profile resolution with fallback alias-based header inference only when no source-specific profile exists.
+7. `lib/import/normalize.ts` standardizes dates, amounts, descriptions, merchant text, transaction direction, and keywords.
+8. The ingestion library builds import-batch metadata plus transaction events for BigQuery insertion. Today this lives in `lib/import/csv.ts`.
+9. `raw_finance.transaction_events` stores event-level transaction payloads as JSON.
+10. `stg_finance.transactions_clean` extracts the latest non-removed version of each transaction.
+11. `core_finance.fact_classification` applies overrides, deterministic rules, institution hints, and fallback logic.
+12. `core_finance.fact_transaction_current` becomes the main canonical transaction fact for the app.
+13. `ops_finance.review_queue` identifies rows needing manual review.
+14. `analytics_finance.transaction_analytics_base` widens the modeled data for descriptive and predictive analytics.
+15. `ops_finance.ai_enrichment_queue` identifies posted rows that are good candidates for future OpenAI-assisted standardization and categorization.
 
 Important operational note:
 
 - The landing-zone steps are now specified as the intended first-mile pattern, but they have not yet been provisioned or automated.
 - The shared CSV parsing and raw-write path already exists and should be reused by the landing-zone runner instead of duplicated.
+- The source mapping registry and six first-pass YAML mapping profiles are now checked into the repo, and the shared CSV parser already loads them. The future standalone landing runner should reuse that shared path instead of re-implementing mapping logic.
+- Runtime account context injection for `sourceAccountId`, `accountName`, and optional `accountMask` is now implemented in the app-side upload route and shared CSV parser. The future standalone runner should pass the same keys unchanged.
+- Fixture-based replay coverage now exists for the six documented source profiles plus one generic fallback CSV.
 - Non-CSV adapters are part of the intended landing-zone design, but they are not implemented in the repo yet.
 - The Dataform graph now includes `analytics_finance.transaction_analytics_base` and `ops_finance.ai_enrichment_queue`, but only compilation has been validated so far.
 - A full `dataform run` against BigQuery has not yet been executed in this repo session.
@@ -239,6 +283,38 @@ Implementation rule:
 - Every adapter must emit the same canonical row payload before writing to `raw_finance.transaction_events`
 - Validation, dedupe, and replay semantics should stay format-independent even when parsing logic differs by adapter
 - New formats should be enabled behind explicit allowlists until they pass end-to-end replay tests
+
+### Source Mapping Registry And Account Identity
+The source mapping registry now lives in:
+
+- `WAREHOUSE_SOURCE_MAPPINGS.md` for the narrative registry and implementation notes
+- `source-mappings/*.yaml` for versioned machine-readable mapping profiles
+
+Account identity convention:
+
+- `sourceAccountId` is the stable machine identifier written into raw events
+- `sourceAccountId` should be lowercase snake_case following `<institution>_<product_or_account>[_<mask>]`
+- `accountName` is the human-readable display label for downstream models and the app
+- `accountName` should be Title Case following `<Institution> <Product> [mask]`
+- If an export does not identify the underlying account directly, the runner should inject `sourceAccountId`, `accountName`, and optional `accountMask` at runtime using the same convention
+
+Current first-pass registry:
+
+| Feed | Mapping profile | `sourceAccountId` | `accountName` | Current notes |
+| --- | --- | --- | --- | --- |
+| Capital One 360 Checking (...5980) | `source-mappings/capital_one.360_checking_5980.csv.v1.yaml` | `capital_one_360_checking_5980` | `Capital One 360 Checking` | Confirmed-only export; running balance present |
+| Apple Card Transactions | `source-mappings/apple_card.transactions.csv.v1.yaml` | `apple_card` | `Apple Card` | Blank `Clearing Date` means pending; purchase amounts invert to negative outflows |
+| Chase Card Activity (...1325) | `source-mappings/chase.card_1325.csv.v1.yaml` | `chase_card_1325` | `Chase Card 1325` | Blank `Post Date` means pending; source sign already matches warehouse convention |
+| American Express Activity | `source-mappings/american_express.activity.csv.v1.yaml` | `american_express_card` | `American Express Card` | `Date` header confirmed; `Reference` preferred for transaction identity |
+| Micro Center Credit Card Export | `source-mappings/micro_center.credit_card_1.csv.v1.yaml` | `micro_center_card` | `Micro Center Card` | Headerless export; single date column is both transaction and post date; confirmed-only |
+| Discover All Available Export | `source-mappings/discover.all_available.csv.v1.yaml` | `discover_card` | `Discover Card` | Blank `Post Date` means pending; source amounts invert to warehouse sign convention |
+
+Implication for runner development:
+
+- The runner now needs a `mappingResolver` that selects profiles by filename, header signature, or headerless column shape
+- The runner should pass the same runtime account context keys into every profile
+- Headerless feeds such as Micro Center should bypass normal header inference entirely
+- Generic filenames such as `activity` require stronger header-signature matching than filename matching alone
 
 ### Ingestion Runner Backlog
 This is the recommended order for implementing the landing-zone runner.
@@ -475,25 +551,36 @@ As we expand the ETL pipeline, upstream flat files or source adapters should sta
 - No checksum-based file claim, archive, or rejection workflow exists yet.
 - JSON, JSONL, Parquet, Arrow, and Feather adapters are planned but not yet implemented.
 - Delimited TXT support needs explicit delimiter detection or source-specific configuration.
-- The CSV importer currently generates `sourceTransactionId` from `postedAt` plus row number. That is weak for dedupe and replay across repeated uploads.
-- `authorizedAt` is currently hard-coded to `null` in CSV normalization.
-- The current upload contract is still sparse relative to the analytics table design.
+- The shared CSV parser now resolves source profiles, but the standalone landing runner that should call it does not exist yet.
+- Several profiles depend on runtime account identity injection because the exported files do not identify the underlying card account directly. The app route now accepts that context, but GCS or feed-config based injection is not implemented yet.
 - The current app route accepts uploaded content directly; it does not yet poll or claim files from Cloud Storage.
-- The app-side importer builds camelCase objects before BigQuery insertion, while the raw BigQuery table schema is snake_case. This must be explicitly verified or mapped before relying on production inserts.
+- Two verification-only `raw_finance.import_batches` rows for `activity.csv` currently have zero matching `transaction_events` because they were inserted before the JSON payload streaming fix. Leave them in place unless you explicitly want cleanup.
 - The assistant already calls OpenAI for chat responses, but the ETL pipeline does not yet write model-generated merchant or category suggestions back into BigQuery.
 - `Plaid` routes are scaffolded, but CSV remains the only practical ingestion path today.
 - The analytics base Dataform model compiles, but a full warehouse materialization run has not yet been validated end to end.
+- `npm run test:imports` currently emits a non-blocking Node warning about `MODULE_TYPELESS_PACKAGE_JSON` because the repo is not marked as `"type": "module"`. The replay tests still pass.
+- Stylelint still tries to parse `WAREHOUSE_ETL_LIVING_SPEC.md` as CSS and reports the same non-blocking Markdown warning noted previously.
 
 ## Near-Term Plan
 - [ ] Provision the landing bucket and standard prefixes `incoming`, `processing`, `archive`, and `rejected`.
 - [ ] Extend `raw_finance.import_batches` or add `raw_finance.landing_files` to capture landing metadata such as file URI, checksum, and lifecycle status.
 - [ ] Build a standalone ingestion runner that claims landed files and reuses the shared CSV parser and raw-load path.
+- [x] Implement shared `mappingResolver` logic in `lib/import/mapping.ts` and wire it into `lib/import/csv.ts` so YAML profiles can be loaded from `source-mappings/`.
+- [x] Standardize the shared runtime account context contract to provide `sourceAccountId`, `accountName`, and optional `accountMask`.
+- [x] Support three mapping-resolution modes in the shared parser: filename match, header-signature match, and headerless column-shape match.
+- [x] Refactor `lib/import/mapping.ts` and the shared CSV import flow to prefer explicit source profiles and only fall back to alias inference when no profile exists.
+- [x] Add fixture-based replay tests for the six documented exports, plus one generic fallback CSV, so sign handling, pending detection, source transaction IDs, and canonical payload shape can be validated end to end.
+- [ ] Reuse the shared profile-backed parser inside the future standalone landing runner instead of duplicating mapping logic.
+- [x] Add explicit JS-to-BigQuery field mapping so raw import batches and transaction events are inserted as snake_case rows.
+- [x] Emit repo-side `import_batches` metadata for mapping profile resolution and runtime account context.
+- [x] Apply the matching schema change to the live `raw_finance.import_batches` table so mapping metadata persists end to end in BigQuery.
+- [x] Verify live raw BigQuery inserts from the shared persist path against the current `raw_finance` tables after the canonical payload expansion.
+- [ ] Decide whether to remove the Node test-runner module warning by adjusting module settings, or leave it as an accepted local-only warning.
+- [ ] Fix or explicitly suppress the stylelint Markdown-file warning for `WAREHOUSE_ETL_LIVING_SPEC.md`.
 - [ ] Implement Phase 1 and Phase 2 of the ingestion runner backlog so landed CSV files can move end to end from `incoming/...` to `archive/...`.
 - [ ] Add format adapters for JSON, JSONL, Parquet, Arrow, Feather, and structured delimited TXT into the same canonical raw-event contract.
 - [ ] Bring adapters online in priority order: CSV, TXT, JSON/JSONL, Parquet, then Arrow/Feather.
 - [ ] Define file-type validation rules and rejection reasons such as `UNSUPPORTED_FORMAT`, `SCHEMA_MISMATCH`, and `EMPTY_FILE`.
-- [ ] Verify raw BigQuery inserts from the app against the live `raw_finance` tables.
-- [ ] Add explicit JS-to-BigQuery field mapping for raw table writes if camelCase does not map cleanly.
 - [ ] Expand the CSV import contract to accept richer source fields such as `source_transaction_id`, `authorized_at`, `running_balance`, and `available_balance`.
 - [ ] Add file validation plus move-to-archive and move-to-rejected handling for landed files.
 - [ ] Run Dataform against the live BigQuery project and confirm materialization of staging, core, ops, mart, and analytics models.
@@ -528,12 +615,46 @@ gcloud storage cp "/path/to/file.csv" "gs://finance-tracker-cdx-etl-landing/inco
 
 # verify repo compiles
 npm run dataform:compile
+npm run test:imports
+npm run lint
+npm run typecheck
 
 # optional future step once credentials and execution path are finalized
 npx dataform run .
 ```
 
 BigQuery objects created in the live project should always be mirrored by checked-in Dataform or SQL definitions when possible.
+
+## Next Session Handoff
+Start here in the next chat if the goal is to continue warehouse ETL work:
+
+- `WAREHOUSE_ETL_LIVING_SPEC.md`
+- `WAREHOUSE_SOURCE_MAPPINGS.md`
+- `source-mappings/`
+- `lib/import/mapping.ts`
+- `lib/import/csv.ts`
+- `lib/import/normalize.ts`
+- `lib/import/persistence.ts`
+- `app/api/import/csv/route.ts`
+- `tests/import/parse-csv-import.test.mjs`
+- `tests/import/persistence.test.mjs`
+- `tests/fixtures/imports/`
+- `dataform/definitions/raw/import_batches.sqlx`
+
+Specific instructions for the next session:
+
+- Treat the shared parser as the current baseline. Do not reintroduce alias-only header inference ahead of explicit source-profile resolution.
+- Keep the runtime account context contract exact: `sourceAccountId`, `accountName`, optional `accountMask`.
+- Keep the raw-write contract explicit. Do not revert back to inserting camelCase app objects directly into snake_case BigQuery tables.
+- Keep `transaction_events.payload` serialized as JSON text when streaming into the BigQuery `JSON` column.
+- If a source profile requires runtime account identity, pass that context into the shared parser rather than encoding it into generic file names.
+- If a new feed or profile is added, update all three places together:
+  - `source-mappings/<profile>.yaml`
+  - `WAREHOUSE_SOURCE_MAPPINGS.md`
+  - `tests/import/parse-csv-import.test.mjs` with at least one representative fixture under `tests/fixtures/imports/`
+- If the standalone landing runner is built next, it should call the shared parser and reuse the existing resolver and normalization code instead of forking a second mapping implementation.
+- If import-batch metadata changes, update this spec and the checked-in Dataform definition for `raw_finance.import_batches` or add a new `raw_finance.landing_files` definition in the repo at the same time.
+- If verification-only raw rows need cleanup later, do it intentionally and record the affected `import_batch_id` values in this spec or the session notes.
 
 ## How To Update This Document
 Whenever we touch warehouse or ETL work in future sessions:
@@ -542,6 +663,7 @@ Whenever we touch warehouse or ETL work in future sessions:
 - Update `Live BigQuery Objects`
 - Add or remove fields under `Analytics Base Table`
 - Record any new datasets, tables, views, or scripts
+- Update source-mapping notes and account identity conventions when feed mappings change
 - Update `Known Gaps And Risks`
 - Check off or add items under `Near-Term Plan`
 - Append a short note to `Session Notes`
@@ -563,6 +685,91 @@ Whenever we touch warehouse or ETL work in future sessions:
 - Expanded the landing-zone contract to include `.csv`, `.txt`, `.json`, `.jsonl`, `.parquet`, `.arrow`, and `.feather` files.
 - Added a concrete adapter support matrix and phased ingestion-runner backlog for implementation planning.
 - Recommended a standalone ingestion runner that reuses the current shared CSV parsing and raw-load path.
+
+### Source mapping registry and account identity standardization
+- Added `WAREHOUSE_SOURCE_MAPPINGS.md` as the narrative registry for feed-level source mappings.
+- Added versioned mapping profiles under `source-mappings/` for six current feeds:
+  - Capital One 360 Checking (`capital_one_360_checking_5980`)
+  - Apple Card (`apple_card`)
+  - Chase card ending in `1325` (`chase_card_1325`)
+  - American Express activity (`american_express_card`)
+  - Micro Center card export (`micro_center_card`)
+  - Discover all-available export (`discover_card`)
+- Standardized account identity across those profiles using stable `sourceAccountId` plus human-readable `accountName`.
+- Confirmed current feed-specific date, sign, and pending semantics:
+  - Apple Card: blank `Clearing Date` means pending
+  - Chase: blank `Post Date` means pending
+  - Discover: blank `Post Date` means pending
+  - Capital One 360 Checking and Micro Center: confirmed-only exports
+  - Micro Center: one headerless date column is both transaction and post date
+  - American Express: `Date` header confirmed and `Reference` should be preferred for transaction identity
+- Identified the next development steps as building `mappingResolver`, formalizing runtime account context injection, and adding fixture-based replay tests for the six documented exports.
+
+### Shared source-profile resolver and replay coverage
+- Implemented shared YAML profile loading and resolution in `lib/import/mapping.ts` using `source-mappings/` plus `js-yaml`.
+- Wired the shared CSV import path in `lib/import/csv.ts` to parse files as a matrix first, support headered and headerless feeds, prefer explicit source profiles, and fall back to generic header inference only when no source profile matches.
+- Implemented the shared runtime account context contract in `app/api/import/csv/route.ts` and `lib/import/normalize.ts` using `sourceAccountId`, `accountName`, and optional `accountMask`.
+- Expanded normalization so profile-driven imports can parse source-specific dates, apply sign transforms, derive deterministic `sourceTransactionId` values, detect pending rows, and preserve additional canonical payload fields such as `currencyCode`, `runningBalance`, `transactionType`, `memo`, and `referenceNumber`.
+- Added fixture-based replay coverage in `tests/import/parse-csv-import.test.mjs` with representative fixtures under `tests/fixtures/imports/` for:
+  - Capital One 360 Checking
+  - Apple Card
+  - Chase card ending in `1325`
+  - American Express activity
+  - Micro Center card export
+  - Discover all-available export
+  - Generic fallback CSV header inference
+- Added `npm run test:imports` to `package.json` and enabled `allowImportingTsExtensions` in `tsconfig.json` so the replay tests can execute against the current source files.
+- Validated the repo changes with:
+  - `npm run test:imports`
+  - `npm run lint`
+  - `npm run typecheck`
+- No BigQuery or Dataform objects were changed in this session.
+- Remaining non-blocking diagnostics after this session:
+  - `npm run test:imports` prints a Node `MODULE_TYPELESS_PACKAGE_JSON` warning, but the tests pass.
+  - Stylelint still tries to parse `WAREHOUSE_ETL_LIVING_SPEC.md` as CSS and reports the same Markdown warning as before.
+
+### Raw-write contract and import batch metadata
+- Added `lib/import/persistence.ts` to translate parser output into explicit snake_case BigQuery insert rows for `raw_finance.import_batches` and `raw_finance.transaction_events`.
+- Updated `persistCsvImport()` to use the explicit raw-row mappers.
+- Extended the checked-in `dataform/definitions/raw/import_batches.sqlx` schema to include:
+  - `mapping_profile_id`
+  - `mapping_resolution_strategy`
+  - `mapping_matched_by`
+  - `runtime_source_account_id`
+  - `runtime_account_name`
+  - `runtime_account_mask`
+- Added `tests/import/persistence.test.mjs` to verify the persisted row shape stays snake_case and that both profile-backed imports and fallback header inference emit the expected batch metadata.
+- Updated `lib/assistant/knowledge.ts` so the internal CSV import summary reflects explicit profile resolution with fallback header inference.
+- Validated the repo changes with:
+  - `npm run test:imports`
+  - `npm run typecheck`
+  - `npm run dataform:compile`
+
+### Live schema migration and persisted-import verification
+- Altered the live `finance-tracker-cdx.raw_finance.import_batches` table to add:
+  - `mapping_profile_id`
+  - `mapping_resolution_strategy`
+  - `mapping_matched_by`
+  - `runtime_source_account_id`
+  - `runtime_account_name`
+  - `runtime_account_mask`
+- Removed the temporary `ignoreUnknownValues` compatibility path from the repo after the live schema matched the checked-in definition.
+- Found and fixed a live-write bug in `lib/import/persistence.ts`: `transaction_events.payload` must be streamed into BigQuery as JSON text rather than a nested JavaScript object.
+- Re-validated the repo changes with:
+  - `npm run test:imports`
+  - `npm run typecheck`
+- Ran a fixture-backed live verification import using `tests/fixtures/imports/american_express_activity.csv` plus runtime account context and confirmed:
+  - `import_batches.mapping_profile_id = american_express.activity.csv.v1`
+  - `import_batches.mapping_matched_by = ["filename", "header-signature"]`
+  - `runtime_source_account_id = american_express_card`
+  - `runtime_account_name = American Express Card`
+  - `runtime_account_mask = 2001`
+  - one matching `transaction_events` row landed with `source_transaction_id = REF-123`
+- Verification artifacts currently left in raw tables:
+  - `batch-1775795770452` has `event_count = 0`
+  - `batch-1775795741724` has `event_count = 0`
+  - `batch-1775796486973` has `event_count = 1`
+  - `batch-1775796521110` has `event_count = 1`
 
 ### Template for future updates
 - What changed:

@@ -1,0 +1,97 @@
+id: discover.all_available.csv.v1
+source_system: discover
+feed: all_available
+format: csv
+
+file_match:
+  filename_contains:
+    - "Discover"
+    - "AllAvailable"
+  required_headers:
+    - "Trans. Date"
+    - "Post Date"
+    - "Description"
+    - "Amount"
+    - "Category"
+
+field_map:
+  sourceAccountId:
+    from_runtime_context: "sourceAccountId"
+    fallback_default: "discover_card"
+
+  accountName:
+    from_runtime_context: "accountName"
+    fallback_default: "Discover Card"
+
+  accountType:
+    default: "credit"
+
+  accountSubtype:
+    default: "credit_card"
+
+  authorizedAt:
+    source: "Trans. Date"
+    transform:
+      parse_as: "M/D/YY"
+      coerce_to: "timestamp"
+
+  postedAt:
+    source: "Post Date"
+    fallback_source: "Trans. Date"
+    transform:
+      parse_as: "M/D/YY"
+
+  descriptionRaw:
+    source: "Description"
+
+  merchantRaw:
+    source: "Description"
+
+  institutionCategory:
+    source: "Category"
+
+  signedAmount:
+    source: "Amount"
+    transform:
+      invert_source_sign: true
+
+  pending:
+    transform:
+      true_when_blank: "Post Date"
+
+defaults:
+  currencyCode: "USD"
+
+derived:
+  sourceTransactionId:
+    strategy: hash
+    fields:
+      - "sourceAccountId"
+      - "Trans. Date"
+      - "Description"
+      - "Amount"
+      - "Category"
+
+  direction:
+    strategy: from_signed_amount
+
+  transactionClass:
+    strategy: classifier
+
+  merchantNorm:
+    strategy: normalize_text
+
+  descriptionNorm:
+    strategy: normalize_text
+
+  keywordArray:
+    strategy: extract_keywords
+
+  rawPayloadJson:
+    strategy: preserve_entire_row
+
+notes:
+  - "Draft profile for a Discover all-available export."
+  - "Source amounts are inverted to match warehouse sign conventions."
+  - "Pending is confirmed when Post Date is blank."
+  - "Account identity should come from feed configuration or bucket path context."

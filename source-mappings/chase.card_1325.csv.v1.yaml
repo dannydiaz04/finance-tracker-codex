@@ -1,0 +1,98 @@
+id: chase.card_1325.csv.v1
+source_system: chase
+feed: card_1325
+format: csv
+
+file_match:
+  filename_contains:
+    - "Chase1325"
+    - "Activity"
+
+field_map:
+  sourceAccountId:
+    default: "chase_card_1325"
+
+  accountName:
+    default: "Chase Card 1325"
+
+  accountType:
+    default: "credit"
+
+  accountSubtype:
+    default: "credit_card"
+
+  accountMask:
+    default: "1325"
+
+  authorizedAt:
+    source: "Transaction Date"
+    transform:
+      parse_as: "M/D/YY"
+      coerce_to: "timestamp"
+
+  postedAt:
+    source: "Post Date"
+    fallback_source: "Transaction Date"
+    transform:
+      parse_as: "M/D/YY"
+
+  descriptionRaw:
+    source: "Description"
+
+  merchantRaw:
+    source: "Description"
+
+  institutionCategory:
+    source: "Category"
+
+  transactionType:
+    source: "Type"
+
+  memo:
+    source: "Memo"
+
+  signedAmount:
+    source: "Amount"
+    transform:
+      use_source_sign: true
+
+  pending:
+    transform:
+      true_when_blank: "Post Date"
+
+defaults:
+  currencyCode: "USD"
+
+derived:
+  sourceTransactionId:
+    strategy: hash
+    fields:
+      - "sourceAccountId"
+      - "Transaction Date"
+      - "Description"
+      - "Type"
+      - "Amount"
+      - "Memo"
+
+  direction:
+    strategy: from_signed_amount
+
+  transactionClass:
+    strategy: classifier
+
+  merchantNorm:
+    strategy: normalize_text
+
+  descriptionNorm:
+    strategy: normalize_text
+
+  keywordArray:
+    strategy: extract_keywords
+
+  rawPayloadJson:
+    strategy: preserve_entire_row
+
+notes:
+  - "Draft profile for the Chase card feed ending in 1325."
+  - "Source amounts are kept as-is because the sample rows already match warehouse sign conventions."
+  - "Pending is confirmed when Post Date is blank."

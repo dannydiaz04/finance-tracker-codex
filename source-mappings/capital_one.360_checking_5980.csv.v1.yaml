@@ -1,0 +1,86 @@
+id: capital_one.360_checking_5980.csv.v1
+source_system: capital_one
+feed: 360_checking_5980
+format: csv
+
+file_match:
+  filename_contains:
+    - "360Checking"
+    - "5980"
+
+field_map:
+  sourceAccountId:
+    source: "Account Number"
+    transform:
+      template: "capital_one_360_checking_{Account Number}"
+
+  accountMask:
+    source: "Account Number"
+    transform:
+      take_last: 4
+
+  accountName:
+    default: "Capital One 360 Checking"
+
+  postedAt:
+    source: "Transaction Date"
+    transform:
+      parse_as: "M/D/YY"
+
+  descriptionRaw:
+    source: "Transaction Description"
+
+  merchantRaw:
+    source: "Transaction Description"
+
+  signedAmount:
+    source: "Transaction Amount"
+    transform:
+      sign_from:
+        field: "Transaction Type"
+        positive_values:
+          - "Credit"
+        negative_values:
+          - "Debit"
+
+  runningBalance:
+    source: "Balance"
+
+defaults:
+  authorizedAt: null
+  currencyCode: "USD"
+  institutionCategory: null
+  pending: false
+
+derived:
+  sourceTransactionId:
+    strategy: hash
+    fields:
+      - "Account Number"
+      - "Transaction Date"
+      - "Transaction Description"
+      - "Transaction Type"
+      - "Transaction Amount"
+      - "Balance"
+
+  direction:
+    strategy: from_signed_amount
+
+  transactionClass:
+    strategy: classifier
+
+  merchantNorm:
+    strategy: normalize_text
+
+  descriptionNorm:
+    strategy: normalize_text
+
+  keywordArray:
+    strategy: extract_keywords
+
+  rawPayloadJson:
+    strategy: preserve_entire_row
+
+notes:
+  - "Draft profile for the Capital One 360 Checking feed ending in 5980."
+  - "This export is confirmed-only, so pending is hardcoded to false."

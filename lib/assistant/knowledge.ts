@@ -68,7 +68,7 @@ export const internalFunctionGuides: AssistantGuide[] = [
   {
     title: "CSV import pipeline",
     summary:
-      "CSV uploads are parsed through `/api/import/csv`, columns are inferred, rows are normalized, and preview mode can persist raw import batches and transaction events into BigQuery.",
+      "CSV uploads are parsed through `/api/import/csv`, explicit source profiles resolve first with fallback header inference, rows are normalized, and preview mode can persist raw import batches and transaction events into BigQuery.",
     examples: [
       "How does CSV ingestion work?",
       "What columns are required for import?",

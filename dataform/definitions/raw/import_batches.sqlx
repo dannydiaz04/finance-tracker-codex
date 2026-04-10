@@ -12,7 +12,13 @@ create table if not exists ${self()} (
   imported_at timestamp,
   row_count int64,
   status string,
-  file_name string
+  file_name string,
+  mapping_profile_id string,
+  mapping_resolution_strategy string,
+  mapping_matched_by array<string>,
+  runtime_source_account_id string,
+  runtime_account_name string,
+  runtime_account_mask string
 )
 partition by date(imported_at)
 options (

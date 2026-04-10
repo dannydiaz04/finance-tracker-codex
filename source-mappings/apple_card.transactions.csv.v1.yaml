@@ -1,0 +1,100 @@
+id: apple_card.transactions.csv.v1
+source_system: apple_card
+feed: transactions
+format: csv
+
+file_match:
+  filename_contains:
+    - "Apple Card Transactions"
+
+field_map:
+  sourceAccountId:
+    default: "apple_card"
+
+  accountName:
+    default: "Apple Card"
+
+  accountType:
+    default: "credit"
+
+  accountSubtype:
+    default: "credit_card"
+
+  authorizedAt:
+    source: "Transaction Date"
+    transform:
+      parse_as: "M/D/YY"
+      coerce_to: "timestamp"
+
+  postedAt:
+    source: "Clearing Date"
+    fallback_source: "Transaction Date"
+    transform:
+      parse_as: "M/D/YY"
+
+  descriptionRaw:
+    source: "Description"
+
+  merchantRaw:
+    source: "Merchant"
+
+  institutionCategory:
+    source: "Category"
+
+  transactionType:
+    source: "Type"
+
+  signedAmount:
+    source: "Amount (USD)"
+    transform:
+      absolute_value: true
+      sign_from:
+        field: "Type"
+        negative_values:
+          - "Purchase"
+        positive_values:
+          - "Payment"
+        fallback: use_source_sign
+
+  pending:
+    transform:
+      true_when_blank: "Clearing Date"
+
+defaults:
+  currencyCode: "USD"
+
+derived:
+  sourceTransactionId:
+    strategy: hash
+    fields:
+      - "sourceAccountId"
+      - "Transaction Date"
+      - "Description"
+      - "Merchant"
+      - "Type"
+      - "Amount (USD)"
+      - "Purchased By"
+
+  direction:
+    strategy: from_signed_amount
+
+  transactionClass:
+    strategy: classifier
+
+  merchantNorm:
+    strategy: normalize_text
+
+  descriptionNorm:
+    strategy: normalize_text
+
+  keywordArray:
+    strategy: extract_keywords
+
+  rawPayloadJson:
+    strategy: preserve_entire_row
+
+notes:
+  - "Draft profile for Apple Card transaction exports."
+  - "Purchase amounts are normalized to negative outflows."
+  - "Payment amounts are normalized to positive inflows."
+  - "Pending is confirmed when Clearing Date is blank."

@@ -1,10 +1,10 @@
-import { normalizeDescription, normalizeMerchant } from "@/lib/categorization/normalize";
+import { normalizeDescription, normalizeMerchant } from "./normalize.ts";
 import type {
   ClassificationSource,
   Rule,
   Transaction,
   TransactionClass,
-} from "@/lib/types/finance";
+} from "../types/finance.ts";
 
 export type ClassificationResult = {
   categoryId: string;

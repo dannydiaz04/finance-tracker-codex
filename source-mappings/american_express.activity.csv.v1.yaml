@@ -1,0 +1,109 @@
+id: american_express.activity.csv.v1
+source_system: american_express
+feed: activity
+format: csv
+
+file_match:
+  filename_contains:
+    - "activity"
+  required_headers:
+    - "Date"
+    - "Description"
+    - "Amount"
+    - "Extended Details"
+    - "Appears On Your Statement As"
+    - "Reference"
+    - "Category"
+
+field_map:
+  sourceAccountId:
+    from_runtime_context: "sourceAccountId"
+    fallback_default: "american_express_card"
+
+  accountName:
+    from_runtime_context: "accountName"
+    fallback_default: "American Express Card"
+
+  accountType:
+    default: "credit"
+
+  accountSubtype:
+    default: "credit_card"
+
+  postedAt:
+    source: "Date"
+    transform:
+      parse_as: "M/D/YY"
+
+  merchantRaw:
+    source: "Description"
+
+  descriptionRaw:
+    source: "Appears On Your Statement As"
+
+  originalDescription:
+    source: "Appears On Your Statement As"
+
+  memo:
+    source: "Extended Details"
+
+  institutionCategory:
+    source: "Category"
+
+  referenceNumber:
+    source: "Reference"
+    transform:
+      trim_wrapping_quotes: true
+
+  signedAmount:
+    source: "Amount"
+    transform:
+      invert_source_sign: true
+
+  merchantPostalCode:
+    source: "Zip Code"
+
+  merchantCountry:
+    source: "Country"
+
+defaults:
+  authorizedAt: null
+  pending: false
+  currencyCode: "USD"
+
+derived:
+  sourceTransactionId:
+    strategy: prefer_field
+    field: "Reference"
+    fallback:
+      strategy: hash
+      fields:
+        - "Date"
+        - "Description"
+        - "Appears On Your Statement As"
+        - "Amount"
+        - "Extended Details"
+
+  direction:
+    strategy: from_signed_amount
+
+  transactionClass:
+    strategy: classifier
+
+  merchantNorm:
+    strategy: normalize_text
+
+  descriptionNorm:
+    strategy: normalize_text
+
+  keywordArray:
+    strategy: extract_keywords
+
+  rawPayloadJson:
+    strategy: preserve_entire_row
+
+notes:
+  - "Draft profile for the American Express activity export."
+  - "The leading date header is Date."
+  - "Source amounts are inverted to match warehouse sign conventions."
+  - "Account identity should come from feed configuration or bucket path context."

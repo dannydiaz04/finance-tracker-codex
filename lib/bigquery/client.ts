@@ -1,6 +1,10 @@
 import "server-only";
 
-import { BigQuery, type BigQueryOptions } from "@google-cloud/bigquery";
+import {
+  BigQuery,
+  type BigQueryOptions,
+  type InsertRowsOptions,
+} from "@google-cloud/bigquery";
 
 let bigQueryClient: BigQuery | null | undefined;
 
@@ -86,6 +90,7 @@ export async function insertBigQueryRows(
   datasetId: string,
   tableId: string,
   rows: Record<string, unknown>[],
+  options?: InsertRowsOptions,
 ) {
   const client = getBigQueryClient();
 
@@ -93,6 +98,6 @@ export async function insertBigQueryRows(
     return false;
   }
 
-  await client.dataset(datasetId).table(tableId).insert(rows);
+  await client.dataset(datasetId).table(tableId).insert(rows, options);
   return true;
 }

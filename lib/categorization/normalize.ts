@@ -1,4 +1,4 @@
-import type { Transaction } from "@/lib/types/finance";
+import type { Transaction } from "../types/finance.ts";
 
 const noisePatterns = [
   /\bpos debit\b/g,
