@@ -74,6 +74,9 @@ Do not store secrets in this file. Reference environment variable names only.
   - `npm run test:imports`
   - `npm run typecheck`
   - `npm run dataform:compile`
+- A local landed-file run loaded seven fixture CSV files into live raw BigQuery tables, one row per file, with zero rejections.
+- A live Dataform run completed successfully after replacing BigQuery-conflicting `current` aliases in two SQLX files.
+- The app was verified locally against the materialized warehouse marts at `/overview` and `/transactions`.
 
 ## Repository Touchpoints
 - `WAREHOUSE_SOURCE_MAPPINGS.md`
@@ -189,7 +192,7 @@ Important operational note:
 - GCS-backed runner scanning, claiming, archiving, rejection, and result-manifest writes are implemented. BigQuery-backed landing lifecycle metadata is still pending.
 - Non-CSV adapters are part of the intended landing-zone design, but they are not implemented in the repo yet.
 - The Dataform graph now includes `analytics_finance.transaction_analytics_base` and `ops_finance.ai_enrichment_queue`, but only compilation has been validated so far.
-- A full `dataform run` against BigQuery has not yet been executed in this repo session.
+- A full `dataform run` against BigQuery has now materialized staging, core, mart, ops, analytics, and assertion objects.
 
 ## Flat-File Landing Zone Plan
 The first explicit ETL step should be a Google Cloud Storage landing zone that receives untouched source files before any parsing or transformation. This creates a durable replay point, gives us a simple place to manually drop bank exports, and cleanly separates file handling from downstream warehouse transforms.
@@ -584,7 +587,7 @@ As we expand the ETL pipeline, upstream flat files or source adapters should sta
 - Two verification-only `raw_finance.import_batches` rows for `activity.csv` currently have zero matching `transaction_events` because they were inserted before the JSON payload streaming fix. Leave them in place unless you explicitly want cleanup.
 - The assistant already calls OpenAI for chat responses, but the ETL pipeline does not yet write model-generated merchant or category suggestions back into BigQuery.
 - `Plaid` routes are scaffolded, but CSV remains the only practical ingestion path today.
-- The analytics base Dataform model compiles, but a full warehouse materialization run has not yet been validated end to end.
+- The analytics base Dataform model and downstream marts have been materialized successfully against live BigQuery.
 - `npm run test:imports` currently emits a non-blocking Node warning about `MODULE_TYPELESS_PACKAGE_JSON` because the repo is not marked as `"type": "module"`. The replay tests still pass.
 - Stylelint still tries to parse `WAREHOUSE_ETL_LIVING_SPEC.md` as CSS and reports the same non-blocking Markdown warning noted previously.
 
@@ -613,7 +616,7 @@ As we expand the ETL pipeline, upstream flat files or source adapters should sta
 - [ ] Define file-type validation rules and rejection reasons such as `UNSUPPORTED_FORMAT`, `SCHEMA_MISMATCH`, and `EMPTY_FILE`.
 - [x] Add file validation plus move-to-archive and move-to-rejected handling for landed files.
 - [ ] Expand the CSV import contract to accept richer source fields such as `source_transaction_id`, `authorized_at`, `running_balance`, and `available_balance`.
-- [ ] Run Dataform against the live BigQuery project and confirm materialization of staging, core, ops, mart, and analytics models.
+- [x] Run Dataform against the live BigQuery project and confirm materialization of staging, core, ops, mart, and analytics models.
 - [ ] Create a durable table for AI-generated standardization and categorization results.
 - [ ] Build an ETL worker that reads from `ops_finance.ai_enrichment_queue`, calls OpenAI in batches, and writes suggestions into BigQuery.
 - [ ] Merge AI enrichment outputs into the broader classification and review flow.
@@ -910,6 +913,46 @@ Whenever we touch warehouse or ETL work in future sessions:
   - persist landing file lifecycle metadata into BigQuery rather than only result manifests
   - add feed-level runtime account context configuration so sidecar manifests are not always required
   - decide whether stronger GCS claim coordination is needed if multiple runner instances may run concurrently
+
+### Local fixture import and app verification
+- Staged the seven checked-in CSV fixtures under the ignored local `landing-zone/incoming/...` contract:
+  - Capital One 360 Checking
+  - Apple Card
+  - Chase card ending in `1325`
+  - American Express activity
+  - Micro Center card
+  - Discover card
+  - Generic fallback CSV
+- Added sidecar context manifests for feeds that require runtime account identity injection.
+- Ran the local landing runner against `./landing-zone` with live BigQuery environment values.
+- Runner result:
+  - processed files: `7`
+  - archived files: `7`
+  - rejected files: `0`
+  - raw transaction events inserted: `7`
+- Verified the seven new `raw_finance.import_batches` rows each have one matching `raw_finance.transaction_events` row.
+- Created a temporary Dataform ADC credentials file for the run, removed it after materialization, and added `dataform/.df-credentials.json` to `.gitignore`.
+- Fixed two BigQuery SQL alias issues by replacing `current` aliases with `current_txn` in:
+  - `dataform/definitions/analytics/transaction_analytics_base.sqlx`
+  - `dataform/definitions/assertions/orphaned_category_ids.sqlx`
+- Ran `npx dataform run dataform` successfully against live BigQuery.
+- Confirmed live row counts:
+  - `mart_finance.overview_snapshot`: `1`
+  - `analytics_finance.transaction_analytics_base`: `7`
+- Normalized BigQuery NUMERIC and DATE wrapper values before passing query results into client components.
+- Updated transaction filtering so blank filters do not send untyped `NULL` or empty array params to BigQuery.
+- Verified local app routes:
+  - `GET /overview` returned `200`
+  - `HEAD /transactions` returned `200`
+  - `HEAD /cashflow` returned `200`
+- Validation performed:
+  - `npm run typecheck`
+  - `npm run lint`
+  - `npm run test:imports`
+  - `npm run dataform:compile`
+- Remaining follow-up after this session:
+  - add richer selected-transaction detail rows for related transfers and raw event history
+  - decide whether to create a Dataform credential setup script
 
 ### Template for future updates
 - What changed:

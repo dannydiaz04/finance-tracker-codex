@@ -1,12 +1,18 @@
 import "server-only";
 
 import { getBigQueryProjectId, runBigQueryQuery } from "@/lib/bigquery/client";
+import { coerceNumber } from "@/lib/queries/coerce";
 import { sampleAccounts, sampleCategories } from "@/lib/sample-data";
 import type { Account, Category } from "@/lib/types/finance";
 
+type RawAccount = Omit<Account, "currentBalance" | "availableBalance"> & {
+  currentBalance: unknown;
+  availableBalance: unknown;
+};
+
 export async function getAccounts() {
   const projectId = getBigQueryProjectId() ?? "project";
-  const rows = await runBigQueryQuery<Account>(
+  const rows = await runBigQueryQuery<RawAccount>(
     `
       SELECT
         account_id AS id,
@@ -23,7 +29,13 @@ export async function getAccounts() {
     `,
   );
 
-  return rows ?? sampleAccounts;
+  return rows
+    ? rows.map((row) => ({
+        ...row,
+        currentBalance: coerceNumber(row.currentBalance),
+        availableBalance: coerceNumber(row.availableBalance),
+      }))
+    : sampleAccounts;
 }
 
 export async function getCategories() {

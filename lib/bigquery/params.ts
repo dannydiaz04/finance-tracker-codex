@@ -57,23 +57,27 @@ export function normalizeTransactionFilters(
 }
 
 export function buildTransactionQueryParams(filters: TransactionFilters) {
+  const accountIds = filters.accountIds ?? [];
+  const categoryIds = filters.categoryIds ?? [];
+
   return {
-    query: filters.query ?? null,
-    accountIds: filters.accountIds ?? [],
-    categoryIds: filters.categoryIds ?? [],
-    merchant: filters.merchant ?? null,
+    query: filters.query ?? "",
+    accountIds: accountIds.length > 0 ? accountIds : [""],
+    hasAccountIds: accountIds.length > 0,
+    categoryIds: categoryIds.length > 0 ? categoryIds : [""],
+    hasCategoryIds: categoryIds.length > 0,
+    merchant: filters.merchant ?? "",
     direction:
-      filters.direction && filters.direction !== "all" ? filters.direction : null,
+      filters.direction && filters.direction !== "all" ? filters.direction : "",
     transactionClass:
       filters.transactionClass && filters.transactionClass !== "all"
         ? filters.transactionClass
-        : null,
-    pending:
-      filters.pending && filters.pending !== "all" ? filters.pending : null,
-    from: filters.from ?? null,
-    to: filters.to ?? null,
-    minAmount: filters.minAmount ?? null,
-    maxAmount: filters.maxAmount ?? null,
+        : "",
+    pending: filters.pending && filters.pending !== "all" ? filters.pending : "",
+    from: filters.from ?? "",
+    to: filters.to ?? "",
+    minAmount: filters.minAmount ?? -1,
+    maxAmount: filters.maxAmount ?? -1,
   };
 }
 

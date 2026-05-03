@@ -5,9 +5,9 @@ config {
   description: "Fail when classified rows point to a category not present in the dimension."
 }
 
-select current.*
-from ${ref("fact_transaction_current")} as current
+select current_txn.*
+from ${ref("fact_transaction_current")} as current_txn
 left join ${ref("dim_category")} as categories
-  on categories.category_id = current.derived_category_id
-where current.derived_category_id is not null
+  on categories.category_id = current_txn.derived_category_id
+where current_txn.derived_category_id is not null
   and categories.category_id is null

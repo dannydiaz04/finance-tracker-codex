@@ -69,15 +69,15 @@ base as (
     ) as merchant_key,
     staged.institution_category,
 
-    current.derived_category_id,
-    current.category_label,
-    current.subcategory_id,
-    current.classification_source,
-    current.confidence_score,
-    current.rule_id,
-    current.is_transfer,
-    current.is_duplicate,
-    coalesce(current.keyword_array, cast([] as array<string>)) as keyword_array,
+    current_txn.derived_category_id,
+    current_txn.category_label,
+    current_txn.subcategory_id,
+    current_txn.classification_source,
+    current_txn.confidence_score,
+    current_txn.rule_id,
+    current_txn.is_transfer,
+    current_txn.is_duplicate,
+    coalesce(current_txn.keyword_array, cast([] as array<string>)) as keyword_array,
 
     coalesce(
       json_value(staged.raw_payload_json, "$.currencyCode"),
@@ -117,8 +117,8 @@ base as (
 
     staged.raw_payload_json
   from ${ref("transactions_clean")} as staged
-  left join ${ref("fact_transaction_current")} as current
-    on current.transaction_id = staged.transaction_id
+  left join ${ref("fact_transaction_current")} as current_txn
+    on current_txn.transaction_id = staged.transaction_id
   left join ${ref("dim_account")} as accounts
     on accounts.account_id = staged.account_id
   left join ${ref("import_batches")} as batches

@@ -6,6 +6,7 @@ import {
   uniqueSearchSuggestions,
 } from "@/lib/bigquery/params";
 import { getBigQueryProjectId, runBigQueryQuery } from "@/lib/bigquery/client";
+import { coerceDateString, coerceNumber } from "@/lib/queries/coerce";
 import {
   sampleTransactionDetails,
   sampleTransactions,
@@ -16,6 +17,26 @@ import type {
   TransactionFilters,
   TransactionSearchSuggestion,
 } from "@/lib/types/finance";
+
+type RawClassificationHistoryItem = {
+  timestamp: unknown;
+  source: Transaction["classificationSource"];
+  confidence_score: unknown;
+  category_id: string;
+  category_label: string;
+  note: string;
+};
+
+type RawTransaction = Omit<
+  Transaction,
+  "authorizedAt" | "postedAt" | "signedAmount" | "confidenceScore" | "classificationHistory"
+> & {
+  authorizedAt: unknown;
+  postedAt: unknown;
+  signedAmount: unknown;
+  confidenceScore: unknown;
+  classificationHistory: RawClassificationHistoryItem[];
+};
 
 function matchesFilters(transaction: Transaction, filters: TransactionFilters) {
   const search = normalizeDescription(filters.query ?? "");
@@ -106,58 +127,84 @@ function matchesFilters(transaction: Transaction, filters: TransactionFilters) {
 
 const projectId = getBigQueryProjectId() ?? "project";
 
+const transactionSelectFields = `
+  transaction_id AS transactionId,
+  source_transaction_id AS sourceTransactionId,
+  canonical_group_id AS canonicalGroupId,
+  account_id AS accountId,
+  account_name AS accountName,
+  account_type AS accountType,
+  authorized_at AS authorizedAt,
+  posted_at AS postedAt,
+  pending,
+  direction,
+  transaction_class AS transactionClass,
+  signed_amount AS signedAmount,
+  merchant_raw AS merchantRaw,
+  merchant_norm AS merchantNorm,
+  description_raw AS descriptionRaw,
+  description_norm AS descriptionNorm,
+  institution_category AS institutionCategory,
+  derived_category_id AS derivedCategoryId,
+  category_label AS categoryLabel,
+  subcategory_id AS subcategoryId,
+  confidence_score AS confidenceScore,
+  classification_source AS classificationSource,
+  rule_id AS ruleId,
+  is_transfer AS isTransfer,
+  is_duplicate AS isDuplicate,
+  notes,
+  keyword_array AS keywordArray,
+  raw_payload_json AS rawPayloadJson,
+  classification_history AS classificationHistory
+`;
+
 const transactionBaseQuery = `
   SELECT
-    transaction_id AS transactionId,
-    source_transaction_id AS sourceTransactionId,
-    canonical_group_id AS canonicalGroupId,
-    account_id AS accountId,
-    account_name AS accountName,
-    account_type AS accountType,
-    authorized_at AS authorizedAt,
-    posted_at AS postedAt,
-    pending,
-    direction,
-    transaction_class AS transactionClass,
-    signed_amount AS signedAmount,
-    merchant_raw AS merchantRaw,
-    merchant_norm AS merchantNorm,
-    description_raw AS descriptionRaw,
-    description_norm AS descriptionNorm,
-    institution_category AS institutionCategory,
-    derived_category_id AS derivedCategoryId,
-    category_label AS categoryLabel,
-    subcategory_id AS subcategoryId,
-    confidence_score AS confidenceScore,
-    classification_source AS classificationSource,
-    rule_id AS ruleId,
-    is_transfer AS isTransfer,
-    is_duplicate AS isDuplicate,
-    notes,
-    keyword_array AS keywordArray,
-    raw_payload_json AS rawPayloadJson,
-    classification_history AS classificationHistory
+    ${transactionSelectFields}
   FROM \`${projectId}.core_finance.fact_transaction_current\`
-  WHERE (@query IS NULL OR SEARCH(description_norm, @query) OR SEARCH(merchant_norm, @query))
-    AND (ARRAY_LENGTH(@accountIds) = 0 OR account_id IN UNNEST(@accountIds))
-    AND (ARRAY_LENGTH(@categoryIds) = 0 OR derived_category_id IN UNNEST(@categoryIds))
-    AND (@merchant IS NULL OR merchant_norm LIKE CONCAT('%', @merchant, '%'))
-    AND (@direction IS NULL OR direction = @direction)
-    AND (@transactionClass IS NULL OR transaction_class = @transactionClass)
-    AND (@pending IS NULL OR (@pending = 'pending' AND pending) OR (@pending = 'posted' AND NOT pending))
-    AND (@from IS NULL OR posted_at >= @from)
-    AND (@to IS NULL OR posted_at <= @to)
-    AND (@minAmount IS NULL OR ABS(signed_amount) >= @minAmount)
-    AND (@maxAmount IS NULL OR ABS(signed_amount) <= @maxAmount)
+  WHERE (
+      @query = ''
+      OR description_norm LIKE CONCAT('%', @query, '%')
+      OR merchant_norm LIKE CONCAT('%', @query, '%')
+    )
+    AND (NOT @hasAccountIds OR account_id IN UNNEST(@accountIds))
+    AND (NOT @hasCategoryIds OR derived_category_id IN UNNEST(@categoryIds))
+    AND (@merchant = '' OR merchant_norm LIKE CONCAT('%', @merchant, '%'))
+    AND (@direction = '' OR direction = @direction)
+    AND (@transactionClass = '' OR transaction_class = @transactionClass)
+    AND (@pending = '' OR (@pending = 'pending' AND pending) OR (@pending = 'posted' AND NOT pending))
+    AND (@from = '' OR posted_at >= DATE(@from))
+    AND (@to = '' OR posted_at <= DATE(@to))
+    AND (@minAmount < 0 OR ABS(signed_amount) >= @minAmount)
+    AND (@maxAmount < 0 OR ABS(signed_amount) <= @maxAmount)
   ORDER BY posted_at DESC, ABS(signed_amount) DESC
 `;
 
+function mapTransaction(row: RawTransaction): Transaction {
+  return {
+    ...row,
+    authorizedAt: row.authorizedAt ? coerceDateString(row.authorizedAt) : null,
+    postedAt: coerceDateString(row.postedAt),
+    signedAmount: coerceNumber(row.signedAmount),
+    confidenceScore: coerceNumber(row.confidenceScore),
+    classificationHistory: (row.classificationHistory ?? []).map((entry) => ({
+      timestamp: coerceDateString(entry.timestamp),
+      source: entry.source,
+      confidenceScore: coerceNumber(entry.confidence_score),
+      categoryId: entry.category_id,
+      categoryLabel: entry.category_label,
+      note: entry.note,
+    })),
+  };
+}
+
 export async function getTransactions(filters: TransactionFilters) {
   const params = buildTransactionQueryParams(filters);
-  const rows = await runBigQueryQuery<Transaction>(transactionBaseQuery, params);
+  const rows = await runBigQueryQuery<RawTransaction>(transactionBaseQuery, params);
 
   if (rows) {
-    return rows;
+    return rows.map(mapTransaction);
   }
 
   return sampleTransactions.filter((transaction) =>
@@ -167,13 +214,13 @@ export async function getTransactions(filters: TransactionFilters) {
 
 export async function getRecentTransactions(limit = 8) {
   const boundedLimit = Math.min(Math.max(Math.trunc(limit), 1), 25);
-  const rows = await runBigQueryQuery<Transaction>(
+  const rows = await runBigQueryQuery<RawTransaction>(
     `${transactionBaseQuery}\nLIMIT ${boundedLimit}`,
     buildTransactionQueryParams({}),
   );
 
   if (rows) {
-    return rows;
+    return rows.map(mapTransaction);
   }
 
   return [...sampleTransactions]
@@ -188,9 +235,10 @@ export async function getRecentTransactions(limit = 8) {
 }
 
 export async function getTransactionById(transactionId: string) {
-  const rows = await runBigQueryQuery<TransactionDetail>(
+  const rows = await runBigQueryQuery<RawTransaction>(
     `
-      SELECT *
+      SELECT
+        ${transactionSelectFields}
       FROM \`${projectId}.core_finance.fact_transaction_current\`
       WHERE transaction_id = @transactionId
       LIMIT 1
@@ -199,13 +247,23 @@ export async function getTransactionById(transactionId: string) {
   );
 
   if (rows?.[0]) {
-    return rows[0];
+    return {
+      ...mapTransaction(rows[0]),
+      relatedTransfers: [],
+      rawEvents: [],
+    } satisfies TransactionDetail;
   }
 
   return sampleTransactionDetails[transactionId] ?? null;
 }
 
 export async function getTransactionSearchSuggestions(query: string) {
+  const normalized = normalizeDescription(query);
+
+  if (!normalized) {
+    return [];
+  }
+
   const rows = await runBigQueryQuery<TransactionSearchSuggestion>(
     `
       SELECT label, type
@@ -218,12 +276,6 @@ export async function getTransactionSearchSuggestions(query: string) {
 
   if (rows) {
     return rows;
-  }
-
-  const normalized = normalizeDescription(query);
-
-  if (!normalized) {
-    return [];
   }
 
   const suggestions = sampleTransactions.flatMap<TransactionSearchSuggestion>(

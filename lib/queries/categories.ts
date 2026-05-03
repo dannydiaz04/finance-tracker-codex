@@ -1,12 +1,32 @@
 import "server-only";
 
 import { getBigQueryProjectId, runBigQueryQuery } from "@/lib/bigquery/client";
+import { coerceDateString, coerceNumber } from "@/lib/queries/coerce";
 import { sampleCategoryInsights, sampleReviewQueue } from "@/lib/sample-data";
 import type { CategoryInsight, ReviewQueueItem } from "@/lib/types/finance";
 
+type RawCategoryInsight = Omit<
+  CategoryInsight,
+  "amount" | "share" | "transactionCount" | "trend"
+> & {
+  amount: unknown;
+  share: unknown;
+  transactionCount: unknown;
+  trend: unknown;
+};
+
+type RawReviewQueueItem = Omit<
+  ReviewQueueItem,
+  "amount" | "postedAt" | "confidenceScore"
+> & {
+  amount: unknown;
+  postedAt: unknown;
+  confidenceScore: unknown;
+};
+
 export async function getCategoryInsights() {
   const projectId = getBigQueryProjectId() ?? "project";
-  const rows = await runBigQueryQuery<CategoryInsight>(
+  const rows = await runBigQueryQuery<RawCategoryInsight>(
     `
       SELECT
         category_id AS categoryId,
@@ -21,12 +41,20 @@ export async function getCategoryInsights() {
     `,
   );
 
-  return rows ?? sampleCategoryInsights;
+  return rows
+    ? rows.map((row) => ({
+        ...row,
+        amount: coerceNumber(row.amount),
+        share: coerceNumber(row.share),
+        transactionCount: coerceNumber(row.transactionCount),
+        trend: coerceNumber(row.trend),
+      }))
+    : sampleCategoryInsights;
 }
 
 export async function getReviewQueue() {
   const projectId = getBigQueryProjectId() ?? "project";
-  const rows = await runBigQueryQuery<ReviewQueueItem>(
+  const rows = await runBigQueryQuery<RawReviewQueueItem>(
     `
       SELECT
         transaction_id AS transactionId,
@@ -43,5 +71,12 @@ export async function getReviewQueue() {
     `,
   );
 
-  return rows ?? sampleReviewQueue;
+  return rows
+    ? rows.map((row) => ({
+        ...row,
+        amount: coerceNumber(row.amount),
+        postedAt: coerceDateString(row.postedAt),
+        confidenceScore: coerceNumber(row.confidenceScore),
+      }))
+    : sampleReviewQueue;
 }

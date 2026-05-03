@@ -1,12 +1,19 @@
 import "server-only";
 
 import { getBigQueryProjectId, runBigQueryQuery } from "@/lib/bigquery/client";
+import { coerceDateString, coerceNumber } from "@/lib/queries/coerce";
 import { sampleCashflow } from "@/lib/sample-data";
-import type { CashflowPoint } from "@/lib/types/finance";
+
+type RawCashflowPoint = {
+  date: unknown;
+  inflow: unknown;
+  outflow: unknown;
+  net: unknown;
+};
 
 export async function getCashflowSeries() {
   const projectId = getBigQueryProjectId() ?? "project";
-  const rows = await runBigQueryQuery<CashflowPoint>(
+  const rows = await runBigQueryQuery<RawCashflowPoint>(
     `
       SELECT
         date,
@@ -19,5 +26,12 @@ export async function getCashflowSeries() {
     `,
   );
 
-  return rows ?? sampleCashflow;
+  return rows
+    ? rows.map((row) => ({
+        date: coerceDateString(row.date),
+        inflow: coerceNumber(row.inflow),
+        outflow: coerceNumber(row.outflow),
+        net: coerceNumber(row.net),
+      }))
+    : sampleCashflow;
 }
