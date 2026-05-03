@@ -35,7 +35,8 @@ Do not store secrets in this file. Reference environment variable names only.
   - `npm run dataform:compile`
 - Flat-file landing-zone workflow is now defined in this spec as the planned first mile for ingestion.
 - Planned landing-zone file types now include delimited text, JSON, Parquet, and Arrow-family files.
-- The landing-zone design is not provisioned in Google Cloud yet.
+- Google Cloud Storage landing bucket `gs://finance-tracker-cdx-etl-landing` is now provisioned in `US` with `incoming`, `processing`, `archive`, and `rejected` prefix placeholders.
+- The bucket uses Standard storage, uniform bucket-level access, public access prevention, and the default 7-day soft-delete policy.
 - A source-mapping registry now exists in `WAREHOUSE_SOURCE_MAPPINGS.md` with versioned YAML profiles under `source-mappings/`.
 - Six first-pass source profiles are now documented for:
   - `capital_one_360_checking_5980`
@@ -60,6 +61,13 @@ Do not store secrets in this file. Reference environment variable names only.
 - The checked-in `raw_finance.import_batches` definition now includes mapping-resolution metadata columns for `mapping_profile_id`, `mapping_resolution_strategy`, `mapping_matched_by`, and runtime account context fields.
 - The live `raw_finance.import_batches` table now includes the six mapping-resolution metadata columns defined in the repo schema.
 - The raw `transaction_events.payload` BigQuery JSON insert contract is now implemented by serializing payloads to JSON text before streaming insert.
+- A first standalone landing runner now exists in the repo at `lib/import/runner.ts` with a CLI entrypoint at `scripts/run-landed-imports.ts`.
+- The current runner supports both local filesystem landing roots and GCS landing roots such as `gs://finance-tracker-cdx-etl-landing`.
+- The current runner can scan `incoming/...`, claim files into `processing/...`, and move processed files into `archive/...` or `rejected/...` for either storage backend.
+- The current runner supports `.csv` files only, persists them through the shared `parseCsvImport()` and `persistCsvImport()` path, and archives or rejects the original landed files.
+- Files that require runtime account identity injection can now supply it through a sidecar manifest named `<file>.context.json`.
+- The runner now writes a per-file result manifest named `<file>.result.json` into `archive/...` or `rejected/...` so checksum, status, mapping resolution, and error details remain attached to the original landed file.
+- The runner CLI now accepts `--gcs-bucket finance-tracker-cdx-etl-landing`; `WAREHOUSE_LANDING_URI` or `WAREHOUSE_LANDING_BUCKET` can also select GCS without a CLI flag.
 - A fixture-backed live verification import using the American Express activity export succeeded against BigQuery and confirmed both batch metadata and event payload persistence.
 - Two earlier verification attempts left metadata-only `import_batches` rows with zero matching `transaction_events` before the JSON payload fix was applied.
 - Validation completed successfully:
@@ -75,9 +83,12 @@ Do not store secrets in this file. Reference environment variable names only.
 - `lib/import/mapping.ts`
 - `lib/import/normalize.ts`
 - `lib/import/persistence.ts`
+- `lib/import/runner.ts`
 - `lib/assistant/knowledge.ts`
+- `scripts/run-landed-imports.ts`
 - `tests/import/parse-csv-import.test.mjs`
 - `tests/import/persistence.test.mjs`
+- `tests/import/runner.test.mjs`
 - `tests/fixtures/imports/`
 - `js-yaml.d.ts`
 - `package.json`
@@ -151,7 +162,7 @@ Dataset purposes:
 ## Current ETL Flow
 The current and intended near-term flow is:
 
-1. Flat files are dropped untouched into a landing bucket such as `gs://finance-tracker-cdx-etl-landing/incoming/...`.
+1. Flat files are dropped untouched into a landing root such as local `landing-zone/incoming/...` today and future `gs://finance-tracker-cdx-etl-landing/incoming/...` in production.
 2. A standalone ingestion runner claims one landed file at a time by moving it into `processing/...`, validates the file, and records landing metadata.
 3. The runner routes each claimed file to the correct format adapter based on extension and structure.
 4. The current implemented adapter is the shared CSV-style parser surfaced at `app/api/import/csv/route.ts`; future adapters should handle JSON, Parquet, Arrow, and related formats while emitting the same canonical row shape.
@@ -169,11 +180,13 @@ The current and intended near-term flow is:
 
 Important operational note:
 
-- The landing-zone steps are now specified as the intended first-mile pattern, but they have not yet been provisioned or automated.
+- A standalone runner now exists and can move landed `.csv` files from `incoming/...` to `archive/...` or `rejected/...` while loading `raw_finance.import_batches` and `raw_finance.transaction_events`.
+- The runner now supports the same lifecycle against either a local landing root or the GCS landing bucket.
 - The shared CSV parsing and raw-write path already exists and should be reused by the landing-zone runner instead of duplicated.
-- The source mapping registry and six first-pass YAML mapping profiles are now checked into the repo, and the shared CSV parser already loads them. The future standalone landing runner should reuse that shared path instead of re-implementing mapping logic.
-- Runtime account context injection for `sourceAccountId`, `accountName`, and optional `accountMask` is now implemented in the app-side upload route and shared CSV parser. The future standalone runner should pass the same keys unchanged.
+- The source mapping registry and six first-pass YAML mapping profiles are now checked into the repo, and the shared CSV parser already loads them. The standalone landing runner reuses that shared path instead of re-implementing mapping logic.
+- Runtime account context injection for `sourceAccountId`, `accountName`, and optional `accountMask` is now implemented in the app-side upload route, shared CSV parser, and standalone runner.
 - Fixture-based replay coverage now exists for the six documented source profiles plus one generic fallback CSV.
+- GCS-backed runner scanning, claiming, archiving, rejection, and result-manifest writes are implemented. BigQuery-backed landing lifecycle metadata is still pending.
 - Non-CSV adapters are part of the intended landing-zone design, but they are not implemented in the repo yet.
 - The Dataform graph now includes `analytics_finance.transaction_analytics_base` and `ops_finance.ai_enrichment_queue`, but only compilation has been validated so far.
 - A full `dataform run` against BigQuery has not yet been executed in this repo session.
@@ -266,12 +279,20 @@ Why this is the simplest first version:
 - File claiming and archiving are easier outside the Next.js request lifecycle
 - Replays become deterministic because the original file remains stored and addressable by URI plus checksum
 
+Current repo implementation note:
+
+- The first checked-in runner is a standalone Node job that can use either a local landing root or a GCS landing root with the same `incoming`, `processing`, `archive`, and `rejected` prefixes described in this spec.
+- The current local CLI entrypoint is `npm run etl:runner -- --landing-root ./landing-zone --max-files 1`.
+- The current GCS CLI entrypoint is `npm run etl:runner -- --gcs-bucket finance-tracker-cdx-etl-landing --max-files 1`.
+- The current runner only accepts `.csv` files and rejects all other formats as `UNSUPPORTED_FORMAT`.
+- Account identity injection is supplied through an adjacent `<file>.context.json` manifest when needed.
+
 ### Adapter Support Matrix
 The landing zone may accept multiple file types, but the ingestion runner should bring them online in a deliberate order so the canonical raw-event contract stays stable.
 
 | File type | Land in bucket | Adapter approach | Canonicalization notes | Priority | Status |
 | --- | --- | --- | --- | --- | --- |
-| `.csv` | yes | Reuse `lib/import/csv.ts` and existing mapping plus normalization flow | Header-based mapping into the canonical transaction-row contract | P0 | implemented in repo for direct upload; not yet wired to landing bucket |
+| `.csv` | yes | Reuse `lib/import/csv.ts` and existing mapping plus normalization flow | Header-based mapping into the canonical transaction-row contract | P0 | implemented in repo for direct upload, local landing runner, and GCS landing runner |
 | `.txt` | yes | Treat as delimited text and route through the CSV-style parser with delimiter detection or source config | Same contract as CSV once delimiter and headers are resolved | P1 | planned |
 | `.json` | yes | JSON adapter that supports arrays plus configurable transaction array paths | Flatten records into the same canonical row shape before raw writes | P1 | planned |
 | `.jsonl` / `.ndjson` | yes | Line-by-line JSON adapter | Each line becomes one canonical transaction row | P1 | planned |
@@ -311,13 +332,19 @@ Current first-pass registry:
 
 Implication for runner development:
 
-- The runner now needs a `mappingResolver` that selects profiles by filename, header signature, or headerless column shape
+- The runner uses the shared `mappingResolver` that selects profiles by filename, header signature, or headerless column shape
 - The runner should pass the same runtime account context keys into every profile
 - Headerless feeds such as Micro Center should bypass normal header inference entirely
 - Generic filenames such as `activity` require stronger header-signature matching than filename matching alone
 
 ### Ingestion Runner Backlog
 This is the recommended order for implementing the landing-zone runner.
+
+Current repo status:
+
+- A standalone runner exists for `.csv` files and reuses the shared parser plus raw BigQuery write path.
+- The runner supports local filesystem and GCS landing roots with the same lifecycle prefix contract.
+- Remaining backlog items cover BigQuery-backed landing metadata, richer rejection tracking, feed configuration, and non-CSV adapters.
 
 #### Phase 1: Landing Foundation
 - Create the landing bucket and the `incoming`, `processing`, `archive`, and `rejected` prefixes
@@ -547,12 +574,12 @@ As we expand the ETL pipeline, upstream flat files or source adapters should sta
 - `raw_payload_json`
 
 ## Known Gaps And Risks
-- The landing bucket, prefix lifecycle, and ingestion runner are defined in the spec but are not yet provisioned or implemented.
-- No checksum-based file claim, archive, or rejection workflow exists yet.
+- The runner can now use the GCS landing bucket directly, but file lifecycle metadata is not yet persisted into BigQuery landing metadata tables.
+- GCS file claiming is implemented as copy-then-delete object movement because Cloud Storage does not have an atomic rename primitive.
 - JSON, JSONL, Parquet, Arrow, and Feather adapters are planned but not yet implemented.
 - Delimited TXT support needs explicit delimiter detection or source-specific configuration.
-- The shared CSV parser now resolves source profiles, but the standalone landing runner that should call it does not exist yet.
-- Several profiles depend on runtime account identity injection because the exported files do not identify the underlying card account directly. The app route now accepts that context, but GCS or feed-config based injection is not implemented yet.
+- The shared CSV parser now resolves source profiles, and the standalone runner calls it directly for local and GCS landed files. The remaining gap is durable feed configuration.
+- Several profiles depend on runtime account identity injection because the exported files do not identify the underlying card account directly. The current runner supports adjacent `<file>.context.json` manifests, but feed-config based injection is not implemented yet.
 - The current app route accepts uploaded content directly; it does not yet poll or claim files from Cloud Storage.
 - Two verification-only `raw_finance.import_batches` rows for `activity.csv` currently have zero matching `transaction_events` because they were inserted before the JSON payload streaming fix. Leave them in place unless you explicitly want cleanup.
 - The assistant already calls OpenAI for chat responses, but the ETL pipeline does not yet write model-generated merchant or category suggestions back into BigQuery.
@@ -562,27 +589,30 @@ As we expand the ETL pipeline, upstream flat files or source adapters should sta
 - Stylelint still tries to parse `WAREHOUSE_ETL_LIVING_SPEC.md` as CSS and reports the same non-blocking Markdown warning noted previously.
 
 ## Near-Term Plan
-- [ ] Provision the landing bucket and standard prefixes `incoming`, `processing`, `archive`, and `rejected`.
+- [x] Provision the landing bucket and standard prefixes `incoming`, `processing`, `archive`, and `rejected`.
 - [ ] Extend `raw_finance.import_batches` or add `raw_finance.landing_files` to capture landing metadata such as file URI, checksum, and lifecycle status.
-- [ ] Build a standalone ingestion runner that claims landed files and reuses the shared CSV parser and raw-load path.
+- [x] Build a standalone local-filesystem ingestion runner that claims landed `.csv` files and reuses the shared CSV parser and raw-load path.
 - [x] Implement shared `mappingResolver` logic in `lib/import/mapping.ts` and wire it into `lib/import/csv.ts` so YAML profiles can be loaded from `source-mappings/`.
 - [x] Standardize the shared runtime account context contract to provide `sourceAccountId`, `accountName`, and optional `accountMask`.
 - [x] Support three mapping-resolution modes in the shared parser: filename match, header-signature match, and headerless column-shape match.
 - [x] Refactor `lib/import/mapping.ts` and the shared CSV import flow to prefer explicit source profiles and only fall back to alias inference when no profile exists.
 - [x] Add fixture-based replay tests for the six documented exports, plus one generic fallback CSV, so sign handling, pending detection, source transaction IDs, and canonical payload shape can be validated end to end.
-- [ ] Reuse the shared profile-backed parser inside the future standalone landing runner instead of duplicating mapping logic.
+- [x] Reuse the shared profile-backed parser inside the standalone landing runner instead of duplicating mapping logic.
+- [x] Support runtime account context sidecar manifests named `<file>.context.json` for landed files that need injected account identity.
 - [x] Add explicit JS-to-BigQuery field mapping so raw import batches and transaction events are inserted as snake_case rows.
 - [x] Emit repo-side `import_batches` metadata for mapping profile resolution and runtime account context.
 - [x] Apply the matching schema change to the live `raw_finance.import_batches` table so mapping metadata persists end to end in BigQuery.
 - [x] Verify live raw BigQuery inserts from the shared persist path against the current `raw_finance` tables after the canonical payload expansion.
 - [ ] Decide whether to remove the Node test-runner module warning by adjusting module settings, or leave it as an accepted local-only warning.
 - [ ] Fix or explicitly suppress the stylelint Markdown-file warning for `WAREHOUSE_ETL_LIVING_SPEC.md`.
-- [ ] Implement Phase 1 and Phase 2 of the ingestion runner backlog so landed CSV files can move end to end from `incoming/...` to `archive/...`.
+- [ ] Finish the remaining Phase 1 landing-foundation work for BigQuery-backed landing metadata.
+- [x] Upgrade the runner so it can scan, claim, archive, reject, and write result manifests in the GCS landing bucket.
+- [x] Implement the Phase 2 local runner skeleton so landed CSV files can move end to end from `incoming/...` to `archive/...` or `rejected/...`.
 - [ ] Add format adapters for JSON, JSONL, Parquet, Arrow, Feather, and structured delimited TXT into the same canonical raw-event contract.
 - [ ] Bring adapters online in priority order: CSV, TXT, JSON/JSONL, Parquet, then Arrow/Feather.
 - [ ] Define file-type validation rules and rejection reasons such as `UNSUPPORTED_FORMAT`, `SCHEMA_MISMATCH`, and `EMPTY_FILE`.
+- [x] Add file validation plus move-to-archive and move-to-rejected handling for landed files.
 - [ ] Expand the CSV import contract to accept richer source fields such as `source_transaction_id`, `authorized_at`, `running_balance`, and `available_balance`.
-- [ ] Add file validation plus move-to-archive and move-to-rejected handling for landed files.
 - [ ] Run Dataform against the live BigQuery project and confirm materialization of staging, core, ops, mart, and analytics models.
 - [ ] Create a durable table for AI-generated standardization and categorization results.
 - [ ] Build an ETL worker that reads from `ops_finance.ai_enrichment_queue`, calls OpenAI in batches, and writes suggestions into BigQuery.
@@ -619,8 +649,36 @@ npm run test:imports
 npm run lint
 npm run typecheck
 
+# run the current local landing runner
+npm run etl:runner -- --landing-root ./landing-zone --max-files 5
+
+# run the GCS-backed landing runner
+npm run etl:runner -- --gcs-bucket finance-tracker-cdx-etl-landing --max-files 5
+
 # optional future step once credentials and execution path are finalized
 npx dataform run .
+```
+
+Current landed-file convention for the local or GCS runner:
+
+```text
+landing-zone/
+  incoming/<source_system>/<YYYY>/<MM>/<DD>/<file>.csv
+  incoming/<source_system>/<YYYY>/<MM>/<DD>/<file>.csv.context.json
+
+gs://finance-tracker-cdx-etl-landing/
+  incoming/<source_system>/<YYYY>/<MM>/<DD>/<file>.csv
+  incoming/<source_system>/<YYYY>/<MM>/<DD>/<file>.csv.context.json
+```
+
+Current context manifest shape:
+
+```json
+{
+  "sourceAccountId": "discover_card",
+  "accountName": "Discover Card",
+  "accountMask": "7788"
+}
 ```
 
 BigQuery objects created in the live project should always be mirrored by checked-in Dataform or SQL definitions when possible.
@@ -635,9 +693,12 @@ Start here in the next chat if the goal is to continue warehouse ETL work:
 - `lib/import/csv.ts`
 - `lib/import/normalize.ts`
 - `lib/import/persistence.ts`
+- `lib/import/runner.ts`
+- `scripts/run-landed-imports.ts`
 - `app/api/import/csv/route.ts`
 - `tests/import/parse-csv-import.test.mjs`
 - `tests/import/persistence.test.mjs`
+- `tests/import/runner.test.mjs`
 - `tests/fixtures/imports/`
 - `dataform/definitions/raw/import_batches.sqlx`
 
@@ -648,11 +709,13 @@ Specific instructions for the next session:
 - Keep the raw-write contract explicit. Do not revert back to inserting camelCase app objects directly into snake_case BigQuery tables.
 - Keep `transaction_events.payload` serialized as JSON text when streaming into the BigQuery `JSON` column.
 - If a source profile requires runtime account identity, pass that context into the shared parser rather than encoding it into generic file names.
+- Keep the local runner and the app-side upload path aligned on runtime account context keys and mapping-resolution behavior.
+- Keep the landed sidecar contract stable as `<file>.context.json` unless there is a deliberate migration plan.
 - If a new feed or profile is added, update all three places together:
   - `source-mappings/<profile>.yaml`
   - `WAREHOUSE_SOURCE_MAPPINGS.md`
   - `tests/import/parse-csv-import.test.mjs` with at least one representative fixture under `tests/fixtures/imports/`
-- If the standalone landing runner is built next, it should call the shared parser and reuse the existing resolver and normalization code instead of forking a second mapping implementation.
+- Keep the current `incoming`, `processing`, `archive`, and `rejected` contract equivalent across local and GCS runner flows.
 - If import-batch metadata changes, update this spec and the checked-in Dataform definition for `raw_finance.import_batches` or add a new `raw_finance.landing_files` definition in the repo at the same time.
 - If verification-only raw rows need cleanup later, do it intentionally and record the affected `import_batch_id` values in this spec or the session notes.
 
@@ -770,6 +833,83 @@ Whenever we touch warehouse or ETL work in future sessions:
   - `batch-1775795741724` has `event_count = 0`
   - `batch-1775796486973` has `event_count = 1`
   - `batch-1775796521110` has `event_count = 1`
+
+### Standalone landed-file runner
+- Added `lib/import/runner.ts` to implement a first standalone landed-file workflow around the shared CSV parser and raw BigQuery persistence path.
+- Added `scripts/run-landed-imports.ts` plus `npm run etl:runner` as the operator entrypoint for processing landed files.
+- The current runner mirrors the landing lifecycle under a local root such as `landing-zone/`:
+  - `incoming/...`
+  - `processing/...`
+  - `archive/...`
+  - `rejected/...`
+- The current runner behavior is:
+  - claims one landed file at a time by moving it into `processing/...`
+  - supports `.csv` only
+  - rejects unsupported formats as `UNSUPPORTED_FORMAT`
+  - reads optional runtime account context from adjacent `<file>.context.json`
+  - loads successful files into `raw_finance.import_batches` and `raw_finance.transaction_events`
+  - writes a `<file>.result.json` manifest into `archive/...` or `rejected/...`
+- Added `tests/import/runner.test.mjs` to verify:
+  - a profile-backed landed CSV is archived after successful persistence through the shared path
+  - unsupported files are rejected with a persisted result manifest
+- Validated the repo changes with:
+  - `npm run test:imports`
+  - `npm run typecheck`
+- Remaining follow-up after this session:
+  - persist landing metadata into BigQuery rather than only result manifests
+  - add non-CSV adapters and richer rejection diagnostics
+
+### GCS landing bucket provisioning
+- Created the Google Cloud Storage bucket `gs://finance-tracker-cdx-etl-landing` in project `finance-tracker-cdx`.
+- Bucket settings confirmed after creation:
+  - location: `US`
+  - storage class: `STANDARD`
+  - uniform bucket-level access: enabled
+  - public access prevention: enforced
+  - soft-delete retention: 7 days
+- Added placeholder objects for the expected lifecycle prefixes:
+  - `incoming/.keep`
+  - `processing/.keep`
+  - `archive/.keep`
+  - `rejected/.keep`
+- Validation performed:
+  - `gcloud storage buckets describe gs://finance-tracker-cdx-etl-landing --project=finance-tracker-cdx --format=json`
+  - `gcloud storage ls --recursive gs://finance-tracker-cdx-etl-landing --project=finance-tracker-cdx`
+- Remaining follow-up after this session:
+  - persist landing file lifecycle metadata into BigQuery
+  - decide whether additional bucket lifecycle rules are needed beyond the default soft-delete policy
+
+### GCS-backed landed-file runner
+- Added `@google-cloud/storage` as the Node SDK dependency for bucket operations.
+- Updated `lib/import/runner.ts` so `landingRoot` can be either a local path or a `gs://...` URI.
+- Added GCS-backed support for:
+  - listing non-auxiliary files under `incoming/...`
+  - claiming files by moving them to `processing/...`
+  - reading adjacent `<file>.context.json` manifests from the bucket
+  - computing checksum and file size from bucket object bytes
+  - archiving loaded files under `archive/...`
+  - rejecting failed or unsupported files under `rejected/...`
+  - writing `<file>.result.json` manifests back to the bucket
+- Updated `scripts/run-landed-imports.ts` with:
+  - `--gcs-bucket <name>`
+  - `--gcs-prefix <prefix>`
+  - continued support for `--landing-root gs://...`
+- Environment-based GCS root selection now supports:
+  - `WAREHOUSE_LANDING_URI=gs://finance-tracker-cdx-etl-landing`
+  - `WAREHOUSE_LANDING_BUCKET=finance-tracker-cdx-etl-landing`
+- Validation performed:
+  - `npm run test:imports`
+  - `npm run typecheck`
+  - `npm run etl:runner -- --gcs-bucket finance-tracker-cdx-etl-landing --max-files 1 --json`
+- Live GCS runner verification result:
+  - `storageBackend = gcs`
+  - `processedCount = 0`
+  - `archivedCount = 0`
+  - `rejectedCount = 0`
+- Remaining follow-up after this session:
+  - persist landing file lifecycle metadata into BigQuery rather than only result manifests
+  - add feed-level runtime account context configuration so sidecar manifests are not always required
+  - decide whether stronger GCS claim coordination is needed if multiple runner instances may run concurrently
 
 ### Template for future updates
 - What changed:

@@ -7,12 +7,14 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "etl:runner": "node --conditions=react-server --experimental-strip-types scripts/run-landed-imports.ts",
     "test:imports": "node --conditions=react-server --experimental-strip-types --test tests/import/*.test.mjs",
     "typecheck": "tsc --noEmit",
     "dataform:compile": "dataform compile dataform"
   },
   "dependencies": {
     "@google-cloud/bigquery": "^8.1.1",
+    "@google-cloud/storage": "^7.19.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
