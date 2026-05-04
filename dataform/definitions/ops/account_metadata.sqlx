@@ -1,0 +1,23 @@
+config {
+  type: "operations",
+  schema: "ops_finance",
+  name: "account_metadata",
+  description: "Operator-maintained account metadata used to enrich CSV-imported accounts.",
+  hasOutput: true
+}
+
+create table if not exists ${self()} (
+  account_id string not null,
+  account_name string,
+  institution string,
+  account_type string,
+  account_subtype string,
+  currency string,
+  mask string,
+  is_active bool,
+  notes string,
+  updated_at timestamp
+)
+options (
+  description = "Operator-maintained account metadata used to enrich CSV-imported accounts."
+)

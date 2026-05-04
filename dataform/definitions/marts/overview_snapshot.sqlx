@@ -13,6 +13,9 @@ with base as (
 cashflow as (
   select * from ${ref("daily_cashflow")}
 ),
+dim_accounts as (
+  select * from ${ref("dim_account")}
+),
 merchant_spend as (
   select * from ${ref("merchant_spend_90d")}
 ),
@@ -43,18 +46,28 @@ select
     (select cast(posted_at as string) from base where direction = "outflow" order by abs(signed_amount) desc limit 1) as posted_at
   ) as largest_expense,
   array(
+    with account_totals as (
+      select
+        account_id,
+        sum(signed_amount) as current_balance,
+        sum(signed_amount) as available_balance
+      from base
+      group by account_id
+    )
     select as struct
-      account_id as id,
-      any_value(account_name) as name,
-      "warehouse" as institution,
-      any_value(account_type) as type,
-      any_value(account_type) as subtype,
-      "USD" as currency,
-      substr(account_id, greatest(length(account_id) - 3, 1), 4) as mask,
-      sum(signed_amount) as current_balance,
-      sum(signed_amount) as available_balance
-    from base
-    group by account_id
+      accounts.account_id as id,
+      accounts.name,
+      accounts.institution,
+      accounts.type,
+      accounts.subtype,
+      accounts.currency,
+      accounts.mask,
+      coalesce(account_totals.current_balance, accounts.current_balance, 0) as current_balance,
+      coalesce(account_totals.available_balance, accounts.available_balance, 0) as available_balance
+    from dim_accounts as accounts
+    left join account_totals
+      on account_totals.account_id = accounts.account_id
+    order by accounts.name
   ) as accounts,
   array(
     select as struct

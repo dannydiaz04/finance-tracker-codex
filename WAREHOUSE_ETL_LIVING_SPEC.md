@@ -77,6 +77,20 @@ Do not store secrets in this file. Reference environment variable names only.
 - A local landed-file run loaded seven fixture CSV files into live raw BigQuery tables, one row per file, with zero rejections.
 - A live Dataform run completed successfully after replacing BigQuery-conflicting `current` aliases in two SQLX files.
 - The app was verified locally against the materialized warehouse marts at `/overview` and `/transactions`.
+- App-readiness SQL scripts now exist under `sql/warehouse/` for auditing, deterministic category-rule seeding, account metadata seeding, and optional orphan import-batch cleanup review.
+- `ops_finance.category_rules` is seeded with first-pass merchant rules for the current fixture data, reducing current uncategorized transactions to `0`.
+- `ops_finance.account_metadata` now provides account display names, institutions, account types, subtypes, currencies, and masks for observed fixture accounts.
+- `stg_finance.accounts_clean` and `mart_finance.overview_snapshot` now consume account metadata so the app sees cleaned account labels consistently.
+- Current app-readiness audit result after seeding and Dataform materialization:
+  - `core_finance.fact_transaction_current`: `7`
+  - `analytics_finance.transaction_analytics_base`: `7`
+  - `mart_finance.overview_snapshot`: `1`
+  - `uncategorized_current_transactions`: `0`
+  - `generic_card_masks`: `0`
+  - `category_mix_rows`: `3`
+  - `review_queue_count`: `3`
+  - `import_batches_without_matching_events`: `2`
+- The current fixture dataset is app-usable for category/account display, but it is not yet production-like because it has only outflows, no income or starting balances, three source-pending rows, and two older metadata-only verification batches.
 
 ## Repository Touchpoints
 - `WAREHOUSE_SOURCE_MAPPINGS.md`
@@ -110,7 +124,13 @@ Do not store secrets in this file. Reference environment variable names only.
 - `dataform/definitions/core/fact_classification.sqlx`
 - `dataform/definitions/ops/review_queue.sqlx`
 - `dataform/definitions/ops/ai_enrichment_queue.sqlx`
+- `dataform/definitions/ops/account_metadata.sqlx`
 - `dataform/definitions/analytics/transaction_analytics_base.sqlx`
+- `dataform/definitions/marts/overview_snapshot.sqlx`
+- `sql/warehouse/01_app_readiness_audit.sql`
+- `sql/warehouse/02_seed_initial_category_rules.sql`
+- `sql/warehouse/03_seed_account_metadata.sql`
+- `sql/warehouse/04_cleanup_orphan_import_batches.sql`
 
 ## Environment And Auth
 Expected environment variables:
@@ -412,6 +432,9 @@ Objects known to be live in Google Cloud:
 | --- | --- | --- | --- |
 | `raw_finance.import_batches` | table | live | Raw import batch metadata |
 | `raw_finance.transaction_events` | table | live | Raw append-only transaction events with JSON payload |
+| `ops_finance.category_rules` | table | live | Deterministic merchant and description rules |
+| `ops_finance.manual_overrides` | table | live | Manual transaction-level override table |
+| `ops_finance.account_metadata` | table | live | Account display metadata used by staging and marts |
 | `analytics_finance.transaction_analytics_base` | table | live | Wide analytics table, 97 fields, partitioned by `posted_at` |
 
 Objects checked into the repo and compiled successfully:
@@ -419,12 +442,22 @@ Objects checked into the repo and compiled successfully:
 | Object | Type | Status | Notes |
 | --- | --- | --- | --- |
 | `stg_finance.transactions_clean` | view | compiled | Extracts clean latest-state transactions |
-| `stg_finance.accounts_clean` | view | compiled | Distinct account dimension staging |
+| `stg_finance.accounts_clean` | view | compiled | Distinct account dimension staging enriched with account metadata |
 | `core_finance.fact_classification` | table | compiled | Deterministic classification ladder |
 | `core_finance.fact_transaction_current` | table | compiled | Canonical current-state transactions |
 | `core_finance.fact_transaction_history` | table | compiled | Event history across imports |
+| `core_finance.dim_account` | table | compiled and live | Clean account dimension for app and marts |
+| `core_finance.dim_category` | table | compiled and live | Seeded category dimension |
+| `core_finance.dim_merchant` | table | compiled and live | Merchant dimension from current transactions |
+| `mart_finance.overview_snapshot` | table | compiled and live | Dashboard snapshot using cleaned account metadata |
+| `mart_finance.category_spend_daily` | table | compiled and live | Category spend rollup |
+| `mart_finance.daily_cashflow` | table | compiled and live | Daily inflow, outflow, and net rollup |
+| `mart_finance.monthly_cashflow` | table | compiled and live | Monthly inflow, outflow, and net rollup |
+| `mart_finance.merchant_spend_90d` | table | compiled and live | Merchant spend rollup |
+| `mart_finance.search_suggestions` | view | compiled and live | Search suggestions for app lookup |
 | `ops_finance.review_queue` | view | compiled | Manual-review worklist |
 | `ops_finance.ai_enrichment_queue` | view | compiled | Future model-enrichment worklist |
+| `ops_finance.account_metadata` | operation | compiled and live | Creates account metadata table if missing |
 | `analytics_finance.transaction_analytics_base` | table | compiled and live | Repo model matches the intended analytics target |
 
 ## Analytics Base Table
@@ -953,6 +986,44 @@ Whenever we touch warehouse or ETL work in future sessions:
 - Remaining follow-up after this session:
   - add richer selected-transaction detail rows for related transfers and raw event history
   - decide whether to create a Dataform credential setup script
+
+### App-readiness audit and first cleanup scripts
+- Added `sql/warehouse/01_app_readiness_audit.sql` to check core row counts, orphan raw batches, uncategorized current rows, review-queue size, generic account masks, and category mix breadth.
+- Added `sql/warehouse/02_seed_initial_category_rules.sql` and ran it against live BigQuery. It upserts first-pass deterministic rules for `Lunch Shop`, `Neighborhood Market`, `Online Bookstore`, and `Laptop Stand`.
+- Added `sql/warehouse/03_seed_account_metadata.sql` and ran it against live BigQuery. It creates and seeds `ops_finance.account_metadata` for the seven fixture accounts.
+- Added `sql/warehouse/04_cleanup_orphan_import_batches.sql` as a review-first cleanup script for metadata-only verification batches. The destructive delete remains commented out and was not executed.
+- Added `dataform/definitions/ops/account_metadata.sqlx` so Dataform owns creation of the account metadata table.
+- Updated `dataform/definitions/staging/accounts_clean.sqlx` to enrich observed accounts from `ops_finance.account_metadata` and to use `unknown` rather than a misleading account-id suffix when no numeric mask exists.
+- Updated `dataform/definitions/marts/overview_snapshot.sqlx` so nested dashboard account data comes from `core_finance.dim_account` instead of rebuilding generic account labels from transaction rows.
+- Ran `npx dataform run dataform` successfully against live BigQuery after the script/model changes. All five Dataform assertions passed.
+- Final audit results:
+  - `raw_finance.import_batches`: `11`
+  - `raw_finance.transaction_events`: `9`
+  - `stg_finance.transactions_clean`: `7`
+  - `core_finance.fact_transaction_current`: `7`
+  - `analytics_finance.transaction_analytics_base`: `7`
+  - `mart_finance.overview_snapshot`: `1`
+  - `uncategorized_current_transactions`: `0`
+  - `generic_card_masks`: `0`
+  - `category_mix_rows`: `3`
+  - `review_queue_count`: `3`
+  - `import_batches_without_matching_events`: `2`
+- Category spread after rules:
+  - `Software`: `2` transactions, `$148.74`
+  - `Dining`: `4` transactions, `$45.63`
+  - `Groceries`: `1` transaction, `$25.50`
+- The remaining review queue rows are all high-confidence classified transactions with `pending = true` from source data, not uncategorized rows.
+- Verified app routes against the running local Next.js server at `http://localhost:3000`:
+  - `HEAD /overview` returned `200`
+  - `HEAD /transactions` returned `200`
+  - `HEAD /cashflow` returned `200`
+  - `HEAD /categories` returned `200`
+  - `HEAD /merchants` returned `200`
+- Remaining risks or blockers:
+  - The fixture data has no income or starting balance rows, so `month_to_date_income = 0`, `available_cash = 0`, and `savings_rate = NULL`.
+  - Two old verification `import_batches` rows still have no matching `transaction_events`; keep them as audit artifacts or run the reviewed cleanup script.
+  - `Online Bookstore` and `Laptop Stand` are temporarily categorized as `Software` until a shopping/books/equipment category decision is made.
+  - Apple Card has no source-provided numeric mask, so it displays as `unknown`.
 
 ### Template for future updates
 - What changed:

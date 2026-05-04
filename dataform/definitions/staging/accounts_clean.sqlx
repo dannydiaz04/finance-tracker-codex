@@ -6,23 +6,45 @@ config {
   tags: ["staging"]
 }
 
+with observed as (
+  select
+    account_id,
+    any_value(account_name) as name,
+    any_value(source_name) as source_name
+  from ${ref("transactions_clean")}
+  group by account_id
+)
 select
-  account_id,
-  any_value(account_name) as name,
-  any_value(source_name) as source_name,
-  case
-    when lower(any_value(account_name)) like "%savings%" then "savings"
-    when lower(any_value(account_name)) like "%credit%" then "credit"
-    else "checking"
-  end as type,
-  case
-    when lower(any_value(account_name)) like "%savings%" then "high_yield_savings"
-    when lower(any_value(account_name)) like "%credit%" then "credit_card"
-    else "checking"
-  end as subtype,
-  "USD" as currency,
-  substr(account_id, greatest(length(account_id) - 3, 1), 4) as mask,
+  observed.account_id,
+  coalesce(metadata.account_name, observed.name) as name,
+  coalesce(metadata.institution, observed.source_name) as source_name,
+  coalesce(
+    metadata.account_type,
+    case
+      when lower(observed.name) like "%savings%" then "savings"
+      when lower(observed.name) like "%credit%" then "credit"
+      when lower(observed.name) like "%card%" then "credit"
+      else "checking"
+    end
+  ) as type,
+  coalesce(
+    metadata.account_subtype,
+    case
+      when lower(observed.name) like "%savings%" then "high_yield_savings"
+      when lower(observed.name) like "%credit%" then "credit_card"
+      when lower(observed.name) like "%card%" then "credit_card"
+      else "checking"
+    end
+  ) as subtype,
+  coalesce(metadata.currency, "USD") as currency,
+  coalesce(
+    nullif(metadata.mask, ""),
+    regexp_extract(observed.account_id, r"([0-9]{4})$"),
+    "unknown"
+  ) as mask,
   cast(null as numeric) as current_balance,
   cast(null as numeric) as available_balance
-from ${ref("transactions_clean")}
-group by account_id
+from observed
+left join ${ref("account_metadata")} as metadata
+  on metadata.account_id = observed.account_id
+ and coalesce(metadata.is_active, true)
