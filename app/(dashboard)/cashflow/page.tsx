@@ -2,12 +2,19 @@ import { ArrowDownRight, ArrowUpRight, Scale } from "lucide-react";
 
 import { CashflowChart } from "@/components/dashboard/cashflow-chart";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { TimeFilterSummary } from "@/components/dashboard/time-filter-summary";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCashflowSeries } from "@/lib/queries/cashflow";
+import { normalizeTimeFilter } from "@/lib/time-filter";
 import { formatCurrency } from "@/lib/utils";
 
-export default async function CashflowPage() {
-  const cashflow = await getCashflowSeries();
+type CashflowPageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
+
+export default async function CashflowPage({ searchParams }: CashflowPageProps) {
+  const timeFilter = normalizeTimeFilter(await searchParams);
+  const cashflow = await getCashflowSeries(timeFilter);
 
   const inflow = cashflow.reduce((sum, point) => sum + point.inflow, 0);
   const outflow = cashflow.reduce((sum, point) => sum + point.outflow, 0);
@@ -19,6 +26,11 @@ export default async function CashflowPage() {
         eyebrow="Cash flow"
         title="Watch inflow, outflow, and net movement as separate signals."
         description="This view is designed to make transfer-cleaned movement obvious across daily windows before you move into merchant or category detail."
+      />
+
+      <TimeFilterSummary
+        filter={timeFilter}
+        fields="Cash flow uses `daily_cashflow.date`, a daily bucket derived from posted transactions."
       />
 
       <div className="grid gap-4 md:grid-cols-3">

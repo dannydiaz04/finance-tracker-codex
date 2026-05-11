@@ -1,6 +1,7 @@
 import { DatabaseZap, Filter, SearchCheck } from "lucide-react";
 
 import { PageHeader } from "@/components/dashboard/page-header";
+import { TimeFilterSummary } from "@/components/dashboard/time-filter-summary";
 import { TransactionDrawer } from "@/components/transactions/transaction-drawer";
 import { TransactionFilters } from "@/components/transactions/transaction-filters";
 import { TransactionTable } from "@/components/transactions/transaction-table";
@@ -12,6 +13,7 @@ import {
   getTransactions,
   getTransactionSearchSuggestions,
 } from "@/lib/queries/transactions";
+import { normalizeTimeFilter } from "@/lib/time-filter";
 import { formatCurrency } from "@/lib/utils";
 
 type TransactionsPageProps = {
@@ -21,7 +23,9 @@ type TransactionsPageProps = {
 export default async function TransactionsPage({
   searchParams,
 }: TransactionsPageProps) {
-  const filters = normalizeTransactionFilters(await searchParams);
+  const rawSearchParams = await searchParams;
+  const filters = normalizeTransactionFilters(rawSearchParams);
+  const timeFilter = normalizeTimeFilter(rawSearchParams);
   const [accounts, categories, transactions, suggestions, selectedTransaction] =
     await Promise.all([
       getAccounts(),
@@ -45,6 +49,11 @@ export default async function TransactionsPage({
         eyebrow="Transactions explorer"
         title="Search every expense and deposit at warehouse grain."
         description="This explorer is optimized for precise filtering, confidence-aware review, and one-click recategorization. Filters live in the URL so views can be revisited and shared later."
+      />
+
+      <TimeFilterSummary
+        filter={timeFilter}
+        fields="Transactions filter `from` and `to` against `postedAt` / warehouse `posted_at`."
       />
 
       <div className="grid gap-4 md:grid-cols-3">

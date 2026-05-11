@@ -1,14 +1,21 @@
 import { GitPullRequestDraft, ShieldCheck } from "lucide-react";
 
 import { PageHeader } from "@/components/dashboard/page-header";
+import { TimeFilterSummary } from "@/components/dashboard/time-filter-summary";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getLowConfidenceReviewItems, getRules } from "@/lib/queries/rules";
+import { normalizeTimeFilter } from "@/lib/time-filter";
 
-export default async function RulesPage() {
+type RulesPageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
+
+export default async function RulesPage({ searchParams }: RulesPageProps) {
+  const timeFilter = normalizeTimeFilter(await searchParams);
   const [rules, reviewItems] = await Promise.all([
     getRules(),
-    getLowConfidenceReviewItems(),
+    getLowConfidenceReviewItems(timeFilter),
   ]);
 
   return (
@@ -17,6 +24,11 @@ export default async function RulesPage() {
         eyebrow="Rules & Review"
         title="Tune the deterministic engine before letting AI handle edge cases."
         description="This page keeps the classification system auditable by exposing rule priority, hit-rate, and the rows waiting for human confirmation."
+      />
+
+      <TimeFilterSummary
+        filter={timeFilter}
+        fields="Review queue rows use transaction `postedAt` / warehouse `posted_at`; rule definitions are not date-filtered."
       />
 
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">

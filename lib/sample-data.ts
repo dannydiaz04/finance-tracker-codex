@@ -782,6 +782,7 @@ export const sampleOverview: OverviewSnapshot = {
   },
   accounts: sampleAccounts,
   cashflow: sampleCashflow,
+  weekdaySpend: [],
   categoryMix: sampleCategoryInsights.map((item) => ({
     categoryId: item.categoryId,
     label: item.label,

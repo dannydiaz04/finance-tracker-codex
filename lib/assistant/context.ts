@@ -23,6 +23,7 @@ import {
   sampleRules,
   sampleTransactions,
 } from "@/lib/sample-data";
+import type { TimeFilter } from "@/lib/time-filter";
 import { formatCurrency, formatPercent } from "@/lib/utils";
 
 async function safeLoad<T>(loader: () => Promise<T>, fallback: T) {
@@ -39,16 +40,21 @@ async function safeLoad<T>(loader: () => Promise<T>, fallback: T) {
   }
 }
 
-export async function getDashboardAssistantContext(): Promise<DashboardAssistantContext> {
+export async function getDashboardAssistantContext(
+  timeFilter?: TimeFilter,
+): Promise<DashboardAssistantContext> {
   const bigQueryStatus = getBigQueryStatus();
   const [overview, categories, merchants, rules, reviewQueue, recentTransactions] =
     await Promise.all([
-      safeLoad(getOverviewSnapshot, sampleOverview),
-      safeLoad(getCategoryInsights, sampleCategoryInsights),
-      safeLoad(getMerchantInsights, sampleMerchantInsights),
+      safeLoad(() => getOverviewSnapshot(timeFilter), sampleOverview),
+      safeLoad(() => getCategoryInsights(timeFilter), sampleCategoryInsights),
+      safeLoad(() => getMerchantInsights(timeFilter), sampleMerchantInsights),
       safeLoad(getRules, sampleRules),
-      safeLoad(getReviewQueue, sampleReviewQueue),
-      safeLoad(() => getRecentTransactions(8), sampleTransactions.slice(0, 8)),
+      safeLoad(() => getReviewQueue(timeFilter), sampleReviewQueue),
+      safeLoad(
+        () => getRecentTransactions(8, timeFilter),
+        sampleTransactions.slice(0, 8),
+      ),
     ]);
   const datasets = [
     overview,

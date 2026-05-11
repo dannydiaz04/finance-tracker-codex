@@ -210,3 +210,32 @@ test("Generic CSV falls back to header inference when no source profile matches"
   assert.equal(row.postedAt, "2026-04-01");
   assert.equal(row.signedAmount, -9.99);
 });
+
+test("Profile date parsing accepts four-digit years for slash dates", () => {
+  const appleCsv = [
+    "Transaction Date,Clearing Date,Description,Merchant,Category,Type,Amount (USD),Purchased By",
+    "05/03/2026,05/04/2026,STARBUCKS,Starbucks,Restaurants,Purchase,5.90,Daniel Diaz",
+  ].join("\n");
+  const appleParsed = parseCsvImport(appleCsv, {
+    fileName: "Apple Card Transactions Mar 14 2026 - May 04 2026.csv",
+  });
+
+  assert.equal(appleParsed.normalizedRows[0].authorizedAt, "2026-05-03T00:00:00.000Z");
+  assert.equal(appleParsed.normalizedRows[0].postedAt, "2026-05-04");
+
+  const discoverCsv = [
+    "Trans. Date,Post Date,Description,Amount,Category",
+    "04/08/2026,04/08/2026,INTERNET PAYMENT - THANK YOU,-100.00,Payments and Credits",
+  ].join("\n");
+  const discoverParsed = parseCsvImport(discoverCsv, {
+    fileName: "Discover-AllAvailable-20260504.csv",
+    runtimeAccountContext: {
+      sourceAccountId: "discover_card",
+      accountName: "Discover Card",
+      accountMask: "7788",
+    },
+  });
+
+  assert.equal(discoverParsed.normalizedRows[0].authorizedAt, "2026-04-08T00:00:00.000Z");
+  assert.equal(discoverParsed.normalizedRows[0].postedAt, "2026-04-08");
+});

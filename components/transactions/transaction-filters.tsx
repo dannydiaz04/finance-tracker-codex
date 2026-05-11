@@ -2,7 +2,7 @@
 
 import type { Route } from "next";
 import { useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Search, SlidersHorizontal } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,7 @@ export function TransactionFilters({
 }: TransactionFiltersProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   type FormState = {
     query: string;
     accountId: string;
@@ -71,6 +72,11 @@ export function TransactionFilters({
 
   const pushState = (nextState: FormState) => {
     const params = new URLSearchParams();
+    const currentPreset = searchParams.get("timePreset");
+    const shouldPreservePreset =
+      currentPreset &&
+      nextState.from === (searchParams.get("from") ?? "") &&
+      nextState.to === (searchParams.get("to") ?? "");
 
     Object.entries(nextState).forEach(([key, value]) => {
       if (value && value !== "all") {
@@ -88,6 +94,10 @@ export function TransactionFilters({
       }
     });
 
+    if (shouldPreservePreset) {
+      params.set("timePreset", currentPreset);
+    }
+
     router.push(`${pathname}?${params.toString()}` as Route);
   };
 
@@ -95,7 +105,8 @@ export function TransactionFilters({
     <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
       <div className="mb-4 flex items-center gap-3 text-sm text-slate-300">
         <SlidersHorizontal className="size-4 text-cyan-300" />
-        Search, filter, and save a granular warehouse view
+        Search and filter posted transactions; date fields use `postedAt` /
+        warehouse `posted_at`.
       </div>
 
       <div className="grid gap-3 lg:grid-cols-5">
@@ -201,7 +212,7 @@ export function TransactionFilters({
 
         <div>
           <label className="mb-2 block text-xs uppercase tracking-[0.24em] text-slate-500">
-            From
+            Posted from
           </label>
           <Input
             type="date"
@@ -212,7 +223,7 @@ export function TransactionFilters({
 
         <div>
           <label className="mb-2 block text-xs uppercase tracking-[0.24em] text-slate-500">
-            To
+            Posted to
           </label>
           <Input
             type="date"

@@ -80,13 +80,32 @@ function toDateFnsFormat(format: string) {
     .replaceAll("D", "d");
 }
 
+function getDateParseFormats(parseAs: string) {
+  const formats = new Set([toDateFnsFormat(parseAs)]);
+
+  if (parseAs.includes("YYYY")) {
+    formats.add(toDateFnsFormat(parseAs.replaceAll("YYYY", "YY")));
+  } else if (parseAs.includes("YY")) {
+    formats.add(toDateFnsFormat(parseAs.replaceAll("YY", "YYYY")));
+  }
+
+  return [...formats];
+}
+
 function parseSupportedDate(value: string, parseAs?: string) {
   const normalizedValue = normalizeRawString(value);
   const parsed = parseAs
-    ? parseDate(normalizedValue, toDateFnsFormat(parseAs), new Date())
+    ? getDateParseFormats(parseAs).reduce<Date | null>((result, format) => {
+        if (result) {
+          return result;
+        }
+
+        const candidate = parseDate(normalizedValue, format, new Date());
+        return isValid(candidate) ? candidate : null;
+      }, null)
     : new Date(normalizedValue);
 
-  if (!isValid(parsed)) {
+  if (!parsed || !isValid(parsed)) {
     throw new Error(`Invalid date value: ${value}`);
   }
 

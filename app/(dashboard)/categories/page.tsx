@@ -2,15 +2,24 @@ import { CircleCheckBig } from "lucide-react";
 
 import { CategoryTreemap } from "@/components/dashboard/category-treemap";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { TimeFilterSummary } from "@/components/dashboard/time-filter-summary";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCategoryInsights, getReviewQueue } from "@/lib/queries/categories";
+import { normalizeTimeFilter } from "@/lib/time-filter";
 import { formatCurrency, formatPercent } from "@/lib/utils";
 
-export default async function CategoriesPage() {
+type CategoriesPageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
+
+export default async function CategoriesPage({
+  searchParams,
+}: CategoriesPageProps) {
+  const timeFilter = normalizeTimeFilter(await searchParams);
   const [categories, reviewQueue] = await Promise.all([
-    getCategoryInsights(),
-    getReviewQueue(),
+    getCategoryInsights(timeFilter),
+    getReviewQueue(timeFilter),
   ]);
 
   return (
@@ -19,6 +28,11 @@ export default async function CategoriesPage() {
         eyebrow="Categories"
         title="Deterministic categorization first, review queue second."
         description="Categories are derived from warehouse rules, institution hints, and user overrides, with low-confidence rows isolated for fast correction."
+      />
+
+      <TimeFilterSummary
+        filter={timeFilter}
+        fields="Category spend and review rows use transaction `postedAt` / warehouse `posted_at`."
       />
 
       <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">

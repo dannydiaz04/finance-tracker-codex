@@ -2,6 +2,11 @@ import "server-only";
 
 import { getBigQueryProjectId, runBigQueryQuery } from "@/lib/bigquery/client";
 import { sampleReviewQueue, sampleRules } from "@/lib/sample-data";
+import {
+  buildTimeFilterQueryParams,
+  filterByPostedAt,
+  type TimeFilter,
+} from "@/lib/time-filter";
 import type { ReviewQueueItem, Rule } from "@/lib/types/finance";
 
 export async function getRules() {
@@ -29,7 +34,7 @@ export async function getRules() {
   return rows ?? sampleRules;
 }
 
-export async function getLowConfidenceReviewItems() {
+export async function getLowConfidenceReviewItems(timeFilter?: TimeFilter) {
   const projectId = getBigQueryProjectId() ?? "project";
   const rows = await runBigQueryQuery<ReviewQueueItem>(
     `
@@ -43,10 +48,13 @@ export async function getLowConfidenceReviewItems() {
         confidence_score AS confidenceScore,
         reason
       FROM \`${projectId}.ops_finance.review_queue\`
+      WHERE (@from = '' OR posted_at >= DATE(@from))
+        AND (@to = '' OR posted_at <= DATE(@to))
       ORDER BY confidence_score ASC
       LIMIT 25
     `,
+    buildTimeFilterQueryParams(timeFilter ?? { preset: "all" }),
   );
 
-  return rows ?? sampleReviewQueue;
+  return rows ?? filterByPostedAt(sampleReviewQueue, timeFilter ?? { preset: "all" });
 }

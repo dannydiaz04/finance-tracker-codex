@@ -2,7 +2,8 @@
 
 import type { Route } from "next";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import {
   ArrowRightLeft,
   Banknote,
@@ -15,6 +16,10 @@ import {
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import {
+  TIME_FILTER_CHANGE_EVENT,
+  copyTimeFilterParams,
+} from "@/lib/time-filter";
 import { cn } from "@/lib/utils";
 
 const navigation = [
@@ -33,6 +38,31 @@ const navigation = [
 
 export function SidebarNav() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [timeQueryString, setTimeQueryString] = useState(() =>
+    copyTimeFilterParams(searchParams).toString(),
+  );
+
+  useEffect(() => {
+    const syncTimeQueryString = (event?: Event) => {
+      const queryString =
+        event instanceof CustomEvent && typeof event.detail === "string"
+          ? event.detail
+          : window.location.search.slice(1);
+
+      setTimeQueryString(
+        copyTimeFilterParams(new URLSearchParams(queryString)).toString(),
+      );
+    };
+
+    window.addEventListener(TIME_FILTER_CHANGE_EVENT, syncTimeQueryString);
+    window.addEventListener("popstate", syncTimeQueryString);
+
+    return () => {
+      window.removeEventListener(TIME_FILTER_CHANGE_EVENT, syncTimeQueryString);
+      window.removeEventListener("popstate", syncTimeQueryString);
+    };
+  }, []);
 
   return (
     <aside className="sticky top-0 hidden h-screen w-72 shrink-0 border-r border-white/10 bg-slate-950/70 px-5 py-6 backdrop-blur xl:flex xl:flex-col">
@@ -66,7 +96,9 @@ export function SidebarNav() {
           return (
             <Link
               key={item.href}
-              href={item.href}
+              href={
+                `${item.href}${timeQueryString ? `?${timeQueryString}` : ""}` as Route
+              }
               className={cn(
                 "group flex items-center gap-3 rounded-2xl px-4 py-3 text-sm transition-colors",
                 active

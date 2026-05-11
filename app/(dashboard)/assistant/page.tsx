@@ -2,6 +2,7 @@ import { ArrowRightLeft, DatabaseZap, ShieldCheck, Sparkles } from "lucide-react
 
 import { AssistantChat } from "@/components/assistant/assistant-chat";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { TimeFilterSummary } from "@/components/dashboard/time-filter-summary";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -15,10 +16,16 @@ import {
   getAssistantRuntimeStatus,
   getDashboardAssistantContext,
 } from "@/lib/assistant/context";
+import { normalizeTimeFilter } from "@/lib/time-filter";
 import { formatCompactCurrency, formatCurrency, formatPercent } from "@/lib/utils";
 
-export default async function AssistantPage() {
-  const context = await getDashboardAssistantContext();
+type AssistantPageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
+
+export default async function AssistantPage({ searchParams }: AssistantPageProps) {
+  const timeFilter = normalizeTimeFilter(await searchParams);
+  const context = await getDashboardAssistantContext(timeFilter);
   const runtime = getAssistantRuntimeStatus();
   const welcomeMessage = buildAssistantWelcomeMessage(context);
   const topCategory = context.categories[0];
@@ -46,6 +53,11 @@ export default async function AssistantPage() {
             </Badge>
           </div>
         }
+      />
+
+      <TimeFilterSummary
+        filter={timeFilter}
+        fields="Assistant signals use transaction `postedAt` / warehouse `posted_at`; balances remain current snapshots."
       />
 
       <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">

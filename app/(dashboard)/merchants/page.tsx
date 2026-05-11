@@ -1,13 +1,22 @@
 import { BadgeCheck, Repeat2 } from "lucide-react";
 
 import { PageHeader } from "@/components/dashboard/page-header";
+import { TimeFilterSummary } from "@/components/dashboard/time-filter-summary";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getMerchantInsights } from "@/lib/queries/merchants";
+import { normalizeTimeFilter } from "@/lib/time-filter";
 import { formatCurrency, formatPercent } from "@/lib/utils";
 
-export default async function MerchantsPage() {
-  const merchants = await getMerchantInsights();
+type MerchantsPageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
+
+export default async function MerchantsPage({
+  searchParams,
+}: MerchantsPageProps) {
+  const timeFilter = normalizeTimeFilter(await searchParams);
+  const merchants = await getMerchantInsights(timeFilter);
 
   return (
     <div className="space-y-6">
@@ -15,6 +24,11 @@ export default async function MerchantsPage() {
         eyebrow="Merchants"
         title="Track merchant aliases, recurring spend, and concentration risk."
         description="Merchant normalization feeds both reporting and rule creation, which makes this screen the bridge between exploration and ETL tuning."
+      />
+
+      <TimeFilterSummary
+        filter={timeFilter}
+        fields="Merchant spend uses transaction `postedAt` / warehouse `posted_at`."
       />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

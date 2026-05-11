@@ -3,6 +3,11 @@ import "server-only";
 import { getBigQueryProjectId, runBigQueryQuery } from "@/lib/bigquery/client";
 import { coerceDateString, coerceNumber } from "@/lib/queries/coerce";
 import { sampleCashflow } from "@/lib/sample-data";
+import {
+  buildTimeFilterQueryParams,
+  filterByDate,
+  type TimeFilter,
+} from "@/lib/time-filter";
 
 type RawCashflowPoint = {
   date: unknown;
@@ -11,7 +16,7 @@ type RawCashflowPoint = {
   net: unknown;
 };
 
-export async function getCashflowSeries() {
+export async function getCashflowSeries(timeFilter?: TimeFilter) {
   const projectId = getBigQueryProjectId() ?? "project";
   const rows = await runBigQueryQuery<RawCashflowPoint>(
     `
@@ -21,9 +26,12 @@ export async function getCashflowSeries() {
         outflow,
         net
       FROM \`${projectId}.mart_finance.daily_cashflow\`
+      WHERE (@from = '' OR date >= DATE(@from))
+        AND (@to = '' OR date <= DATE(@to))
       ORDER BY date DESC
       LIMIT 90
     `,
+    buildTimeFilterQueryParams(timeFilter ?? { preset: "all" }),
   );
 
   return rows
@@ -33,5 +41,5 @@ export async function getCashflowSeries() {
         outflow: coerceNumber(row.outflow),
         net: coerceNumber(row.net),
       }))
-    : sampleCashflow;
+    : filterByDate(sampleCashflow, timeFilter ?? { preset: "all" });
 }

@@ -1,9 +1,13 @@
+import { Suspense } from "react";
 import { ArrowUpRight, CircleAlert, Wallet2 } from "lucide-react";
 
 import { CashflowChart } from "@/components/dashboard/cashflow-chart";
 import { CategoryTreemap } from "@/components/dashboard/category-treemap";
 import { KpiCards } from "@/components/dashboard/kpi-cards";
+import { MonthSelector } from "@/components/dashboard/month-selector";
+import { MonthlyMoneyChart } from "@/components/dashboard/monthly-money-chart";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { WeekdaySpendChart } from "@/components/dashboard/weekday-spend-chart";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -14,22 +18,74 @@ import {
 } from "@/components/ui/card";
 import { getCategoryInsights } from "@/lib/queries/categories";
 import { getMerchantInsights } from "@/lib/queries/merchants";
+import { getMonthlyFinanceSummaries } from "@/lib/queries/monthly";
 import { getOverviewSnapshot } from "@/lib/queries/overview";
+import {
+  getMonthRange,
+  isValidMonthInput,
+  normalizeTimeFilter,
+  type TimeFilterSearchParams,
+} from "@/lib/time-filter";
+import type { MonthlyFinanceSummary } from "@/lib/types/finance";
 import { formatCompactCurrency, formatCurrency } from "@/lib/utils";
 
-export default async function OverviewPage() {
+type OverviewPageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
+
+function getSingleSearchValue(
+  searchParams: TimeFilterSearchParams,
+  key: keyof TimeFilterSearchParams,
+) {
+  const value = searchParams[key];
+
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function getSelectedMonth(
+  searchParams: TimeFilterSearchParams,
+  summaries: MonthlyFinanceSummary[],
+) {
+  const month = getSingleSearchValue(searchParams, "month");
+  const from = getSingleSearchValue(searchParams, "from");
+  const to = getSingleSearchValue(searchParams, "to");
+  const validMonth =
+    isValidMonthInput(month) &&
+    summaries.some((summary) => summary.month === month);
+
+  if (validMonth) {
+    return month!;
+  }
+
+  if (!from && !to) {
+    return summaries[0]?.month ?? null;
+  }
+
+  return (
+    summaries.find((summary) => summary.from === from && summary.to === to)
+      ?.month ?? null
+  );
+}
+
+export default async function OverviewPage({ searchParams }: OverviewPageProps) {
+  const resolvedSearchParams = await searchParams;
+  const monthlySummaries = await getMonthlyFinanceSummaries();
+  const selectedMonth = getSelectedMonth(resolvedSearchParams, monthlySummaries);
+  const timeFilter = selectedMonth
+    ? { ...getMonthRange(selectedMonth), preset: "custom" as const }
+    : normalizeTimeFilter(resolvedSearchParams);
   const [overview, categories, merchants] = await Promise.all([
-    getOverviewSnapshot(),
-    getCategoryInsights(),
-    getMerchantInsights(),
+    getOverviewSnapshot(timeFilter),
+    getCategoryInsights(timeFilter),
+    getMerchantInsights(timeFilter),
   ]);
 
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Overview"
-        title="A finance cockpit built for transaction-level analysis."
-        description="This dashboard is optimized for fast personal review: current balance posture, month-to-date movement, category concentration, and the next transactions that deserve attention."
+        title="Monthly income, spend, categories, and weekday behavior."
+        description="The overview centers on posted transaction months so inflow, outflow, spending mix, and weekday patterns answer the same time-scoped question."
         action={
           <div className="rounded-3xl border border-white/10 bg-white/[0.04] px-5 py-4 text-right">
             <p className="text-xs uppercase tracking-[0.28em] text-slate-500">
@@ -42,7 +98,19 @@ export default async function OverviewPage() {
         }
       />
 
+      <Suspense fallback={null}>
+        <MonthSelector months={monthlySummaries} selectedMonth={selectedMonth} />
+      </Suspense>
+
       <KpiCards overview={overview} />
+
+      <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+        <MonthlyMoneyChart
+          summaries={monthlySummaries}
+          selectedMonth={selectedMonth}
+        />
+        <WeekdaySpendChart weekdays={overview.weekdaySpend} />
+      </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
         <CashflowChart data={overview.cashflow} />
@@ -51,7 +119,7 @@ export default async function OverviewPage() {
           <CardHeader>
             <CardTitle>Largest current mover</CardTitle>
             <CardDescription>
-              Highest magnitude classified expense for the active month.
+              Highest magnitude classified expense inside the active time scope.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -70,7 +138,9 @@ export default async function OverviewPage() {
                 </div>
               </div>
               <p className="mt-4 text-sm text-slate-400">
-                Posted {overview.largestExpense.postedAt}
+                {overview.largestExpense.postedAt === "n/a"
+                  ? "No posted transaction in scope"
+                  : `Posted ${overview.largestExpense.postedAt}`}
               </p>
             </div>
 

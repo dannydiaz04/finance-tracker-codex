@@ -135,6 +135,26 @@ export type CashflowPoint = {
   net: number;
 };
 
+export type MonthlyFinanceSummary = {
+  month: string;
+  label: string;
+  from: string;
+  to: string;
+  income: number;
+  spend: number;
+  net: number;
+  transactionCount: number;
+};
+
+export type WeekdaySpendInsight = {
+  weekday: string;
+  weekdayIndex: number;
+  spend: number;
+  transactionCount: number;
+  averageTransaction: number;
+  share: number;
+};
+
 export type CategorySpendPoint = {
   date: string;
   categoryId: string;
@@ -162,6 +182,7 @@ export type OverviewSnapshot = {
   };
   accounts: Account[];
   cashflow: CashflowPoint[];
+  weekdaySpend: WeekdaySpendInsight[];
   categoryMix: Array<{
     categoryId: string;
     label: string;

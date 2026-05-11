@@ -22,20 +22,20 @@ const kpis = [
   },
   {
     key: "monthToDateIncome",
-    label: "Income MTD",
+    label: "Income in scope",
     icon: ArrowUpRight,
     accessor: (overview: OverviewSnapshot) =>
       formatCurrency(overview.monthToDateIncome),
-    helper: "Classified after transfer and refund cleanup.",
+    helper: "Filtered by posted transaction date.",
   },
   {
     key: "monthToDateSpend",
-    label: "Spend MTD",
+    label: "Spend in scope",
     icon: ArrowDownRight,
     accessor: (overview: OverviewSnapshot) =>
       formatCurrency(overview.monthToDateSpend),
     helper: (overview: OverviewSnapshot) =>
-      `Savings rate ${formatPercent(overview.savingsRate)} this month.`,
+      `Savings rate ${formatPercent(overview.savingsRate)} for this scope.`,
   },
 ];
 

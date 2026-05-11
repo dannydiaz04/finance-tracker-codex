@@ -1,8 +1,12 @@
 import "server-only";
 
 import { getBigQueryProjectId, runBigQueryQuery } from "@/lib/bigquery/client";
+import { getCashflowSeries } from "@/lib/queries/cashflow";
 import { coerceDateString, coerceNumber } from "@/lib/queries/coerce";
+import { deriveOverviewFromTransactions } from "@/lib/queries/finance-aggregates";
+import { getTransactions } from "@/lib/queries/transactions";
 import { sampleOverview } from "@/lib/sample-data";
+import type { TimeFilter } from "@/lib/time-filter";
 import type { Account, CashflowPoint, OverviewSnapshot } from "@/lib/types/finance";
 
 type RawOverviewAccount = {
@@ -81,6 +85,7 @@ function mapOverviewSnapshot(row: RawOverviewSnapshot): OverviewSnapshot {
         net: coerceNumber(point.net),
       }),
     ),
+    weekdaySpend: [],
     categoryMix: (row.category_mix ?? []).map((category) => ({
       categoryId: category.category_id,
       label: category.label,
@@ -97,7 +102,7 @@ function mapOverviewSnapshot(row: RawOverviewSnapshot): OverviewSnapshot {
   };
 }
 
-export async function getOverviewSnapshot() {
+export async function getOverviewSnapshot(timeFilter?: TimeFilter) {
   const projectId = getBigQueryProjectId() ?? "project";
   const rows = await runBigQueryQuery<RawOverviewSnapshot>(
     `
@@ -106,6 +111,17 @@ export async function getOverviewSnapshot() {
       LIMIT 1
     `,
   );
+  const base = rows?.[0] ? mapOverviewSnapshot(rows[0]) : sampleOverview;
+  const [transactions, cashflow] = await Promise.all([
+    getTransactions({
+      from: timeFilter?.from,
+      to: timeFilter?.to,
+    }),
+    getCashflowSeries(timeFilter),
+  ]);
 
-  return rows?.[0] ? mapOverviewSnapshot(rows[0]) : sampleOverview;
+  return {
+    ...deriveOverviewFromTransactions(transactions, base),
+    cashflow,
+  };
 }

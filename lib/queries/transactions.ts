@@ -11,6 +11,7 @@ import {
   sampleTransactionDetails,
   sampleTransactions,
 } from "@/lib/sample-data";
+import type { TimeFilter } from "@/lib/time-filter";
 import type {
   Transaction,
   TransactionDetail,
@@ -212,11 +213,14 @@ export async function getTransactions(filters: TransactionFilters) {
   );
 }
 
-export async function getRecentTransactions(limit = 8) {
+export async function getRecentTransactions(limit = 8, timeFilter?: TimeFilter) {
   const boundedLimit = Math.min(Math.max(Math.trunc(limit), 1), 25);
   const rows = await runBigQueryQuery<RawTransaction>(
     `${transactionBaseQuery}\nLIMIT ${boundedLimit}`,
-    buildTransactionQueryParams({}),
+    buildTransactionQueryParams({
+      from: timeFilter?.from,
+      to: timeFilter?.to,
+    }),
   );
 
   if (rows) {
@@ -224,6 +228,12 @@ export async function getRecentTransactions(limit = 8) {
   }
 
   return [...sampleTransactions]
+    .filter((transaction) =>
+      matchesFilters(transaction, {
+        from: timeFilter?.from,
+        to: timeFilter?.to,
+      }),
+    )
     .sort((left, right) => {
       if (left.postedAt === right.postedAt) {
         return Math.abs(right.signedAmount) - Math.abs(left.signedAmount);
