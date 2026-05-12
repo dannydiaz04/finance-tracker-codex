@@ -65,7 +65,7 @@ export function SidebarNav() {
   }, []);
 
   return (
-    <aside className="sticky top-0 hidden h-screen w-72 shrink-0 border-r border-white/10 bg-slate-950/70 px-5 py-6 backdrop-blur xl:flex xl:flex-col">
+    <aside className="sticky top-0 z-30 hidden h-screen w-72 shrink-0 border-r border-white/10 bg-slate-950/70 px-5 py-6 backdrop-blur xl:flex xl:flex-col">
       <div className="mb-8 flex items-center justify-between">
         <div>
           <p className="text-xs uppercase tracking-[0.32em] text-cyan-300/80">

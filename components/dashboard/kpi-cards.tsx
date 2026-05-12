@@ -4,42 +4,66 @@ import { motion } from "motion/react";
 import { ArrowDownRight, ArrowUpRight, Wallet } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatTimeFilterLabel, type TimeFilter } from "@/lib/time-filter";
 import type { OverviewSnapshot } from "@/lib/types/finance";
 import { formatCompactCurrency, formatCurrency, formatPercent } from "@/lib/utils";
 
 type KpiCardsProps = {
   overview: OverviewSnapshot;
+  timeFilter: TimeFilter;
 };
+
+function getDateScopeCopy(filter: TimeFilter) {
+  const label = formatTimeFilterLabel(filter);
+
+  if (!filter.from && !filter.to && !filter.month) {
+    return {
+      label,
+      activityPhrase: "across all available dates",
+      contextPhrase: "all available dates",
+    };
+  }
+
+  return {
+    label,
+    activityPhrase: `dated ${label}`,
+    contextPhrase: label,
+  };
+}
 
 const kpis = [
   {
     key: "totalBalance",
-    label: "Net worth surface",
+    label: (scope: string) => `Net worth (${scope})`,
     icon: Wallet,
     accessor: (overview: OverviewSnapshot) =>
       formatCompactCurrency(overview.totalBalance),
-    helper: "Current across linked cash and credit accounts.",
+    helper: (_overview: OverviewSnapshot, scope: ReturnType<typeof getDateScopeCopy>) =>
+      `Current linked account balances, shown with ${scope.contextPhrase} context.`,
   },
   {
     key: "monthToDateIncome",
-    label: "Income in scope",
+    label: (scope: string) => `Income (${scope})`,
     icon: ArrowUpRight,
     accessor: (overview: OverviewSnapshot) =>
       formatCurrency(overview.monthToDateIncome),
-    helper: "Filtered by posted transaction date.",
+    helper: (_overview: OverviewSnapshot, scope: ReturnType<typeof getDateScopeCopy>) =>
+      `Posted income ${scope.activityPhrase}.`,
   },
   {
     key: "monthToDateSpend",
-    label: "Spend in scope",
+    label: (scope: string) => `Spend (${scope})`,
     icon: ArrowDownRight,
     accessor: (overview: OverviewSnapshot) =>
       formatCurrency(overview.monthToDateSpend),
-    helper: (overview: OverviewSnapshot) =>
-      `Savings rate ${formatPercent(overview.savingsRate)} for this scope.`,
+    helper: (overview: OverviewSnapshot, scope: ReturnType<typeof getDateScopeCopy>) =>
+      `Savings rate ${formatPercent(overview.savingsRate)} for posted activity ${scope.activityPhrase}.`,
   },
 ];
 
-export function KpiCards({ overview }: KpiCardsProps) {
+export function KpiCards({ overview, timeFilter }: KpiCardsProps) {
+  const scope = getDateScopeCopy(timeFilter);
+
   return (
     <div className="grid gap-4 lg:grid-cols-3">
       {kpis.map((item, index) => {
@@ -55,7 +79,7 @@ export function KpiCards({ overview }: KpiCardsProps) {
             <Card className="h-full">
               <CardHeader className="flex-row items-start justify-between gap-4 pb-4">
                 <div>
-                  <p className="text-sm text-slate-400">{item.label}</p>
+                  <p className="text-sm text-slate-400">{item.label(scope.label)}</p>
                   <CardTitle className="mt-2 text-3xl">
                     {item.accessor(overview)}
                   </CardTitle>
@@ -65,7 +89,7 @@ export function KpiCards({ overview }: KpiCardsProps) {
                 </div>
               </CardHeader>
               <CardContent className="pt-0 text-sm text-slate-400">
-                {typeof item.helper === "function" ? item.helper(overview) : item.helper}
+                {item.helper(overview, scope)}
               </CardContent>
             </Card>
           </motion.div>

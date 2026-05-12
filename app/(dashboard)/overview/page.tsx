@@ -89,7 +89,7 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
         action={
           <div className="rounded-3xl border border-white/10 bg-white/[0.04] px-5 py-4 text-right">
             <p className="text-xs uppercase tracking-[0.28em] text-slate-500">
-              Review queue
+              Needs review
             </p>
             <p className="mt-2 text-3xl font-semibold text-white">
               {overview.reviewQueueCount}
@@ -102,7 +102,7 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
         <MonthSelector months={monthlySummaries} selectedMonth={selectedMonth} />
       </Suspense>
 
-      <KpiCards overview={overview} />
+      <KpiCards overview={overview} timeFilter={timeFilter} />
 
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <MonthlyMoneyChart

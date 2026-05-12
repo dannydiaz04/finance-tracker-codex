@@ -50,7 +50,7 @@ export function MobileNav() {
   }, []);
 
   return (
-    <nav className="overflow-x-auto border-b border-white/10 xl:hidden">
+    <nav className="sticky top-0 z-40 overflow-x-auto border-b border-white/10 bg-slate-950/80 backdrop-blur xl:hidden">
       <div className="flex min-w-max gap-2 px-4 py-3">
         {items.map((item) => (
           <Link
