@@ -38,9 +38,23 @@ To enable model-backed responses, set:
 ```bash
 OPENAI_API_KEY=your_key_here
 OPENAI_MODEL=gpt-5.2
+OPENAI_CATEGORIZATION_MODEL=gpt-5.2
 ```
 
 `OPENAI_MODEL` is optional. If omitted, the assistant defaults to `gpt-5.2`.
+`OPENAI_CATEGORIZATION_MODEL` is optional for the ETL categorization runner.
+
+## AI Categorization ETL
+
+The flat-file ETL path can enrich low-confidence transactions in batch:
+
+```bash
+npm run etl:ai-enrich -- --limit 50
+```
+
+This reads `ops_finance.ai_enrichment_queue`, calls OpenAI with `OPENAI_API_KEY`,
+writes suggestions to `ops_finance.ai_enrichment_results`, and lets the warehouse
+classification model consume only accepted high-confidence results.
 
 ## Data Sources
 

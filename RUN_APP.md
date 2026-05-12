@@ -44,12 +44,14 @@ BIGQUERY_LOCATION=US
 GOOGLE_CLOUD_PROJECT=finance-tracker-cdx
 WAREHOUSE_LANDING_BUCKET=finance-tracker-cdx-etl-landing
 OPENAI_MODEL=gpt-5.2
+OPENAI_CATEGORIZATION_MODEL=gpt-5.2
 OPENAI_API_KEY=
 ```
 
 Notes:
 
-- `OPENAI_API_KEY` is optional for basic local use. Without it, the assistant uses fallback behavior.
+- `OPENAI_API_KEY` is optional for basic local use. Without it, the assistant uses fallback behavior and the AI enrichment runner cannot call OpenAI.
+- `OPENAI_CATEGORIZATION_MODEL` is optional for ETL categorization. If omitted, the runner falls back to `OPENAI_MODEL`, then `gpt-5.2`.
 - `BIGQUERY_PROJECT_ID` or `GOOGLE_CLOUD_PROJECT` enables BigQuery reads.
 - `WAREHOUSE_LANDING_BUCKET` lets the ETL runner default to `gs://finance-tracker-cdx-etl-landing`.
 
@@ -199,6 +201,30 @@ npm run etl:runner -- --landing-root ./landing-zone --max-files 5
 
 `landing-zone/` is gitignored.
 
+## Run The AI Categorization ETL Phase
+
+Create or update the warehouse objects first:
+
+```bash
+npm run dataform:compile
+npx dataform run dataform
+```
+
+Then run the OpenAI-backed enrichment worker:
+
+```bash
+npm run etl:ai-enrich -- --limit 50
+```
+
+Useful options:
+
+```bash
+npm run etl:ai-enrich -- --limit 100 --batch-size 20 --json
+npm run etl:ai-enrich -- --model gpt-5.2 --auto-accept-threshold 0.92
+```
+
+The worker reads `ops_finance.ai_enrichment_queue`, calls OpenAI using `OPENAI_API_KEY`, writes results to `ops_finance.ai_enrichment_results`, and lets Dataform merge only accepted suggestions into `core_finance.fact_classification`.
+
 ## Build And Production Start
 
 Build:
@@ -251,4 +277,3 @@ If dependencies look stale:
 ```bash
 npm install
 ```
-

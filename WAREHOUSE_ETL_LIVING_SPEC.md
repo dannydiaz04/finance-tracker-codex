@@ -140,12 +140,14 @@ BIGQUERY_PROJECT_ID=finance-tracker-cdx
 BIGQUERY_LOCATION=US
 GOOGLE_CLOUD_PROJECT=finance-tracker-cdx
 OPENAI_API_KEY=...
+OPENAI_CATEGORIZATION_MODEL=gpt-5.2
 OPENAI_MODEL=gpt-5.2
 ```
 
 Notes:
 
 - `OPENAI_API_KEY` should remain local or in a secure secret store. Never commit the literal value.
+- `OPENAI_CATEGORIZATION_MODEL` is optional for ETL categorization. If omitted, the AI enrichment runner falls back to `OPENAI_MODEL`, then `gpt-5.2`.
 - `OPENAI_MODEL` is optional today. The app defaults to `gpt-5.2`.
 - BigQuery access in this repo is currently working through local Google Cloud auth plus Application Default Credentials.
 
@@ -435,6 +437,7 @@ Objects known to be live in Google Cloud:
 | `ops_finance.category_rules` | table | live | Deterministic merchant and description rules |
 | `ops_finance.manual_overrides` | table | live | Manual transaction-level override table |
 | `ops_finance.account_metadata` | table | live | Account display metadata used by staging and marts |
+| `ops_finance.ai_enrichment_results` | table | repo-defined | Durable ETL model suggestions; materialize with Dataform before running the AI enrichment worker |
 | `analytics_finance.transaction_analytics_base` | table | live | Wide analytics table, 97 fields, partitioned by `posted_at` |
 
 Objects checked into the repo and compiled successfully:
@@ -443,7 +446,7 @@ Objects checked into the repo and compiled successfully:
 | --- | --- | --- | --- |
 | `stg_finance.transactions_clean` | view | compiled | Extracts clean latest-state transactions |
 | `stg_finance.accounts_clean` | view | compiled | Distinct account dimension staging enriched with account metadata |
-| `core_finance.fact_classification` | table | compiled | Deterministic classification ladder |
+| `core_finance.fact_classification` | table | compiled | Classification ladder with manual overrides, deterministic rules, accepted AI enrichment, and fallbacks |
 | `core_finance.fact_transaction_current` | table | compiled | Canonical current-state transactions |
 | `core_finance.fact_transaction_history` | table | compiled | Event history across imports |
 | `core_finance.dim_account` | table | compiled and live | Clean account dimension for app and marts |
@@ -456,7 +459,8 @@ Objects checked into the repo and compiled successfully:
 | `mart_finance.merchant_spend_90d` | table | compiled and live | Merchant spend rollup |
 | `mart_finance.search_suggestions` | view | compiled and live | Search suggestions for app lookup |
 | `ops_finance.review_queue` | view | compiled | Manual-review worklist |
-| `ops_finance.ai_enrichment_queue` | view | compiled | Future model-enrichment worklist |
+| `ops_finance.ai_enrichment_queue` | view | compiled | Model-enrichment worklist |
+| `ops_finance.ai_enrichment_results` | operation | compiled | Creates the durable AI enrichment result table if missing |
 | `ops_finance.account_metadata` | operation | compiled and live | Creates account metadata table if missing |
 | `analytics_finance.transaction_analytics_base` | table | compiled and live | Repo model matches the intended analytics target |
 
@@ -618,7 +622,7 @@ As we expand the ETL pipeline, upstream flat files or source adapters should sta
 - Several profiles depend on runtime account identity injection because the exported files do not identify the underlying card account directly. The current runner supports adjacent `<file>.context.json` manifests, but feed-config based injection is not implemented yet.
 - The current app route accepts uploaded content directly; it does not yet poll or claim files from Cloud Storage.
 - Two verification-only `raw_finance.import_batches` rows for `activity.csv` currently have zero matching `transaction_events` because they were inserted before the JSON payload streaming fix. Leave them in place unless you explicitly want cleanup.
-- The assistant already calls OpenAI for chat responses, but the ETL pipeline does not yet write model-generated merchant or category suggestions back into BigQuery.
+- The assistant calls OpenAI for chat responses, and the ETL enrichment worker can now call OpenAI separately for transaction category suggestions when `OPENAI_API_KEY` is available.
 - `Plaid` routes are scaffolded, but CSV remains the only practical ingestion path today.
 - The analytics base Dataform model and downstream marts have been materialized successfully against live BigQuery.
 - `npm run test:imports` currently emits a non-blocking Node warning about `MODULE_TYPELESS_PACKAGE_JSON` because the repo is not marked as `"type": "module"`. The replay tests still pass.
@@ -650,9 +654,9 @@ As we expand the ETL pipeline, upstream flat files or source adapters should sta
 - [x] Add file validation plus move-to-archive and move-to-rejected handling for landed files.
 - [ ] Expand the CSV import contract to accept richer source fields such as `source_transaction_id`, `authorized_at`, `running_balance`, and `available_balance`.
 - [x] Run Dataform against the live BigQuery project and confirm materialization of staging, core, ops, mart, and analytics models.
-- [ ] Create a durable table for AI-generated standardization and categorization results.
-- [ ] Build an ETL worker that reads from `ops_finance.ai_enrichment_queue`, calls OpenAI in batches, and writes suggestions into BigQuery.
-- [ ] Merge AI enrichment outputs into the broader classification and review flow.
+- [x] Create a durable table for AI-generated standardization and categorization results.
+- [x] Build an ETL worker that reads from `ops_finance.ai_enrichment_queue`, calls OpenAI in batches, and writes suggestions into BigQuery.
+- [x] Merge accepted AI enrichment outputs into the broader classification and review flow.
 - [ ] Add backfill and replay procedures for historical CSV uploads.
 
 ## Proposed AI Enrichment Pattern
@@ -660,10 +664,10 @@ The current plan is:
 
 1. Use deterministic normalization and rules first.
 2. Send only unresolved or low-confidence posted transactions to `ops_finance.ai_enrichment_queue`.
-3. Have a future enrichment worker read those rows in batches.
-4. Ask OpenAI to standardize merchant names, infer category candidates, and possibly detect recurring patterns or transfer-like behavior.
-5. Write those suggestions into a dedicated BigQuery table such as `ops_finance.ai_enrichment_results`.
-6. Keep model output separate from the canonical fact until it is accepted by deterministic logic or a human review step.
+3. Run `npm run etl:ai-enrich -- --limit 50` to have the enrichment worker read those rows in batches.
+4. Ask OpenAI to standardize merchant names and infer category candidates from the checked-in taxonomy and batch prompt. The worker sends only the fields needed for categorization, not the full raw payload.
+5. Write those suggestions into `ops_finance.ai_enrichment_results` with prompt/rules/taxonomy versions, input hash, model metadata, raw model output JSON, final confidence, and status.
+6. Merge only `accepted` AI outputs into `core_finance.fact_classification` after deterministic rules and before institution-category fallback. Low-confidence valid outputs are stored as `needs_review` and shown in the review queue.
 
 This keeps the ETL design audit-friendly and prevents model outputs from silently mutating canonical finance records.
 

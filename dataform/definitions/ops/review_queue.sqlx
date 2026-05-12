@@ -6,21 +6,40 @@ config {
   tags: ["ops"]
 }
 
+with ai_review_suggestions as (
+  select
+    transaction_id,
+    suggested_category_label,
+    confidence_score,
+    reason,
+    row_number() over (
+      partition by transaction_id
+      order by confidence_score desc, created_at desc
+    ) as suggestion_rank
+  from ${ref("ai_enrichment_results")}
+  where status = "needs_review"
+)
+
 select
-  transaction_id,
-  merchant_raw as merchant,
-  description_raw as description,
-  abs(signed_amount) as amount,
-  posted_at,
-  category_label as suggested_category,
-  confidence_score,
+  current_txn.transaction_id,
+  current_txn.merchant_raw as merchant,
+  current_txn.description_raw as description,
+  abs(current_txn.signed_amount) as amount,
+  current_txn.posted_at,
+  coalesce(ai_review_suggestions.suggested_category_label, current_txn.category_label) as suggested_category,
+  coalesce(ai_review_suggestions.confidence_score, current_txn.confidence_score) as confidence_score,
   case
-    when pending then "Pending merchant with non-final bank metadata."
-    when confidence_score < 0.7 then "Low-confidence classification."
-    when derived_category_id = "uncategorized" then "No deterministic rule matched."
+    when current_txn.pending then "Pending merchant with non-final bank metadata."
+    when ai_review_suggestions.transaction_id is not null then concat("AI suggestion needs review: ", ai_review_suggestions.reason)
+    when current_txn.confidence_score < 0.7 then "Low-confidence classification."
+    when current_txn.derived_category_id = "uncategorized" then "No deterministic rule matched."
     else "Manual review requested."
   end as reason
-from ${ref("fact_transaction_current")}
-where pending
-   or confidence_score < 0.7
-   or derived_category_id = "uncategorized"
+from ${ref("fact_transaction_current")} as current_txn
+left join ai_review_suggestions
+  on ai_review_suggestions.transaction_id = current_txn.transaction_id
+ and ai_review_suggestions.suggestion_rank = 1
+where current_txn.pending
+   or current_txn.confidence_score < 0.7
+   or current_txn.derived_category_id = "uncategorized"
+   or ai_review_suggestions.transaction_id is not null

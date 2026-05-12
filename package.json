@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint .",
     "etl:runner": "node --conditions=react-server --experimental-strip-types scripts/run-landed-imports.ts",
+    "etl:ai-enrich": "node --conditions=react-server --experimental-strip-types scripts/run-ai-enrichment.ts",
     "test:imports": "node --conditions=react-server --experimental-strip-types --test tests/import/*.test.mjs",
     "typecheck": "tsc --noEmit",
     "dataform:compile": "dataform compile dataform"

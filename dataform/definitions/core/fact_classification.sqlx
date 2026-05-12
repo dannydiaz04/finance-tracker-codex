@@ -2,7 +2,7 @@ config {
   type: "table",
   schema: "core_finance",
   name: "fact_classification",
-  description: "Deterministic classification ladder combining overrides, rules, and fallback logic.",
+  description: "Classification ladder combining overrides, deterministic rules, accepted AI enrichment, and fallback logic.",
   tags: ["core"]
 }
 
@@ -37,6 +37,22 @@ matched_rules as (
      or (rules.match_strategy = "description_regex" and regexp_contains(lower(base.description_norm), lower(rules.match_value)))
    )
 ),
+accepted_ai_suggestions as (
+  select
+    transaction_id,
+    suggested_category_id as category_id,
+    confidence_score,
+    run_id,
+    created_at,
+    row_number() over (
+      partition by transaction_id
+      order by confidence_score desc, created_at desc
+    ) as suggestion_rank
+  from ${ref("ai_enrichment_results")}
+  where status = "accepted"
+    and suggested_category_id != "uncategorized"
+    and confidence_score >= 0.90
+),
 fallbacks as (
   select
     transaction_id,
@@ -53,34 +69,52 @@ fallbacks as (
 )
 select
   base.transaction_id,
-  coalesce(overrides.category_id, matched_rules.category_id, fallbacks.category_id) as category_id,
+  coalesce(
+    overrides.category_id,
+    matched_rules.category_id,
+    accepted_ai_suggestions.category_id,
+    fallbacks.category_id
+  ) as category_id,
   categories.label as category_label,
   categories.category_l2 as subcategory_id,
   case
     when overrides.category_id is not null then 1.00
     when matched_rules.rule_id is not null then 0.95
+    when accepted_ai_suggestions.category_id is not null then accepted_ai_suggestions.confidence_score
     when base.institution_category is not null then 0.70
     else 0.55
   end as confidence_score,
   case
     when overrides.category_id is not null then "manual_override"
     when matched_rules.rule_id is not null then "merchant_rule"
+    when accepted_ai_suggestions.category_id is not null then "ai_suggestion"
     when base.institution_category is not null then "institution_category"
     else "fallback"
   end as classification_source,
-  matched_rules.rule_id,
-  coalesce(overrides.updated_at, base.event_timestamp) as classified_at
+  coalesce(
+    matched_rules.rule_id,
+    if(
+      accepted_ai_suggestions.run_id is not null,
+      concat("ai:", accepted_ai_suggestions.run_id),
+      null
+    )
+  ) as rule_id,
+  coalesce(overrides.updated_at, accepted_ai_suggestions.created_at, base.event_timestamp) as classified_at
 from base
 left join overrides
   on overrides.transaction_id = base.transaction_id
 left join matched_rules
   on matched_rules.transaction_id = base.transaction_id
  and matched_rules.rule_rank = 1
+left join accepted_ai_suggestions
+  on accepted_ai_suggestions.transaction_id = base.transaction_id
+ and accepted_ai_suggestions.suggestion_rank = 1
 left join fallbacks
   on fallbacks.transaction_id = base.transaction_id
 left join ${ref("dim_category")} as categories
   on categories.category_id = coalesce(
     overrides.category_id,
     matched_rules.category_id,
+    accepted_ai_suggestions.category_id,
     fallbacks.category_id
   )

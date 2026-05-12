@@ -1,0 +1,38 @@
+config {
+  type: "operations",
+  schema: "ops_finance",
+  name: "ai_enrichment_results",
+  description: "Durable OpenAI-backed ETL category suggestions for low-confidence transaction rows.",
+  hasOutput: true,
+  tags: ["ops", "ai"]
+}
+
+create table if not exists ${self()} (
+  run_id string,
+  transaction_id string,
+  input_hash string,
+  prompt_version string,
+  rules_version string,
+  taxonomy_version string,
+  model_provider string,
+  model string,
+  model_response_id string,
+  suggested_category_id string,
+  suggested_category_label string,
+  normalized_merchant string,
+  model_confidence_score float64,
+  confidence_score float64,
+  confidence_level string,
+  review_required bool,
+  status string,
+  reason string,
+  confidence_notes array<string>,
+  signals array<string>,
+  secondary_candidates_json json,
+  input_json json,
+  model_output_json json,
+  created_at timestamp
+)
+options (
+  description = "Durable OpenAI-backed ETL category suggestions for low-confidence transaction rows."
+)
