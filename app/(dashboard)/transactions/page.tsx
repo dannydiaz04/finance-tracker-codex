@@ -39,6 +39,14 @@ export default async function TransactionsPage({
     (sum, transaction) => sum + transaction.signedAmount,
     0,
   );
+  const operatingNet = transactions
+    .filter(
+      (transaction) =>
+        transaction.transactionClass !== "transfer" &&
+        transaction.transactionClass !== "credit_payment",
+    )
+    .reduce((sum, transaction) => sum + transaction.signedAmount, 0);
+  const accountingOnlyNet = net - operatingNet;
   const lowConfidence = transactions.filter(
     (transaction) => transaction.confidenceScore < 0.75,
   ).length;
@@ -56,7 +64,7 @@ export default async function TransactionsPage({
         fields="Transactions filter `from` and `to` against `postedAt` / warehouse `posted_at`."
       />
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex-row items-center justify-between gap-3">
             <CardTitle className="text-base">Visible rows</CardTitle>
@@ -68,11 +76,20 @@ export default async function TransactionsPage({
         </Card>
         <Card>
           <CardHeader className="flex-row items-center justify-between gap-3">
-            <CardTitle className="text-base">Net movement</CardTitle>
+            <CardTitle className="text-base">Operating net</CardTitle>
             <DatabaseZap className="size-4 text-fuchsia-300" />
           </CardHeader>
           <CardContent className="text-3xl font-semibold text-white">
-            {formatCurrency(net)}
+            {formatCurrency(operatingNet)}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex-row items-center justify-between gap-3">
+            <CardTitle className="text-base">Accounting-only net</CardTitle>
+            <DatabaseZap className="size-4 text-cyan-300" />
+          </CardHeader>
+          <CardContent className="text-3xl font-semibold text-white">
+            {formatCurrency(accountingOnlyNet)}
           </CardContent>
         </Card>
         <Card>

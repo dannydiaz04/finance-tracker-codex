@@ -1,0 +1,22 @@
+config {
+  type: "operations",
+  schema: "ops_finance",
+  name: "credit_card_payment_aliases",
+  description: "Operator-maintained aliases that identify checking-side credit card payment withdrawals.",
+  hasOutput: true,
+  tags: ["ops", "classification"]
+}
+
+create table if not exists ${self()} (
+  alias_id string,
+  target_account_id string,
+  target_account_name string,
+  alias_pattern string,
+  match_strategy string,
+  priority int64,
+  enabled bool,
+  created_at timestamp
+)
+options (
+  description = "Operator-maintained aliases that identify checking-side credit card payment withdrawals."
+)

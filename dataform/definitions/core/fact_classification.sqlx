@@ -16,7 +16,19 @@ overrides as (
     category_id,
     reason,
     updated_at
-  from ${ref("manual_overrides")}
+  from (
+    select
+      transaction_id,
+      category_id,
+      reason,
+      updated_at,
+      row_number() over (
+        partition by transaction_id
+        order by updated_at desc
+      ) as override_rank
+    from ${ref("manual_overrides")}
+  )
+  where override_rank = 1
 ),
 matched_rules as (
   select
@@ -57,6 +69,7 @@ fallbacks as (
   select
     transaction_id,
     case
+      when transaction_class = "credit_payment" then "credit-card-payment"
       when transaction_class = "transfer" then "transfers"
       when transaction_class = "fee" then "fees"
       when transaction_class = "income" then "salary"

@@ -42,7 +42,7 @@ export default async function MerchantsPage({
                 {formatCurrency(merchant.spend)}
               </div>
               <div className="flex flex-wrap gap-2">
-                <Badge>{merchant.transactions} txns</Badge>
+                <Badge>{merchant.transactions} transactions</Badge>
                 <Badge>trend {formatPercent(merchant.trend)}</Badge>
                 {merchant.likelyRecurring ? (
                   <Badge className="border-cyan-400/20 bg-cyan-400/10 text-cyan-100">

@@ -200,7 +200,7 @@ function buildMerchantReply(context: DashboardAssistantContext) {
     .slice(0, 3)
     .map(
       (merchant) =>
-        `${merchant.merchant}: ${formatCurrency(merchant.spend)} across ${merchant.transactions} txns`,
+        `${merchant.merchant}: ${formatCurrency(merchant.spend)} across ${merchant.transactions} transactions`,
     )
     .join(", ");
 

@@ -57,6 +57,18 @@ export type AiEnrichmentQueueRow = {
   enrichmentReason: string;
 };
 
+type ManualCategoryExample = {
+  categoryId: string;
+  categoryLabel: string;
+  merchantRaw: string;
+  merchantNorm: string;
+  descriptionRaw: string;
+  descriptionNorm: string;
+  signedAmount: number;
+  transactionClass: string;
+  reason: string | null;
+};
+
 export type CategoryCandidate = {
   categoryId: string;
   confidence: number;
@@ -260,6 +272,20 @@ function toPromptTransaction(row: AiEnrichmentQueueRow) {
   };
 }
 
+function toPromptManualExample(row: ManualCategoryExample) {
+  return {
+    categoryId: row.categoryId,
+    categoryLabel: row.categoryLabel,
+    merchantRaw: row.merchantRaw,
+    merchantNorm: row.merchantNorm,
+    descriptionRaw: row.descriptionRaw,
+    descriptionNorm: row.descriptionNorm,
+    signedAmount: row.signedAmount,
+    transactionClass: row.transactionClass,
+    reason: row.reason,
+  };
+}
+
 function buildInputJson(
   transaction: AiEnrichmentQueueRow,
   taxonomyVersion: string,
@@ -289,6 +315,7 @@ export function buildCategoryClassifierInstructions() {
     "Classify each transaction using merchant and description patterns, not UI behavior.",
     "Use only categoryId values from the provided taxonomy. Do not invent categories.",
     "Prefer stable merchant and description evidence over the bank-provided institution category when they disagree.",
+    "Use manualExamples as high-signal learning examples when a new transaction has similar merchant or description text.",
     "Treat institution category as a weak hint, not as ground truth.",
     "Do not classify a transaction as salary unless it is clearly payroll, paycheck, direct deposit, or employer income.",
     "Do not classify refunds as income just because the signed amount is positive.",
@@ -301,6 +328,7 @@ export function buildCategoryClassifierInstructions() {
 export function buildCategoryClassifierInput(
   transactions: AiEnrichmentQueueRow[],
   categories: CategoryTaxonomyItem[],
+  manualExamples: ManualCategoryExample[] = [],
 ) {
   return JSON.stringify(
     {
@@ -311,6 +339,7 @@ export function buildCategoryClassifierInput(
         subcategory: category.categoryL2,
       })),
       transactions: transactions.map(toPromptTransaction),
+      manualExamples: manualExamples.map(toPromptManualExample),
     },
     null,
     2,
@@ -449,11 +478,13 @@ export function parseCategoryClassifierResponse(
 export async function callOpenAiCategoryClassifier({
   transactions,
   categories,
+  manualExamples = [],
   apiKey,
   model,
 }: {
   transactions: AiEnrichmentQueueRow[];
   categories: CategoryTaxonomyItem[];
+  manualExamples?: ManualCategoryExample[];
   apiKey: string;
   model: string;
 }): Promise<CategoryClassifierBatchResponse> {
@@ -466,7 +497,7 @@ export async function callOpenAiCategoryClassifier({
     body: JSON.stringify({
       model,
       instructions: buildCategoryClassifierInstructions(),
-      input: buildCategoryClassifierInput(transactions, categories),
+      input: buildCategoryClassifierInput(transactions, categories, manualExamples),
     }),
     signal: AbortSignal.timeout(60_000),
   });
@@ -822,6 +853,60 @@ async function loadAiEnrichmentQueue({
   return (rows ?? []).map(normalizeQueueRow);
 }
 
+async function loadManualCategoryExamples() {
+  const projectId = getBigQueryProjectId();
+
+  if (!projectId) {
+    throw new Error("BIGQUERY_PROJECT_ID or GOOGLE_CLOUD_PROJECT is required.");
+  }
+
+  const rows = await runBigQueryQuery<Record<string, unknown>>(
+    `
+      WITH latest_overrides AS (
+        SELECT
+          transaction_id,
+          category_id,
+          reason,
+          ROW_NUMBER() OVER (
+            PARTITION BY transaction_id
+            ORDER BY updated_at DESC
+          ) AS override_rank
+        FROM \`${projectId}.ops_finance.manual_overrides\`
+      )
+      SELECT
+        overrides.category_id AS categoryId,
+        categories.label AS categoryLabel,
+        current_txn.merchant_raw AS merchantRaw,
+        current_txn.merchant_norm AS merchantNorm,
+        current_txn.description_raw AS descriptionRaw,
+        current_txn.description_norm AS descriptionNorm,
+        current_txn.signed_amount AS signedAmount,
+        current_txn.transaction_class AS transactionClass,
+        overrides.reason AS reason
+      FROM latest_overrides AS overrides
+      JOIN \`${projectId}.core_finance.fact_transaction_current\` AS current_txn
+        ON current_txn.transaction_id = overrides.transaction_id
+      LEFT JOIN \`${projectId}.core_finance.dim_category\` AS categories
+        ON categories.category_id = overrides.category_id
+      WHERE overrides.override_rank = 1
+      ORDER BY current_txn.posted_at DESC
+      LIMIT 50
+    `,
+  );
+
+  return (rows ?? []).map((row) => ({
+    categoryId: normalizeString(row.categoryId),
+    categoryLabel: normalizeString(row.categoryLabel),
+    merchantRaw: normalizeString(row.merchantRaw),
+    merchantNorm: normalizeString(row.merchantNorm),
+    descriptionRaw: normalizeString(row.descriptionRaw),
+    descriptionNorm: normalizeString(row.descriptionNorm),
+    signedAmount: normalizeNumber(row.signedAmount),
+    transactionClass: normalizeString(row.transactionClass),
+    reason: normalizeNullableString(row.reason),
+  }));
+}
+
 function chunkArray<T>(items: T[], chunkSize: number) {
   const chunks: T[][] = [];
 
@@ -850,6 +935,7 @@ export async function runAiCategoryEnrichment(
     limit,
     includeExisting: Boolean(options.includeExisting),
   });
+  const manualExamples = await loadManualCategoryExamples();
   let insertedCount = 0;
   let acceptedCount = 0;
   let needsReviewCount = 0;
@@ -881,6 +967,7 @@ export async function runAiCategoryEnrichment(
     const response = await callOpenAiCategoryClassifier({
       transactions: batch,
       categories,
+      manualExamples,
       apiKey,
       model,
     });

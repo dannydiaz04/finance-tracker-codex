@@ -108,14 +108,15 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
         <MonthlyMoneyChart
           summaries={monthlySummaries}
           selectedMonth={selectedMonth}
+          tone="flow"
         />
-        <WeekdaySpendChart weekdays={overview.weekdaySpend} />
+        <WeekdaySpendChart weekdays={overview.weekdaySpend} tone="behavior" />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
-        <CashflowChart data={overview.cashflow} />
+        <CashflowChart data={overview.cashflow} tone="flow" />
 
-        <Card>
+        <Card tone="spend">
           <CardHeader>
             <CardTitle>Largest current mover</CardTitle>
             <CardDescription>
@@ -170,9 +171,9 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-        <CategoryTreemap categories={categories} />
+        <CategoryTreemap categories={categories} tone="category" />
 
-        <Card>
+        <Card tone="merchant">
           <CardHeader>
             <CardTitle>Top merchants</CardTitle>
             <CardDescription>
@@ -216,7 +217,7 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <Card>
+        <Card tone="balance">
           <CardHeader className="flex-row items-center gap-3">
             <Wallet2 className="size-5 text-cyan-300" />
             <div>
@@ -233,7 +234,7 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
           </CardContent>
         </Card>
 
-        <Card>
+        <Card tone="review">
           <CardHeader>
             <CardTitle className="text-base">Review posture</CardTitle>
             <CardDescription>

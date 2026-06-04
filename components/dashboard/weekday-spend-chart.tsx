@@ -7,15 +7,20 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  type CardTone,
 } from "@/components/ui/card";
 import type { WeekdaySpendInsight } from "@/lib/types/finance";
 import { cn, formatCurrency, formatPercent } from "@/lib/utils";
 
 type WeekdaySpendChartProps = {
   weekdays: WeekdaySpendInsight[];
+  tone?: CardTone;
 };
 
-export function WeekdaySpendChart({ weekdays }: WeekdaySpendChartProps) {
+export function WeekdaySpendChart({
+  weekdays,
+  tone = "neutral",
+}: WeekdaySpendChartProps) {
   const maxSpend = Math.max(...weekdays.map((weekday) => weekday.spend), 1);
   const most = weekdays.reduce((current, weekday) =>
     weekday.spend > current.spend ? weekday : current,
@@ -25,7 +30,7 @@ export function WeekdaySpendChart({ weekdays }: WeekdaySpendChartProps) {
   );
 
   return (
-    <Card>
+    <Card tone={tone}>
       <CardHeader>
         <CardTitle>Spend by weekday</CardTitle>
         <CardDescription>
@@ -69,7 +74,7 @@ export function WeekdaySpendChart({ weekdays }: WeekdaySpendChartProps) {
               <div>
                 <p className="text-sm font-medium text-white">{weekday.weekday}</p>
                 <p className="mt-1 text-xs text-slate-500">
-                  {weekday.transactionCount} txns
+                  {weekday.transactionCount} transactions
                 </p>
               </div>
               <div className="flex items-center gap-3">

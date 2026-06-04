@@ -1,0 +1,28 @@
+config {
+  type: "operations",
+  schema: "ops_finance",
+  name: "category_rule_suggestions",
+  description: "User-reviewed rule suggestions learned from manual transaction categorization.",
+  hasOutput: true,
+  tags: ["ops", "classification"]
+}
+
+create table if not exists ${self()} (
+  suggestion_id string,
+  transaction_id string,
+  category_id string,
+  category_label string,
+  match_strategy string,
+  match_value string,
+  rule_name string,
+  rule_description string,
+  source string,
+  status string,
+  note string,
+  created_at timestamp,
+  updated_at timestamp,
+  reviewed_at timestamp
+)
+options (
+  description = "User-reviewed rule suggestions learned from manual transaction categorization."
+)

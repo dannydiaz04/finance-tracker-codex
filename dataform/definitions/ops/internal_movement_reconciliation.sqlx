@@ -1,0 +1,99 @@
+config {
+  type: "table",
+  schema: "ops_finance",
+  name: "internal_movement_reconciliation",
+  description: "Matched and unmatched accounting-only internal movements, including card payments.",
+  tags: ["ops", "reconciliation"]
+}
+
+with internal_movements as (
+  select
+    transaction_id,
+    account_id,
+    account_name,
+    transaction_class,
+    posted_at,
+    signed_amount,
+    merchant_raw,
+    description_raw
+  from ${ref("fact_transaction_current")}
+  where transaction_class in ("transfer", "credit_payment")
+),
+candidate_pairs as (
+  select
+    outflow.transaction_id as outflow_transaction_id,
+    inflow.transaction_id as inflow_transaction_id,
+    outflow.transaction_class,
+    abs(date_diff(outflow.posted_at, inflow.posted_at, day)) as day_delta,
+    abs(cast(outflow.signed_amount as float64) + cast(inflow.signed_amount as float64)) as amount_delta,
+    row_number() over (
+      partition by outflow.transaction_id
+      order by
+        abs(cast(outflow.signed_amount as float64) + cast(inflow.signed_amount as float64)),
+        abs(date_diff(outflow.posted_at, inflow.posted_at, day)),
+        inflow.posted_at
+    ) as outflow_rank,
+    row_number() over (
+      partition by inflow.transaction_id
+      order by
+        abs(cast(outflow.signed_amount as float64) + cast(inflow.signed_amount as float64)),
+        abs(date_diff(outflow.posted_at, inflow.posted_at, day)),
+        outflow.posted_at
+    ) as inflow_rank
+  from internal_movements as outflow
+  join internal_movements as inflow
+    on outflow.signed_amount < 0
+   and inflow.signed_amount > 0
+   and outflow.transaction_class = inflow.transaction_class
+   and abs(cast(outflow.signed_amount as float64) + cast(inflow.signed_amount as float64)) < 0.01
+   and abs(date_diff(outflow.posted_at, inflow.posted_at, day)) <= 5
+   and outflow.transaction_id != inflow.transaction_id
+),
+matched_pairs as (
+  select *
+  from candidate_pairs
+  where outflow_rank = 1
+    and inflow_rank = 1
+),
+reconciled as (
+  select
+    outflow_transaction_id as transaction_id,
+    inflow_transaction_id as counterpart_transaction_id,
+    transaction_class,
+    day_delta,
+    amount_delta
+  from matched_pairs
+  union all
+  select
+    inflow_transaction_id as transaction_id,
+    outflow_transaction_id as counterpart_transaction_id,
+    transaction_class,
+    day_delta,
+    amount_delta
+  from matched_pairs
+)
+select
+  movements.transaction_id,
+  movements.account_id,
+  movements.account_name,
+  movements.transaction_class,
+  movements.posted_at,
+  movements.signed_amount,
+  movements.merchant_raw,
+  movements.description_raw,
+  coalesce(reconciled.counterpart_transaction_id, cast(null as string)) as counterpart_transaction_id,
+  coalesce(reconciled.day_delta, cast(null as int64)) as day_delta,
+  coalesce(reconciled.amount_delta, cast(null as float64)) as amount_delta,
+  if(reconciled.counterpart_transaction_id is null, "unmatched", "matched") as match_status,
+  if(
+    reconciled.counterpart_transaction_id is null,
+    to_hex(md5(concat("unmatched::", movements.transaction_id))),
+    to_hex(md5(concat(
+      least(movements.transaction_id, reconciled.counterpart_transaction_id),
+      "::",
+      greatest(movements.transaction_id, reconciled.counterpart_transaction_id)
+    )))
+  ) as reconciliation_group_id
+from internal_movements as movements
+left join reconciled
+  on reconciled.transaction_id = movements.transaction_id

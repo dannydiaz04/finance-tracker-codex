@@ -25,6 +25,9 @@ with ranked_events as (
     safe_cast(json_value(payload, "$.signedAmount") as numeric) as signed_amount,
     json_value(payload, "$.direction") as direction,
     json_value(payload, "$.transactionClass") as transaction_class,
+    json_value(payload, "$.accountType") as account_type,
+    json_value(payload, "$.accountSubtype") as account_subtype,
+    json_value(payload, "$.transactionType") as transaction_type,
     json_value(payload, "$.institutionCategory") as institution_category,
     safe_cast(json_value(payload, "$.pending") as bool) as pending,
     payload as raw_payload_json,
@@ -43,6 +46,24 @@ survivors as (
   from ranked_events
   where latest_rank = 1
     and event_type != "removed"
+),
+payment_aliases as (
+  select
+    alias_pattern,
+    coalesce(match_strategy, "description_contains") as match_strategy
+  from ${ref("credit_card_payment_aliases")}
+  where coalesce(enabled, true)
+),
+classified_survivors as (
+  select
+    *,
+    regexp_replace(lower(coalesce(description_raw, "")), r"[^a-z0-9]+", " ") as description_search,
+    regexp_replace(lower(coalesce(merchant_raw, "")), r"[^a-z0-9]+", " ") as merchant_search,
+    regexp_replace(lower(coalesce(account_type, "")), r"[^a-z0-9]+", " ") as account_type_search,
+    regexp_replace(lower(coalesce(account_subtype, "")), r"[^a-z0-9]+", " ") as account_subtype_search,
+    regexp_replace(lower(coalesce(institution_category, "")), r"[^a-z0-9]+", " ") as institution_category_search,
+    regexp_replace(lower(coalesce(transaction_type, "")), r"[^a-z0-9]+", " ") as transaction_type_search
+  from survivors
 )
 select
   to_hex(md5(concat(source_account_id, "::", source_transaction_id))) as transaction_id,
@@ -57,7 +78,53 @@ select
   coalesce(merchant_norm, description_norm, "") as merchant_norm,
   signed_amount,
   direction,
-  transaction_class,
+  case
+    when (
+      signed_amount < 0
+      and (
+        exists (
+          select 1
+          from payment_aliases
+          where (
+            match_strategy = "description_regex"
+            and regexp_contains(
+              concat(description_search, " ", merchant_search),
+              alias_pattern
+            )
+          )
+          or (
+            match_strategy != "description_regex"
+            and concat(description_search, " ", merchant_search) like concat(
+              "%",
+              regexp_replace(lower(alias_pattern), r"[^a-z0-9]+", "%"),
+              "%"
+            )
+          )
+        )
+        or regexp_contains(
+          concat(description_search, " ", merchant_search),
+          r"\b(applecard|apple card|gsbank|amex|american express|discover|chase credit crd|chase credit card|credit one bank|credit card)\b"
+        )
+      )
+      and regexp_contains(
+        concat(description_search, " ", merchant_search),
+        r"\b(payment|pmt|epay|epayment|debit|debits)\b"
+      )
+    )
+    or (
+      signed_amount > 0
+      and (
+        account_type_search = "credit"
+        or regexp_contains(account_subtype_search, r"\bcredit\b")
+      )
+      and (
+        regexp_contains(institution_category_search, r"\bpayments?( and credits?)?\b")
+        or regexp_contains(transaction_type_search, r"\bpayment\b")
+        or regexp_contains(description_search, r"\b(internet payment|payment thank you)\b")
+      )
+    ) then "credit_payment"
+    else transaction_class
+  end as transaction_class,
   institution_category,
   pending,
   keyword_array_json,
@@ -76,4 +143,4 @@ select
       )
     )
   ) as canonical_group_id
-from survivors
+from classified_survivors

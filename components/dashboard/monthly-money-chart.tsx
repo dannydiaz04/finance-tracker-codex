@@ -4,6 +4,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  type CardTone,
 } from "@/components/ui/card";
 import type { MonthlyFinanceSummary } from "@/lib/types/finance";
 import { cn, formatCompactCurrency, formatCurrency } from "@/lib/utils";
@@ -11,11 +12,13 @@ import { cn, formatCompactCurrency, formatCurrency } from "@/lib/utils";
 type MonthlyMoneyChartProps = {
   summaries: MonthlyFinanceSummary[];
   selectedMonth: string | null;
+  tone?: CardTone;
 };
 
 export function MonthlyMoneyChart({
   summaries,
   selectedMonth,
+  tone = "neutral",
 }: MonthlyMoneyChartProps) {
   const displaySummaries = [...summaries].reverse();
   const maxValue = Math.max(
@@ -24,7 +27,7 @@ export function MonthlyMoneyChart({
   );
 
   return (
-    <Card>
+    <Card tone={tone}>
       <CardHeader>
         <CardTitle>Monthly money movement</CardTitle>
         <CardDescription>
@@ -46,7 +49,7 @@ export function MonthlyMoneyChart({
               <div>
                 <p className="text-sm font-medium text-white">{summary.label}</p>
                 <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-500">
-                  {summary.transactionCount} txns
+                  {summary.transactionCount} transactions
                 </p>
               </div>
               <div className="grid content-center gap-2">

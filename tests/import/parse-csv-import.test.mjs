@@ -211,6 +211,29 @@ test("Generic CSV falls back to header inference when no source profile matches"
   assert.equal(row.signedAmount, -9.99);
 });
 
+test("Capital One card-payment withdrawals classify as credit payments", () => {
+  const csv = [
+    "Account Number,Transaction Date,Transaction Description,Transaction Type,Transaction Amount,Balance",
+    "5980,5/4/26,Withdrawal from APPLECARD GSBANK PAYMENT,Debit,150.00,1000.00",
+    "5980,5/1/26,Withdrawal from AMEX EPAYMENT ACH PMT,Debit,320.00,680.00",
+    "5980,4/27/26,Withdrawal from DISCOVER E-PAYMENT,Debit,100.00,580.00",
+    "5980,4/27/26,Withdrawal from CHASE CREDIT CRD EPAY,Debit,246.00,334.00",
+  ].join("\n");
+  const parsed = parseCsvImport(csv, {
+    fileName: "2026-05-04_360Checking_5980.csv",
+  });
+
+  assert.equal(parsed.mappingResolution.strategy, "profile");
+  assert.deepEqual(
+    parsed.normalizedRows.map((row) => row.transactionClass),
+    ["credit_payment", "credit_payment", "credit_payment", "credit_payment"],
+  );
+  assert.deepEqual(
+    parsed.normalizedRows.map((row) => row.signedAmount),
+    [-150, -320, -100, -246],
+  );
+});
+
 test("Profile date parsing accepts four-digit years for slash dates", () => {
   const appleCsv = [
     "Transaction Date,Clearing Date,Description,Merchant,Category,Type,Amount (USD),Purchased By",
@@ -238,4 +261,5 @@ test("Profile date parsing accepts four-digit years for slash dates", () => {
 
   assert.equal(discoverParsed.normalizedRows[0].authorizedAt, "2026-04-08T00:00:00.000Z");
   assert.equal(discoverParsed.normalizedRows[0].postedAt, "2026-04-08");
+  assert.equal(discoverParsed.normalizedRows[0].transactionClass, "credit_payment");
 });

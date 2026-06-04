@@ -33,17 +33,31 @@ select
   sum(case when direction = "inflow" then signed_amount else 0 end)
     - abs(sum(case when direction = "outflow" then signed_amount else 0 end)) as total_balance,
   sum(case when direction = "inflow" then signed_amount else 0 end) as available_cash,
-  abs(sum(case when direction = "outflow" then signed_amount else 0 end)) as month_to_date_spend,
-  sum(case when direction = "inflow" then signed_amount else 0 end) as month_to_date_income,
+  abs(
+    sum(
+      case
+        when direction = "outflow"
+          and transaction_class not in ("transfer", "credit_payment")
+        then signed_amount
+        else 0
+      end
+    )
+  ) as month_to_date_spend,
+  sum(
+    case
+      when direction = "inflow" and transaction_class = "income" then signed_amount
+      else 0
+    end
+  ) as month_to_date_income,
   safe_divide(
-    sum(case when direction = "inflow" then signed_amount else 0 end)
-      - abs(sum(case when direction = "outflow" then signed_amount else 0 end)),
-    nullif(sum(case when direction = "inflow" then signed_amount else 0 end), 0)
+    sum(case when direction = "inflow" and transaction_class = "income" then signed_amount else 0 end)
+      - abs(sum(case when direction = "outflow" and transaction_class not in ("transfer", "credit_payment") then signed_amount else 0 end)),
+    nullif(sum(case when direction = "inflow" and transaction_class = "income" then signed_amount else 0 end), 0)
   ) as savings_rate,
   struct(
-    (select merchant_raw from base where direction = "outflow" order by abs(signed_amount) desc limit 1) as merchant,
-    (select abs(signed_amount) from base where direction = "outflow" order by abs(signed_amount) desc limit 1) as amount,
-    (select cast(posted_at as string) from base where direction = "outflow" order by abs(signed_amount) desc limit 1) as posted_at
+    (select merchant_raw from base where direction = "outflow" and transaction_class not in ("transfer", "credit_payment") order by abs(signed_amount) desc limit 1) as merchant,
+    (select abs(signed_amount) from base where direction = "outflow" and transaction_class not in ("transfer", "credit_payment") order by abs(signed_amount) desc limit 1) as amount,
+    (select cast(posted_at as string) from base where direction = "outflow" and transaction_class not in ("transfer", "credit_payment") order by abs(signed_amount) desc limit 1) as posted_at
   ) as largest_expense,
   array(
     with account_totals as (

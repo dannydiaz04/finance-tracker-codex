@@ -4,6 +4,7 @@ import type { Route } from "next";
 import { AnimatePresence, motion } from "motion/react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Database, GitCompareArrows, Sparkles, X } from "lucide-react";
+import { type FormEvent, useState, useTransition } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,12 @@ export function TransactionDrawer({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const [saveState, setSaveState] = useState<{
+    transactionId: string | null;
+    status: "idle" | "saved" | "error";
+    message: string | null;
+  }>({ transactionId: null, status: "idle", message: null });
+  const [isSaving, startTransition] = useTransition();
 
   const close = () => {
     const params = new URLSearchParams(searchParams.toString());
@@ -32,6 +39,48 @@ export function TransactionDrawer({
         params.toString() ? `${pathname}?${params.toString()}` : pathname
       ) as Route,
     );
+  };
+
+  const saveOverride = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    setSaveState({
+      transactionId: transaction?.transactionId ?? null,
+      status: "idle",
+      message: null,
+    });
+
+    startTransition(async () => {
+      const response = await fetch("/api/categories/override", {
+        method: "POST",
+        body: formData,
+      });
+      const payload = (await response.json().catch(() => null)) as
+        | {
+            error?: string;
+            ruleSuggestion?: unknown;
+            ruleSuggestionPersisted?: boolean;
+          }
+        | null;
+
+      if (!response.ok) {
+        setSaveState({
+          transactionId: transaction?.transactionId ?? null,
+          status: "error",
+          message: payload?.error ?? "Unable to save override.",
+        });
+        return;
+      }
+
+      setSaveState({
+        transactionId: transaction?.transactionId ?? null,
+        status: "saved",
+        message: payload?.ruleSuggestionPersisted
+          ? "Override saved. A learned rule is waiting for review."
+          : "Override saved.",
+      });
+      router.refresh();
+    });
   };
 
   return (
@@ -98,14 +147,18 @@ export function TransactionDrawer({
                 </CardHeader>
                 <CardContent>
                   <form
-                    action="/api/categories/override"
-                    method="post"
+                    onSubmit={saveOverride}
                     className="grid gap-3"
                   >
                     <input
                       type="hidden"
                       name="transactionId"
                       value={transaction.transactionId}
+                    />
+                    <input
+                      type="hidden"
+                      name="createRuleSuggestion"
+                      value="true"
                     />
                     <select
                       name="categoryId"
@@ -118,9 +171,21 @@ export function TransactionDrawer({
                         </option>
                       ))}
                     </select>
-                    <Button type="submit" variant="secondary">
-                      Save override
+                    <Button type="submit" variant="secondary" disabled={isSaving}>
+                      {isSaving ? "Saving..." : "Save override"}
                     </Button>
+                    {saveState.message &&
+                    saveState.transactionId === transaction.transactionId ? (
+                      <p
+                        className={
+                          saveState.status === "error"
+                            ? "text-sm text-rose-200"
+                            : "text-sm text-emerald-200"
+                        }
+                      >
+                        {saveState.message}
+                      </p>
+                    ) : null}
                   </form>
                 </CardContent>
               </Card>

@@ -5,8 +5,10 @@ import type {
   CashflowPoint,
   MerchantInsight,
   OverviewSnapshot,
+  InternalMovementReconciliationItem,
   ReviewQueueItem,
   Rule,
+  RuleSuggestion,
   Transaction,
   TransactionDetail,
   TransactionEvent,
@@ -47,6 +49,13 @@ export const sampleCategories: Category[] = [
     group: "Internal",
     sublabel: "Linked accounts",
     color: "#8992a5",
+  },
+  {
+    id: "credit-card-payment",
+    label: "Credit Card Payments",
+    group: "Internal",
+    sublabel: "Accounting-only card payments",
+    color: "#38bdf8",
   },
   {
     id: "software",
@@ -649,6 +658,25 @@ export const sampleRules: Rule[] = [
   },
 ];
 
+export const sampleRuleSuggestions: RuleSuggestion[] = [
+  {
+    suggestionId: "sample-rule-suggestion-1",
+    transactionId: "txn-grocery",
+    categoryId: "groceries",
+    categoryLabel: "Groceries",
+    matchStrategy: "merchant_contains",
+    matchValue: "wholefoods",
+    ruleName: "Wholefoods -> Groceries",
+    ruleDescription: "Learned from manual categorization of Wholefoods.",
+    source: "manual_override",
+    status: "pending",
+    note: "Sample pending learning suggestion.",
+    createdAt: "2026-03-24T12:00:00.000Z",
+    updatedAt: "2026-03-24T12:00:00.000Z",
+    reviewedAt: null,
+  },
+];
+
 export const sampleReviewQueue: ReviewQueueItem[] = [
   {
     transactionId: "txn-010",
@@ -684,6 +712,23 @@ export const sampleCashflow: CashflowPoint[] = [
   { date: "2026-03-26", inflow: 0, outflow: 56.31, net: -56.31 },
 ];
 
+export const sampleInternalMovementReconciliationItems: InternalMovementReconciliationItem[] = [
+  {
+    transactionId: "txn-transfer-out",
+    counterpartTransactionId: "txn-transfer-in",
+    accountName: "Main Checking",
+    transactionClass: "transfer",
+    postedAt: "2026-03-18",
+    signedAmount: -5000,
+    merchant: "SCHWAB TRANSFER",
+    description: "Online transfer to savings",
+    matchStatus: "matched",
+    dayDelta: 0,
+    amountDelta: 0,
+    reconciliationGroupId: "sample-transfer-match",
+  },
+];
+
 export const sampleCategoryInsights: CategoryInsight[] = [
   {
     categoryId: "housing-rent",
@@ -692,6 +737,11 @@ export const sampleCategoryInsights: CategoryInsight[] = [
     share: 0.67,
     transactionCount: 1,
     trend: 0,
+    averageTransaction: 2850,
+    sparkline: [{ date: "2026-03-01", amount: 2850 }],
+    topMerchants: [
+      { merchant: "VISTA PROPERTY MGMT", amount: 2850, transactionCount: 1 },
+    ],
   },
   {
     categoryId: "groceries",
@@ -700,6 +750,15 @@ export const sampleCategoryInsights: CategoryInsight[] = [
     share: 0.04,
     transactionCount: 2,
     trend: 0.18,
+    averageTransaction: 94.37,
+    sparkline: [
+      { date: "2026-03-08", amount: 56.31 },
+      { date: "2026-03-24", amount: 132.42 },
+    ],
+    topMerchants: [
+      { merchant: "WHOLEFOODS 10429", amount: 132.42, transactionCount: 1 },
+      { merchant: "TRADER JOES 542", amount: 56.31, transactionCount: 1 },
+    ],
   },
   {
     categoryId: "dining",
@@ -708,6 +767,11 @@ export const sampleCategoryInsights: CategoryInsight[] = [
     share: 0.02,
     transactionCount: 1,
     trend: 0.11,
+    averageTransaction: 89.6,
+    sparkline: [{ date: "2026-03-23", amount: 89.6 }],
+    topMerchants: [
+      { merchant: "SWEETGREEN 88", amount: 89.6, transactionCount: 1 },
+    ],
   },
   {
     categoryId: "software",
@@ -716,6 +780,11 @@ export const sampleCategoryInsights: CategoryInsight[] = [
     share: 0.01,
     transactionCount: 1,
     trend: 0,
+    averageTransaction: 32,
+    sparkline: [{ date: "2026-03-20", amount: 32 }],
+    topMerchants: [
+      { merchant: "NOTION LABS", amount: 32, transactionCount: 1 },
+    ],
   },
   {
     categoryId: "travel",
@@ -724,6 +793,11 @@ export const sampleCategoryInsights: CategoryInsight[] = [
     share: 0.06,
     transactionCount: 1,
     trend: 0.44,
+    averageTransaction: 248.56,
+    sparkline: [{ date: "2026-03-12", amount: 248.56 }],
+    topMerchants: [
+      { merchant: "UBER TRIP", amount: 248.56, transactionCount: 1 },
+    ],
   },
 ];
 

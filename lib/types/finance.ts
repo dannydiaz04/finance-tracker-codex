@@ -208,6 +208,23 @@ export type Rule = {
   lastMatchedAt: string;
 };
 
+export type RuleSuggestion = {
+  suggestionId: string;
+  transactionId: string;
+  categoryId: string;
+  categoryLabel: string;
+  matchStrategy: Rule["matchStrategy"];
+  matchValue: string;
+  ruleName: string;
+  ruleDescription: string;
+  source: string;
+  status: "pending" | "accepted" | "dismissed";
+  note: string | null;
+  createdAt: string;
+  updatedAt: string;
+  reviewedAt: string | null;
+};
+
 export type ReviewQueueItem = {
   transactionId: string;
   merchant: string;
@@ -219,12 +236,38 @@ export type ReviewQueueItem = {
   reason: string;
 };
 
+export type InternalMovementReconciliationItem = {
+  transactionId: string;
+  counterpartTransactionId: string | null;
+  accountName: string;
+  transactionClass: TransactionClass;
+  postedAt: string;
+  signedAmount: number;
+  merchant: string;
+  description: string;
+  matchStatus: "matched" | "unmatched";
+  dayDelta: number | null;
+  amountDelta: number | null;
+  reconciliationGroupId: string;
+};
+
 export type MerchantInsight = {
   merchant: string;
   spend: number;
   transactions: number;
   trend: number;
   likelyRecurring: boolean;
+};
+
+export type CategorySparklinePoint = {
+  date: string;
+  amount: number;
+};
+
+export type CategoryTopMerchant = {
+  merchant: string;
+  amount: number;
+  transactionCount: number;
 };
 
 export type CategoryInsight = {
@@ -234,4 +277,7 @@ export type CategoryInsight = {
   share: number;
   transactionCount: number;
   trend: number;
+  averageTransaction: number;
+  sparkline: CategorySparklinePoint[];
+  topMerchants: CategoryTopMerchant[];
 };

@@ -2,7 +2,14 @@
 
 import { motion } from "motion/react";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  type CardTone,
+} from "@/components/ui/card";
 import type { CashflowPoint } from "@/lib/types/finance";
 import { formatCompactCurrency, formatDateLabel } from "@/lib/utils";
 
@@ -10,12 +17,14 @@ type CashflowChartProps = {
   data: CashflowPoint[];
   title?: string;
   description?: string;
+  tone?: CardTone;
 };
 
 export function CashflowChart({
   data,
   title = "Cash flow pulse",
   description = "Recent inflow and outflow cadence from the warehouse mart.",
+  tone = "neutral",
 }: CashflowChartProps) {
   const maxValue = Math.max(
     ...data.flatMap((item) => [item.inflow, item.outflow, Math.abs(item.net)]),
@@ -23,7 +32,7 @@ export function CashflowChart({
   );
 
   return (
-    <Card>
+    <Card tone={tone}>
       <CardHeader>
         <CardTitle>{title}</CardTitle>
         <CardDescription>{description}</CardDescription>

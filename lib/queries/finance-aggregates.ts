@@ -9,12 +9,15 @@ import type {
 } from "@/lib/types/finance";
 import { formatMonthLabel, getMonthRange } from "@/lib/time-filter";
 
-function isSpendTransaction(transaction: Transaction) {
+function isInternalMovement(transaction: Transaction) {
   return (
-    transaction.signedAmount < 0 &&
-    transaction.transactionClass !== "transfer" &&
-    transaction.transactionClass !== "credit_payment"
+    transaction.transactionClass === "transfer" ||
+    transaction.transactionClass === "credit_payment"
   );
+}
+
+function isSpendTransaction(transaction: Transaction) {
+  return transaction.signedAmount < 0 && !isInternalMovement(transaction);
 }
 
 function isIncomeTransaction(transaction: Transaction) {
@@ -34,6 +37,11 @@ export function deriveCashflowFromTransactions(
       net: 0,
     };
 
+    if (isInternalMovement(transaction)) {
+      byDate.set(transaction.postedAt, current);
+      return;
+    }
+
     if (transaction.signedAmount >= 0) {
       current.inflow += transaction.signedAmount;
     } else {
@@ -49,38 +57,97 @@ export function deriveCashflowFromTransactions(
   );
 }
 
+type CategoryBucket = {
+  categoryId: string;
+  label: string;
+  amount: number;
+  transactionCount: number;
+  byDate: Map<string, number>;
+  byMerchant: Map<string, { merchant: string; amount: number; transactionCount: number }>;
+};
+
 export function deriveCategoryInsightsFromTransactions(
   transactions: Transaction[],
 ): CategoryInsight[] {
-  const byCategory = new Map<
-    string,
-    { categoryId: string; label: string; amount: number; transactionCount: number }
-  >();
+  const byCategory = new Map<string, CategoryBucket>();
 
   transactions.filter(isSpendTransaction).forEach((transaction) => {
-    const current = byCategory.get(transaction.derivedCategoryId) ?? {
-      categoryId: transaction.derivedCategoryId,
-      label: transaction.categoryLabel,
+    const bucket =
+      byCategory.get(transaction.derivedCategoryId) ??
+      ({
+        categoryId: transaction.derivedCategoryId,
+        label: transaction.categoryLabel,
+        amount: 0,
+        transactionCount: 0,
+        byDate: new Map<string, number>(),
+        byMerchant: new Map(),
+      } satisfies CategoryBucket);
+
+    const value = Math.abs(transaction.signedAmount);
+    bucket.amount += value;
+    bucket.transactionCount += 1;
+
+    bucket.byDate.set(
+      transaction.postedAt,
+      (bucket.byDate.get(transaction.postedAt) ?? 0) + value,
+    );
+
+    const merchantKey =
+      transaction.merchantRaw || transaction.merchantNorm || "Unknown";
+    const merchantEntry = bucket.byMerchant.get(merchantKey) ?? {
+      merchant: merchantKey,
       amount: 0,
       transactionCount: 0,
     };
+    merchantEntry.amount += value;
+    merchantEntry.transactionCount += 1;
+    bucket.byMerchant.set(merchantKey, merchantEntry);
 
-    current.amount += Math.abs(transaction.signedAmount);
-    current.transactionCount += 1;
-    byCategory.set(transaction.derivedCategoryId, current);
+    byCategory.set(transaction.derivedCategoryId, bucket);
   });
 
   const total = Array.from(byCategory.values()).reduce(
-    (sum, category) => sum + category.amount,
+    (sum, bucket) => sum + bucket.amount,
     0,
   );
 
   return Array.from(byCategory.values())
-    .map((category) => ({
-      ...category,
-      share: total > 0 ? category.amount / total : 0,
-      trend: 0,
-    }))
+    .map((bucket) => {
+      const sparkline = Array.from(bucket.byDate.entries())
+        .map(([date, amount]) => ({ date, amount }))
+        .sort((left, right) => left.date.localeCompare(right.date));
+
+      const half = Math.floor(sparkline.length / 2);
+      const priorSpend = sparkline
+        .slice(0, half)
+        .reduce((sum, point) => sum + point.amount, 0);
+      const recentSpend = sparkline
+        .slice(half)
+        .reduce((sum, point) => sum + point.amount, 0);
+      const trend =
+        sparkline.length > 1 && priorSpend > 0
+          ? (recentSpend - priorSpend) / priorSpend
+          : 0;
+
+      const topMerchants = Array.from(bucket.byMerchant.values())
+        .sort((left, right) => right.amount - left.amount)
+        .slice(0, 3);
+
+      return {
+        categoryId: bucket.categoryId,
+        label: bucket.label,
+        amount: bucket.amount,
+        transactionCount: bucket.transactionCount,
+        share: total > 0 ? bucket.amount / total : 0,
+        trend,
+        averageTransaction:
+          bucket.transactionCount > 0
+            ? bucket.amount / bucket.transactionCount
+            : 0,
+        sparkline,
+        topMerchants,
+      };
+    })
     .sort((left, right) => right.amount - left.amount);
 }
 

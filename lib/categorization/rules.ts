@@ -14,11 +14,78 @@ export type ClassificationResult = {
   ruleId: string | null;
 };
 
+export type MovementClassificationContext = {
+  accountType?: string | null;
+  accountSubtype?: string | null;
+  institutionCategory?: string | null;
+  merchantRaw?: string | null;
+  transactionType?: string | null;
+};
+
+function normalizeOptionalSignal(value: string | null | undefined) {
+  return value ? normalizeDescription(value) : "";
+}
+
+function hasCreditCardPaymentPayee(value: string) {
+  return /\b(?:apple\s*card|applecard|gsbank|amex|american express|discover|chase credit crd|chase credit card|credit one bank|credit card)\b/.test(
+    value,
+  );
+}
+
+function hasPaymentAction(value: string) {
+  return /\b(?:payment|pmt|epay|epayment|debit|debits)\b/.test(value);
+}
+
+function hasCreditCardAccountPaymentSignal(
+  amount: number,
+  description: string,
+  context: MovementClassificationContext,
+) {
+  const accountType = normalizeOptionalSignal(context.accountType);
+  const accountSubtype = normalizeOptionalSignal(context.accountSubtype);
+  const institutionCategory = normalizeOptionalSignal(context.institutionCategory);
+  const transactionType = normalizeOptionalSignal(context.transactionType);
+
+  if (
+    amount <= 0 ||
+    (accountType !== "credit" && !accountSubtype.includes("credit"))
+  ) {
+    return false;
+  }
+
+  return (
+    /\bpayments?(?: and credits?)?\b/.test(institutionCategory) ||
+    /\bpayment\b/.test(transactionType) ||
+    /\b(?:internet payment|payment thank you)\b/.test(description)
+  );
+}
+
+function isCreditCardPayment(
+  amount: number,
+  description: string,
+  context: MovementClassificationContext = {},
+) {
+  const merchant = normalizeOptionalSignal(context.merchantRaw);
+  const haystack = [description, merchant].filter(Boolean).join(" ");
+
+  return (
+    (amount < 0 &&
+      hasCreditCardPaymentPayee(haystack) &&
+      hasPaymentAction(haystack)) ||
+    hasCreditCardAccountPaymentSignal(amount, description, context)
+  );
+}
+
 export function classifyMovementType(
   amount: number,
   description: string,
+  context: MovementClassificationContext = {},
 ): TransactionClass {
   const normalized = normalizeDescription(description);
+
+  if (isCreditCardPayment(amount, normalized, context)) {
+    return "credit_payment";
+  }
 
   if (/transfer|zelle|venmo cashout|ach transfer/.test(normalized)) {
     return "transfer";
