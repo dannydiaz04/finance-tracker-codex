@@ -2,10 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 
+import { resolveRouteUserId } from "@/lib/auth/session";
 import { insertBigQueryRows, isBigQueryConfigured } from "@/lib/bigquery/client";
 import { buildRuleSuggestionDraft } from "@/lib/categorization/rule-suggestions";
 import { getCategories } from "@/lib/queries/catalog";
 import { getTransactionById } from "@/lib/queries/transactions";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 const booleanLikeSchema = z.preprocess(
   (value) => value === true || value === "true" || value === "on" || value === "1",
@@ -37,13 +41,30 @@ async function parseRequest(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const { userId, response } = await resolveRouteUserId();
+
+    if (response) {
+      return response;
+    }
+
     const payload = await parseRequest(request);
     const [transaction, categories] = await Promise.all([
       getTransactionById(payload.transactionId),
       getCategories(),
     ]);
+
+    // getTransactionById is user-scoped, so a missing transaction means the
+    // caller does not own it (or it does not exist).
+    if (!transaction) {
+      return NextResponse.json(
+        { error: "Transaction not found." },
+        { status: 404 },
+      );
+    }
+
     const category = categories.find((item) => item.id === payload.categoryId);
     const row = {
+      user_id: userId,
       transaction_id: payload.transactionId,
       category_id: payload.categoryId,
       reason: payload.note ?? "Saved from transaction drawer.",
@@ -59,6 +80,7 @@ export async function POST(request: NextRequest) {
         : null;
     const ruleSuggestion = ruleSuggestionDraft
       ? {
+          user_id: userId,
           suggestion_id: `rule-suggestion-${randomUUID()}`,
           transaction_id: payload.transactionId,
           category_id: ruleSuggestionDraft.categoryId,

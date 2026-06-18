@@ -8,6 +8,7 @@ config {
 }
 
 create table if not exists ${self()} (
+  user_id string,
   suggestion_id string,
   transaction_id string,
   category_id string,

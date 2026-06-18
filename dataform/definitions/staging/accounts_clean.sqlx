@@ -8,13 +8,15 @@ config {
 
 with observed as (
   select
+    user_id,
     account_id,
     any_value(account_name) as name,
     any_value(source_name) as source_name
   from ${ref("transactions_clean")}
-  group by account_id
+  group by user_id, account_id
 )
 select
+  observed.user_id,
   observed.account_id,
   coalesce(metadata.account_name, observed.name) as name,
   coalesce(metadata.institution, observed.source_name) as source_name,
@@ -42,9 +44,10 @@ select
     regexp_extract(observed.account_id, r"([0-9]{4})$"),
     "unknown"
   ) as mask,
-  cast(null as numeric) as current_balance,
-  cast(null as numeric) as available_balance
+  metadata.current_balance as current_balance,
+  metadata.available_balance as available_balance
 from observed
 left join ${ref("account_metadata")} as metadata
   on metadata.account_id = observed.account_id
+ and metadata.user_id = observed.user_id
  and coalesce(metadata.is_active, true)

@@ -6,8 +6,9 @@ config {
 }
 
 select
+  user_id,
   transaction_id,
   count(*) as row_count
 from ${ref("fact_transaction_current")}
-group by transaction_id
+group by user_id, transaction_id
 having count(*) > 1

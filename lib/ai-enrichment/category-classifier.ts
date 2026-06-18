@@ -39,6 +39,7 @@ export type CategoryTaxonomyItem = {
 
 export type AiEnrichmentQueueRow = {
   transactionId: string;
+  userId: string | null;
   accountId: string;
   accountName: string;
   postedAt: string;
@@ -106,6 +107,7 @@ export type CategoryClassifierDecision = {
 
 export type AiEnrichmentInsertRow = {
   run_id: string;
+  user_id: string | null;
   transaction_id: string;
   input_hash: string;
   prompt_version: string;
@@ -720,6 +722,7 @@ export function buildAiEnrichmentInsertRows({
 
     return {
       run_id: runId,
+      user_id: transaction.userId,
       transaction_id: transaction.transactionId,
       input_hash: decision.inputHash,
       prompt_version: CATEGORY_CLASSIFIER_PROMPT_VERSION,
@@ -754,6 +757,7 @@ export function buildAiEnrichmentInsertRows({
 function normalizeQueueRow(row: Record<string, unknown>): AiEnrichmentQueueRow {
   return {
     transactionId: normalizeString(row.transactionId),
+    userId: normalizeNullableString(row.userId),
     accountId: normalizeString(row.accountId),
     accountName: normalizeString(row.accountName),
     postedAt: normalizeString(row.postedAt),
@@ -817,6 +821,7 @@ async function loadAiEnrichmentQueue({
     `
       SELECT
         q.transaction_id AS transactionId,
+        q.user_id AS userId,
         q.account_id AS accountId,
         q.account_name AS accountName,
         q.posted_at AS postedAt,

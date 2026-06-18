@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { resolveRouteUserId } from "@/lib/auth/session";
 import { parseCsvImport, persistCsvImport } from "@/lib/import/csv";
 import type { CsvImportRuntimeAccountContext } from "@/lib/import/mapping";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 function normalizeTextInput(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -59,6 +63,12 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const { userId, response } = await resolveRouteUserId();
+
+    if (response) {
+      return response;
+    }
+
     const contentType = request.headers.get("content-type") ?? "";
 
     let csv = "";
@@ -114,6 +124,7 @@ export async function POST(request: NextRequest) {
     const parsedImport = parseCsvImport(csv, {
       fileName,
       runtimeAccountContext,
+      userId,
     });
     const persistenceResult = persist
       ? await persistCsvImport(parsedImport)

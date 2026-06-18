@@ -18,6 +18,7 @@ function loadFixture(fileName) {
 test("Profile-backed imports map import batch metadata to snake_case BigQuery fields", () => {
   const parsed = parseCsvImport(loadFixture("american_express_activity.csv"), {
     fileName: "activity.csv",
+    userId: "user-123",
     runtimeAccountContext: {
       sourceAccountId: "american_express_card",
       accountName: "American Express Card",
@@ -40,7 +41,9 @@ test("Profile-backed imports map import batch metadata to snake_case BigQuery fi
     "runtime_source_account_id",
     "source_name",
     "status",
+    "user_id",
   ]);
+  assert.equal(batchRow.user_id, "user-123");
   assert.equal(batchRow.import_batch_id, parsed.importBatch.importBatchId);
   assert.equal(batchRow.source_name, "csv");
   assert.equal(batchRow.imported_at, parsed.importBatch.importedAt);
@@ -62,7 +65,9 @@ test("Profile-backed imports map import batch metadata to snake_case BigQuery fi
     "source_account_id",
     "source_name",
     "source_transaction_id",
+    "user_id",
   ]);
+  assert.equal(eventRow.user_id, "user-123");
   assert.equal(eventRow.event_id, parsed.events[0].eventId);
   assert.equal(eventRow.import_batch_id, parsed.events[0].importBatchId);
   assert.equal(eventRow.source_name, "csv");

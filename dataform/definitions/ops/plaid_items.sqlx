@@ -1,0 +1,24 @@
+config {
+  type: "operations",
+  schema: "ops_finance",
+  name: "plaid_items",
+  description: "Connected Plaid Items (one per institution login) with sync cursors.",
+  hasOutput: true
+}
+
+create table if not exists ${self()} (
+  user_id string,
+  item_id string not null,
+  access_token string,
+  institution_id string,
+  institution_name string,
+  cursor string,
+  status string,
+  error string,
+  last_synced_at timestamp,
+  created_at timestamp,
+  updated_at timestamp
+)
+options (
+  description = "Connected Plaid Items (one per institution login) with sync cursors. access_token is a long-lived credential; restrict access to this table."
+)

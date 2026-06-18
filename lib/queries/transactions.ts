@@ -1,6 +1,7 @@
 import "server-only";
 
 import { normalizeDescription } from "@/lib/categorization/normalize";
+import { getCurrentUserId } from "@/lib/auth/session";
 import {
   buildTransactionQueryParams,
   uniqueSearchSuggestions,
@@ -164,7 +165,8 @@ const transactionBaseQuery = `
   SELECT
     ${transactionSelectFields}
   FROM \`${projectId}.core_finance.fact_transaction_current\`
-  WHERE (
+  WHERE user_id = @userId
+    AND (
       @query = ''
       OR description_norm LIKE CONCAT('%', @query, '%')
       OR merchant_norm LIKE CONCAT('%', @query, '%')
@@ -201,8 +203,14 @@ function mapTransaction(row: RawTransaction): Transaction {
 }
 
 export async function getTransactions(filters: TransactionFilters) {
+  const userId = await getCurrentUserId();
   const params = buildTransactionQueryParams(filters);
-  const rows = await runBigQueryQuery<RawTransaction>(transactionBaseQuery, params);
+  const rows = userId
+    ? await runBigQueryQuery<RawTransaction>(transactionBaseQuery, {
+        ...params,
+        userId,
+      })
+    : null;
 
   if (rows) {
     return rows.map(mapTransaction);
@@ -214,14 +222,20 @@ export async function getTransactions(filters: TransactionFilters) {
 }
 
 export async function getRecentTransactions(limit = 8, timeFilter?: TimeFilter) {
+  const userId = await getCurrentUserId();
   const boundedLimit = Math.min(Math.max(Math.trunc(limit), 1), 25);
-  const rows = await runBigQueryQuery<RawTransaction>(
-    `${transactionBaseQuery}\nLIMIT ${boundedLimit}`,
-    buildTransactionQueryParams({
-      from: timeFilter?.from,
-      to: timeFilter?.to,
-    }),
-  );
+  const rows = userId
+    ? await runBigQueryQuery<RawTransaction>(
+        `${transactionBaseQuery}\nLIMIT ${boundedLimit}`,
+        {
+          ...buildTransactionQueryParams({
+            from: timeFilter?.from,
+            to: timeFilter?.to,
+          }),
+          userId,
+        },
+      )
+    : null;
 
   if (rows) {
     return rows.map(mapTransaction);
@@ -245,16 +259,20 @@ export async function getRecentTransactions(limit = 8, timeFilter?: TimeFilter) 
 }
 
 export async function getTransactionById(transactionId: string) {
-  const rows = await runBigQueryQuery<RawTransaction>(
-    `
+  const userId = await getCurrentUserId();
+  const rows = userId
+    ? await runBigQueryQuery<RawTransaction>(
+        `
       SELECT
         ${transactionSelectFields}
       FROM \`${projectId}.core_finance.fact_transaction_current\`
       WHERE transaction_id = @transactionId
+        AND user_id = @userId
       LIMIT 1
     `,
-    { transactionId },
-  );
+        { transactionId, userId },
+      )
+    : null;
 
   if (rows?.[0]) {
     return {
@@ -262,6 +280,11 @@ export async function getTransactionById(transactionId: string) {
       relatedTransfers: [],
       rawEvents: [],
     } satisfies TransactionDetail;
+  }
+
+  // An authenticated, warehouse-backed user with no match gets null (no sample leak).
+  if (userId) {
+    return null;
   }
 
   return sampleTransactionDetails[transactionId] ?? null;
@@ -274,15 +297,19 @@ export async function getTransactionSearchSuggestions(query: string) {
     return [];
   }
 
-  const rows = await runBigQueryQuery<TransactionSearchSuggestion>(
-    `
+  const userId = await getCurrentUserId();
+  const rows = userId
+    ? await runBigQueryQuery<TransactionSearchSuggestion>(
+        `
       SELECT label, type
       FROM \`${projectId}.mart_finance.search_suggestions\`
-      WHERE SEARCH(label, @query)
+      WHERE user_id = @userId
+        AND SEARCH(label, @query)
       LIMIT 8
     `,
-    { query },
-  );
+        { query, userId },
+      )
+    : null;
 
   if (rows) {
     return rows;

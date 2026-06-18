@@ -7,9 +7,10 @@ config {
 }
 
 select
+  user_id,
   merchant_norm as merchant_id,
   merchant_norm,
   any_value(merchant_raw) as merchant_display_name,
   count(*) as transaction_count
 from ${ref("transactions_clean")}
-group by merchant_norm
+group by user_id, merchant_norm

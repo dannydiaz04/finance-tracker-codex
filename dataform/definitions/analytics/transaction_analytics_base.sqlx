@@ -6,22 +6,24 @@ config {
   tags: ["analytics"],
   bigquery: {
     partitionBy: "posted_at",
-    clusterBy: ["account_id", "merchant_key", "derived_category_id", "transaction_class"]
+    clusterBy: ["user_id", "account_id", "merchant_key", "derived_category_id"]
   }
 }
 
 with history as (
   select
+    user_id,
     source_transaction_id,
     account_id,
     count(*) as event_count,
     min(event_timestamp) as first_seen_at,
     max(event_timestamp) as last_seen_at
   from ${ref("fact_transaction_history")}
-  group by 1, 2
+  group by 1, 2, 3
 ),
 base as (
   select
+    staged.user_id,
     staged.transaction_id,
     staged.source_transaction_id,
     staged.canonical_group_id,
@@ -121,11 +123,14 @@ base as (
     on current_txn.transaction_id = staged.transaction_id
   left join ${ref("dim_account")} as accounts
     on accounts.account_id = staged.account_id
+   and accounts.user_id = staged.user_id
   left join ${ref("import_batches")} as batches
     on batches.import_batch_id = staged.import_batch_id
+   and batches.user_id = staged.user_id
   left join history
     on history.source_transaction_id = staged.source_transaction_id
    and history.account_id = staged.account_id
+   and history.user_id = staged.user_id
 )
 select
   base.*,
@@ -150,17 +155,17 @@ select
   end as week_of_month,
 
   row_number() over (
-    partition by base.account_id
+    partition by base.user_id, base.account_id
     order by base.posted_at, base.transaction_id
   ) as account_txn_sequence,
   row_number() over (
-    partition by base.account_id, base.merchant_key
+    partition by base.user_id, base.account_id, base.merchant_key
     order by base.posted_at, base.transaction_id
   ) as merchant_txn_sequence_in_account,
   date_diff(
     base.posted_at,
     lag(base.posted_at) over (
-      partition by base.account_id
+      partition by base.user_id, base.account_id
       order by base.posted_at, base.transaction_id
     ),
     day
@@ -168,34 +173,34 @@ select
   date_diff(
     base.posted_at,
     lag(base.posted_at) over (
-      partition by base.account_id, base.merchant_key
+      partition by base.user_id, base.account_id, base.merchant_key
       order by base.posted_at, base.transaction_id
     ),
     day
   ) as days_since_prior_same_merchant_txn,
   date_diff(
     base.posted_at,
-    min(base.posted_at) over (partition by base.account_id),
+    min(base.posted_at) over (partition by base.user_id, base.account_id),
     day
   ) as account_age_days_at_txn,
 
   lag(base.signed_amount) over (
-    partition by base.account_id
+    partition by base.user_id, base.account_id
     order by base.posted_at, base.transaction_id
   ) as prior_signed_amount_same_account,
   mod(cast(round(base.amount_abs * 100) as int64), 100) = 0 as is_round_dollar,
   count(*) over (
-    partition by base.account_id, base.merchant_key
+    partition by base.user_id, base.account_id, base.merchant_key
     order by unix_date(base.posted_at)
     range between 90 preceding and current row
   ) as txn_count_same_merchant_90d,
   avg(base.amount_abs) over (
-    partition by base.account_id, base.merchant_key
+    partition by base.user_id, base.account_id, base.merchant_key
     order by unix_date(base.posted_at)
     range between 90 preceding and current row
   ) as avg_amount_same_merchant_90d,
   stddev_pop(base.amount_abs) over (
-    partition by base.account_id, base.merchant_key
+    partition by base.user_id, base.account_id, base.merchant_key
     order by unix_date(base.posted_at)
     range between 90 preceding and current row
   ) as stddev_amount_same_merchant_90d,
@@ -205,7 +210,7 @@ select
       else cast(0 as numeric)
     end
   ) over (
-    partition by base.account_id
+    partition by base.user_id, base.account_id
     order by unix_date(base.posted_at)
     range between 30 preceding and current row
   ) as outflow_30d,
@@ -215,7 +220,7 @@ select
       else cast(0 as numeric)
     end
   ) over (
-    partition by base.account_id
+    partition by base.user_id, base.account_id
     order by unix_date(base.posted_at)
     range between 30 preceding and current row
   ) as inflow_30d

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { getCurrentUserId } from "@/lib/auth/session";
 import { getBigQueryProjectId, runBigQueryQuery } from "@/lib/bigquery/client";
 import { getCashflowSeries } from "@/lib/queries/cashflow";
 import { coerceDateString, coerceNumber } from "@/lib/queries/coerce";
@@ -103,14 +104,19 @@ function mapOverviewSnapshot(row: RawOverviewSnapshot): OverviewSnapshot {
 }
 
 export async function getOverviewSnapshot(timeFilter?: TimeFilter) {
+  const userId = await getCurrentUserId();
   const projectId = getBigQueryProjectId() ?? "project";
-  const rows = await runBigQueryQuery<RawOverviewSnapshot>(
-    `
+  const rows = userId
+    ? await runBigQueryQuery<RawOverviewSnapshot>(
+        `
       SELECT *
       FROM \`${projectId}.mart_finance.overview_snapshot\`
+      WHERE user_id = @userId
       LIMIT 1
     `,
-  );
+        { userId },
+      )
+    : null;
   const base = rows?.[0] ? mapOverviewSnapshot(rows[0]) : sampleOverview;
   const [transactions, cashflow] = await Promise.all([
     getTransactions({

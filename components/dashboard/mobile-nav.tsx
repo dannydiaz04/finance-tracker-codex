@@ -18,6 +18,7 @@ const items = [
   { href: "/categories", label: "Categories" },
   { href: "/merchants", label: "Merchants" },
   { href: "/rules", label: "Rules" },
+  { href: "/connections" as Route, label: "Connections" },
   { href: "/assistant" as Route, label: "Assistant" },
 ] as const satisfies ReadonlyArray<{ href: Route; label: string }>;
 

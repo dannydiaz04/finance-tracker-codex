@@ -8,6 +8,7 @@ config {
 
 with daily_category_totals as (
   select
+    user_id,
     posted_at as date,
     derived_category_id as category_id,
     category_label as label,
@@ -16,22 +17,23 @@ with daily_category_totals as (
   from ${ref("fact_transaction_current")}
   where direction = "outflow"
     and transaction_class in ("expense", "fee", "adjustment")
-  group by posted_at, derived_category_id, category_label
+  group by user_id, posted_at, derived_category_id, category_label
 )
 select
+  user_id,
   date,
   category_id,
   label,
   amount,
   transaction_count,
-  safe_divide(amount, sum(amount) over ()) as share,
+  safe_divide(amount, sum(amount) over (partition by user_id)) as share,
   safe_divide(
     amount - lag(amount) over (
-      partition by category_id
+      partition by user_id, category_id
       order by date
     ),
     lag(amount) over (
-      partition by category_id
+      partition by user_id, category_id
       order by date
     )
   ) as trend

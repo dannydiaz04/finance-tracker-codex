@@ -1,6 +1,7 @@
 import type { ParsedCsvImport } from "./csv.ts";
 
 export type RawImportBatchInsertRow = {
+  user_id: string | null;
   import_batch_id: string;
   source_name: string;
   imported_at: string;
@@ -16,6 +17,7 @@ export type RawImportBatchInsertRow = {
 };
 
 export type RawTransactionEventInsertRow = {
+  user_id: string | null;
   event_id: string;
   import_batch_id: string;
   source_name: string;
@@ -47,6 +49,7 @@ export function toRawImportBatchInsertRow(
   const runtimeAccountContext = parsedImport.mappingResolution.runtimeAccountContext;
 
   return {
+    user_id: parsedImport.importBatch.userId ?? null,
     import_batch_id: parsedImport.importBatch.importBatchId,
     source_name: parsedImport.importBatch.sourceName,
     imported_at: parsedImport.importBatch.importedAt,
@@ -71,6 +74,7 @@ export function toRawTransactionEventInsertRows(
   parsedImport: ParsedCsvImport,
 ): RawTransactionEventInsertRow[] {
   return parsedImport.events.map((event) => ({
+    user_id: event.userId ?? null,
     event_id: event.eventId,
     import_batch_id: event.importBatchId,
     source_name: event.sourceName,

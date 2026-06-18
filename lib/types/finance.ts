@@ -40,6 +40,7 @@ export type Account = {
 export type TransactionEvent = {
   eventId: string;
   importBatchId: string;
+  userId: string | null;
   sourceName: "csv" | "plaid";
   sourceTransactionId: string;
   sourceAccountId: string;
@@ -121,6 +122,7 @@ export type TransactionSearchSuggestion = {
 
 export type ImportBatch = {
   importBatchId: string;
+  userId: string | null;
   sourceName: "csv" | "plaid";
   importedAt: string;
   rowCount: number;

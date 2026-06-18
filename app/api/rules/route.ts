@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
+import { resolveRouteUserId } from "@/lib/auth/session";
 import { insertBigQueryRows, isBigQueryConfigured } from "@/lib/bigquery/client";
 import { getRules } from "@/lib/queries/rules";
 import { sampleCategories } from "@/lib/sample-data";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 const ruleSchema = z.object({
   name: z.string().min(1),
@@ -25,11 +29,18 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const { userId, response } = await resolveRouteUserId();
+
+    if (response) {
+      return response;
+    }
+
     const payload = ruleSchema.parse(await request.json());
     const categoryLabel =
       sampleCategories.find((category) => category.id === payload.categoryId)?.label ??
       payload.categoryId;
     const row = {
+      user_id: userId,
       rule_id: `rule-${Date.now()}`,
       name: payload.name,
       description: payload.description,

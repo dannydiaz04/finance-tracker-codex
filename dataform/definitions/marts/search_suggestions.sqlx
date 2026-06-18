@@ -6,19 +6,19 @@ config {
   tags: ["mart"]
 }
 
-select merchant_raw as label, "merchant" as type
+select user_id, merchant_raw as label, "merchant" as type
 from ${ref("fact_transaction_current")}
-group by merchant_raw
+group by user_id, merchant_raw
 
 union all
 
-select category_label as label, "category" as type
+select user_id, category_label as label, "category" as type
 from ${ref("fact_transaction_current")}
-group by category_label
+group by user_id, category_label
 
 union all
 
-select keyword as label, "keyword" as type
+select user_id, keyword as label, "keyword" as type
 from ${ref("fact_transaction_current")},
 unnest(keyword_array) as keyword
-group by keyword
+group by user_id, keyword

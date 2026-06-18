@@ -23,6 +23,7 @@ import type { ImportBatch, TransactionEvent } from "../types/finance.ts";
 export type ParseCsvImportOptions = {
   fileName?: string;
   runtimeAccountContext?: Partial<CsvImportRuntimeAccountContext>;
+  userId?: string | null;
 };
 
 export type ParsedCsvImport = {
@@ -115,6 +116,7 @@ export function parseCsvImport(
       : optionsOrFileName;
   const fileName = options.fileName ?? "manual-upload.csv";
   const runtimeAccountContext = options.runtimeAccountContext ?? {};
+  const userId = options.userId ?? null;
   const matrix = parseCsvMatrix(csv);
 
   if (matrix.length === 0) {
@@ -161,6 +163,7 @@ export function parseCsvImport(
     (row: NormalizedImportEvent, index: number) => ({
       eventId: `${importBatchId}-event-${index + 1}`,
       importBatchId,
+      userId,
       sourceName: "csv",
       sourceTransactionId: row.sourceTransactionId,
       sourceAccountId: row.sourceAccountId,
@@ -173,6 +176,7 @@ export function parseCsvImport(
   return {
     importBatch: {
       importBatchId,
+      userId,
       sourceName: "csv",
       importedAt: new Date().toISOString(),
       rowCount: normalizedRows.length,

@@ -72,6 +72,7 @@ export type LandingRunnerOptions = {
   landingRoot?: string;
   maxFiles?: number;
   sourceSystem?: string;
+  userId?: string | null;
   persistImport?: (
     parsedImport: ParsedCsvImport,
   ) => Promise<Awaited<ReturnType<typeof persistCsvImport>>>;
@@ -480,15 +481,33 @@ async function claimLandingFile(
   };
 }
 
-async function loadRuntimeAccountContext(
-  contextManifestPath: string | null,
-): Promise<Partial<CsvImportRuntimeAccountContext>> {
+function extractManifestUserId(manifest: unknown): string | null {
+  if (manifest && typeof manifest === "object") {
+    const value = (manifest as { userId?: unknown }).userId;
+
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  return null;
+}
+
+async function loadLandingContext(contextManifestPath: string | null): Promise<{
+  runtimeAccountContext: Partial<CsvImportRuntimeAccountContext>;
+  userId: string | null;
+}> {
   if (!contextManifestPath) {
-    return {};
+    return { runtimeAccountContext: {}, userId: null };
   }
 
   const rawManifest = await readLandingTextFile(contextManifestPath);
-  return buildRuntimeAccountContext(JSON.parse(rawManifest));
+  const manifest = JSON.parse(rawManifest);
+
+  return {
+    runtimeAccountContext: buildRuntimeAccountContext(manifest),
+    userId: extractManifestUserId(manifest),
+  };
 }
 
 async function writeResultManifest(
@@ -642,17 +661,20 @@ async function rejectClaimedFile(params: {
 
 async function processClaimedLandingFile(
   claimedFile: ClaimedLandingFile,
-  options: Required<Pick<LandingRunnerOptions, "persistImport" | "now">>,
+  options: Required<Pick<LandingRunnerOptions, "persistImport" | "now">> & {
+    userId: string | null;
+  },
   paths: LandingPaths,
 ) {
   const processedAt = options.now().toISOString();
   const inspection = await inspectLandingFile(claimedFile.claimedFilePath);
   let runtimeAccountContext: Partial<CsvImportRuntimeAccountContext>;
+  let manifestUserId: string | null = null;
 
   try {
-    runtimeAccountContext = await loadRuntimeAccountContext(
-      claimedFile.claimedContextPath,
-    );
+    const loaded = await loadLandingContext(claimedFile.claimedContextPath);
+    runtimeAccountContext = loaded.runtimeAccountContext;
+    manifestUserId = loaded.userId;
   } catch (error) {
     return rejectClaimedFile({
       paths,
@@ -703,6 +725,7 @@ async function processClaimedLandingFile(
     parsedImport = parseCsvImport(fileContents, {
       fileName: getLandingPathBaseName(claimedFile.claimedFilePath),
       runtimeAccountContext,
+      userId: manifestUserId ?? options.userId,
     });
   } catch (error) {
     return rejectClaimedFile({
@@ -812,6 +835,7 @@ export async function runLandingImports(
   const maxFiles = Math.max(1, options.maxFiles ?? 1);
   const persistImport = options.persistImport ?? persistCsvImport;
   const now = options.now ?? (() => new Date());
+  const userId = options.userId ?? null;
   const incomingFiles = await listIncomingLandingFiles({
     landingRoot: paths.root,
     sourceSystem: options.sourceSystem,
@@ -826,6 +850,7 @@ export async function runLandingImports(
       {
         persistImport,
         now,
+        userId,
       },
       paths,
     );

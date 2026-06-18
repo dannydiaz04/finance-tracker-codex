@@ -7,6 +7,7 @@ config {
 }
 
 select
+  user_id,
   account_id,
   name,
   source_name as institution,

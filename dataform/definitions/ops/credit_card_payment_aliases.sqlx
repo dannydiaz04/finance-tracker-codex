@@ -8,6 +8,7 @@ config {
 }
 
 create table if not exists ${self()} (
+  user_id string,
   alias_id string,
   target_account_id string,
   target_account_name string,

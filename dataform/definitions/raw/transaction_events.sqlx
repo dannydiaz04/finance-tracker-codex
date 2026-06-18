@@ -7,6 +7,7 @@ config {
 }
 
 create table if not exists ${self()} (
+  user_id string,
   event_id string,
   import_batch_id string,
   source_name string,
@@ -17,7 +18,7 @@ create table if not exists ${self()} (
   payload json
 )
 partition by date(event_timestamp)
-cluster by source_name, source_account_id
+cluster by user_id, source_name, source_account_id
 options (
   description = "Append-only inbound transaction mutations from CSV and future Plaid sync."
 )

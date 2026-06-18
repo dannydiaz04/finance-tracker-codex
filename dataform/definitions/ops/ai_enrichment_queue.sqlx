@@ -7,6 +7,7 @@ config {
 }
 
 select
+  user_id,
   transaction_id,
   account_id,
   account_name,

@@ -6,11 +6,12 @@ config {
   tags: ["core"],
   bigquery: {
     partitionBy: "posted_at",
-    clusterBy: ["account_id", "transaction_class", "derived_category_id", "merchant_norm"]
+    clusterBy: ["user_id", "account_id", "transaction_class", "derived_category_id"]
   }
 }
 
 select
+  staged.user_id,
   staged.transaction_id,
   staged.source_transaction_id,
   staged.canonical_group_id,
@@ -57,3 +58,4 @@ left join ${ref("fact_classification")} as classification
   on classification.transaction_id = staged.transaction_id
 left join ${ref("dim_account")} as accounts
   on accounts.account_id = staged.account_id
+ and accounts.user_id = staged.user_id

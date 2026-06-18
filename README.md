@@ -56,6 +56,45 @@ This reads `ops_finance.ai_enrichment_queue`, calls OpenAI with `OPENAI_API_KEY`
 writes suggestions to `ops_finance.ai_enrichment_results`, and lets the warehouse
 classification model consume only accepted high-confidence results.
 
+## Authentication and multi-user
+
+The app is multi-user: every visitor signs in (email/password or Google), and all
+data is isolated per user via a `user_id` that flows from ingestion through every
+BigQuery table, Dataform model, and query.
+
+Identity lives in Postgres via Auth.js v5 (`next-auth`) + Drizzle; the Postgres
+`user.id` is the `user_id` stamped on all warehouse rows.
+
+Required environment variables:
+
+```bash
+DATABASE_URL=postgres://user:pass@host:5432/dbname
+AUTH_SECRET=generate_with_npx_auth_secret
+AUTH_GOOGLE_ID=your_google_oauth_client_id
+AUTH_GOOGLE_SECRET=your_google_oauth_client_secret
+```
+
+Setup:
+
+1. Provision Postgres and set `DATABASE_URL`; create a Google OAuth client
+   (redirect URI `http://localhost:3000/api/auth/callback/google`).
+2. Generate `AUTH_SECRET` with `npx auth secret`.
+3. Create the auth tables: `npm run db:migrate` (or `npm run db:push`).
+4. Apply the warehouse multi-user migrations (idempotent):
+
+```bash
+bq query --use_legacy_sql=false < sql/warehouse/07_add_user_id_columns.sql
+bq query --use_legacy_sql=false < sql/warehouse/08_add_account_balances.sql
+```
+
+5. Sign up at `/sign-up`, then (optional) backfill any pre-existing warehouse data
+   to your new account: edit `sql/warehouse/09_backfill_user_id.sql` with your
+   user id, run it, and rerun `npx dataform run dataform`.
+
+Routes outside the sign-in/sign-up pages, the Auth.js endpoints, and the Plaid
+webhook are gated by `middleware.ts`. The Plaid webhook resolves the owning user
+from the stored Item, so it needs no session.
+
 ## Data Sources
 
 - If BigQuery is configured, dashboard queries read from the warehouse marts and
@@ -71,8 +110,53 @@ BIGQUERY_LOCATION=US
 GOOGLE_CLOUD_PROJECT=your_project
 ```
 
-Plaid routes are scaffolded but not fully wired yet. CSV import remains the
-fully functional ingestion path today.
+## Plaid account linking
+
+You can connect bank and credit card accounts with Plaid in addition to (or
+instead of) CSV import. Plaid transactions flow into the **same**
+`raw_finance.transaction_events` model as CSV (`source_name = "plaid"`), so every
+downstream mart, rule, and dashboard works unchanged.
+
+Set up:
+
+```bash
+PLAID_CLIENT_ID=your_client_id
+PLAID_SECRET=your_secret
+PLAID_ENV=sandbox            # sandbox or production
+PLAID_WEBHOOK_URL=https://your-public-tunnel/api/plaid/webhook   # optional
+PLAID_REDIRECT_URI=https://your-app/connections                  # optional (OAuth banks)
+```
+
+Create the item store table once (or run `npx dataform run dataform`, which now
+includes it):
+
+```bash
+bq query --use_legacy_sql=false < sql/warehouse/06_create_plaid_items.sql
+```
+
+Flow:
+
+1. Open `/connections` and click **Connect a bank** to launch Plaid Link.
+2. The public token is exchanged server-side; the durable access token and a
+   per-item sync cursor are stored in `ops_finance.plaid_items`.
+3. `/api/plaid/sync` (and the Plaid `SYNC_UPDATES_AVAILABLE` webhook) call
+   `/transactions/sync`, writing added/modified/removed events and upserting
+   account metadata, including current/available balances shown on the Overview.
+4. Run `npx dataform run dataform` to refresh the marts.
+
+Set `PLAID_WEBHOOK_URL` (a public HTTPS URL ending in `/api/plaid/webhook`, e.g.
+via an ngrok tunnel in dev) to enable webhook-driven auto-sync; the Connections
+page shows whether auto-sync is on.
+
+API routes: `POST /api/plaid/link-token`, `POST /api/plaid/exchange`,
+`POST /api/plaid/sync`, and `POST /api/plaid/webhook`.
+
+> Security: the Plaid `access_token` is a long-lived credential stored in
+> BigQuery. Restrict IAM access to `ops_finance.plaid_items`, and consider moving
+> the token to Secret Manager for production.
+
+If Plaid env vars are absent, the Connections page explains the setup and CSV
+import remains the fully functional ingestion path.
 
 ## Warehouse ETL
 

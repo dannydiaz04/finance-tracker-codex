@@ -43,6 +43,7 @@ matched_rules as (
   from base
   join ${ref("category_rules")} as rules
     on coalesce(rules.enabled, true)
+   and rules.user_id = base.user_id
    and (
      (rules.match_strategy = "merchant_exact" and lower(base.merchant_norm) = lower(rules.match_value))
      or (rules.match_strategy = "merchant_contains" and lower(base.merchant_norm) like concat("%", lower(rules.match_value), "%"))
@@ -81,6 +82,7 @@ fallbacks as (
   from base
 )
 select
+  base.user_id,
   base.transaction_id,
   coalesce(
     overrides.category_id,

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { getCurrentUserId } from "@/lib/auth/session";
 import { getBigQueryProjectId, runBigQueryQuery } from "@/lib/bigquery/client";
 import { coerceDateString, coerceNumber } from "@/lib/queries/coerce";
 import { deriveCategoryInsightsFromTransactions } from "@/lib/queries/finance-aggregates";
@@ -33,9 +34,11 @@ export async function getCategoryInsights(timeFilter?: TimeFilter) {
 }
 
 export async function getReviewQueue(timeFilter?: TimeFilter) {
+  const userId = await getCurrentUserId();
   const projectId = getBigQueryProjectId() ?? "project";
-  const rows = await runBigQueryQuery<RawReviewQueueItem>(
-    `
+  const rows = userId
+    ? await runBigQueryQuery<RawReviewQueueItem>(
+        `
       SELECT
         transaction_id AS transactionId,
         merchant,
@@ -46,13 +49,15 @@ export async function getReviewQueue(timeFilter?: TimeFilter) {
         confidence_score AS confidenceScore,
         reason
       FROM \`${projectId}.ops_finance.review_queue\`
-      WHERE (@from = '' OR posted_at >= DATE(@from))
+      WHERE user_id = @userId
+        AND (@from = '' OR posted_at >= DATE(@from))
         AND (@to = '' OR posted_at <= DATE(@to))
       ORDER BY confidence_score ASC, posted_at DESC
       LIMIT 50
     `,
-    buildTimeFilterQueryParams(timeFilter ?? { preset: "all" }),
-  );
+        { ...buildTimeFilterQueryParams(timeFilter ?? { preset: "all" }), userId },
+      )
+    : null;
 
   return rows
     ? rows.map((row) => ({

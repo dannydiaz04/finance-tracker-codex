@@ -7,6 +7,7 @@ config {
 }
 
 select
+  events.user_id,
   events.event_id,
   events.import_batch_id,
   events.source_name,
@@ -24,3 +25,4 @@ from ${ref("transaction_events")} as events
 left join ${ref("transactions_clean")} as clean
   on clean.source_transaction_id = events.source_transaction_id
  and clean.account_id = events.source_account_id
+ and clean.user_id = events.user_id

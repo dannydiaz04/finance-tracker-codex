@@ -2,7 +2,7 @@ config {
   type: "table",
   schema: "mart_finance",
   name: "overview_snapshot",
-  description: "Single-row dashboard snapshot with nested arrays for the overview route.",
+  description: "Per-user dashboard snapshot with nested arrays for the overview route.",
   tags: ["mart"]
 }
 
@@ -10,109 +10,165 @@ with base as (
   select *
   from ${ref("fact_transaction_current")}
 ),
-cashflow as (
-  select * from ${ref("daily_cashflow")}
-),
-dim_accounts as (
-  select * from ${ref("dim_account")}
-),
-merchant_spend as (
-  select * from ${ref("merchant_spend_90d")}
-),
-category_mix as (
+scalars as (
   select
+    user_id,
+    sum(case when direction = "inflow" then signed_amount else 0 end)
+      - abs(sum(case when direction = "outflow" then signed_amount else 0 end)) as total_balance,
+    sum(case when direction = "inflow" then signed_amount else 0 end) as available_cash,
+    abs(
+      sum(
+        case
+          when direction = "outflow"
+            and transaction_class not in ("transfer", "credit_payment")
+          then signed_amount
+          else 0
+        end
+      )
+    ) as month_to_date_spend,
+    sum(
+      case
+        when direction = "inflow" and transaction_class = "income" then signed_amount
+        else 0
+      end
+    ) as month_to_date_income,
+    safe_divide(
+      sum(case when direction = "inflow" and transaction_class = "income" then signed_amount else 0 end)
+        - abs(sum(case when direction = "outflow" and transaction_class not in ("transfer", "credit_payment") then signed_amount else 0 end)),
+      nullif(sum(case when direction = "inflow" and transaction_class = "income" then signed_amount else 0 end), 0)
+    ) as savings_rate
+  from base
+  group by user_id
+),
+largest as (
+  select user_id, merchant, amount, posted_at
+  from (
+    select
+      user_id,
+      merchant_raw as merchant,
+      abs(signed_amount) as amount,
+      cast(posted_at as string) as posted_at,
+      row_number() over (
+        partition by user_id
+        order by abs(signed_amount) desc
+      ) as rn
+    from base
+    where direction = "outflow"
+      and transaction_class not in ("transfer", "credit_payment")
+  )
+  where rn = 1
+),
+account_totals as (
+  select
+    user_id,
+    account_id,
+    sum(signed_amount) as current_balance,
+    sum(signed_amount) as available_balance
+  from base
+  group by user_id, account_id
+),
+accounts_arr as (
+  select
+    acct.user_id,
+    array_agg(
+      struct(
+        acct.account_id as id,
+        acct.name as name,
+        acct.institution as institution,
+        acct.type as type,
+        acct.subtype as subtype,
+        acct.currency as currency,
+        acct.mask as mask,
+        coalesce(acct.current_balance, account_totals.current_balance, 0) as current_balance,
+        coalesce(acct.available_balance, account_totals.available_balance, 0) as available_balance
+      )
+      order by acct.name
+    ) as accounts
+  from ${ref("dim_account")} as acct
+  left join account_totals
+    on account_totals.user_id = acct.user_id
+   and account_totals.account_id = acct.account_id
+  group by acct.user_id
+),
+cashflow_arr as (
+  select
+    user_id,
+    array_agg(
+      struct(cast(date as string) as date, inflow, outflow, net)
+      order by date desc
+      limit 30
+    ) as cashflow
+  from ${ref("daily_cashflow")}
+  group by user_id
+),
+category_totals as (
+  select
+    user_id,
     derived_category_id as category_id,
     any_value(category_label) as label,
     abs(sum(signed_amount)) as amount
   from base
   where direction = "outflow"
     and transaction_class in ("expense", "fee", "adjustment")
-  group by derived_category_id
+  group by user_id, derived_category_id
+),
+category_with_share as (
+  select
+    user_id,
+    category_id,
+    label,
+    amount,
+    safe_divide(amount, sum(amount) over (partition by user_id)) as share
+  from category_totals
+),
+category_arr as (
+  select
+    user_id,
+    array_agg(
+      struct(category_id, label, amount, share)
+      order by amount desc
+      limit 8
+    ) as category_mix
+  from category_with_share
+  group by user_id
+),
+merchant_arr as (
+  select
+    user_id,
+    array_agg(
+      struct(merchant, amount, transactions, change_vs_prior)
+      order by amount desc
+      limit 8
+    ) as top_merchants
+  from ${ref("merchant_spend_90d")}
+  group by user_id
+),
+review_counts as (
+  select user_id, count(*) as review_queue_count
+  from ${ref("review_queue")}
+  group by user_id
 )
 select
-  sum(case when direction = "inflow" then signed_amount else 0 end)
-    - abs(sum(case when direction = "outflow" then signed_amount else 0 end)) as total_balance,
-  sum(case when direction = "inflow" then signed_amount else 0 end) as available_cash,
-  abs(
-    sum(
-      case
-        when direction = "outflow"
-          and transaction_class not in ("transfer", "credit_payment")
-        then signed_amount
-        else 0
-      end
-    )
-  ) as month_to_date_spend,
-  sum(
-    case
-      when direction = "inflow" and transaction_class = "income" then signed_amount
-      else 0
-    end
-  ) as month_to_date_income,
-  safe_divide(
-    sum(case when direction = "inflow" and transaction_class = "income" then signed_amount else 0 end)
-      - abs(sum(case when direction = "outflow" and transaction_class not in ("transfer", "credit_payment") then signed_amount else 0 end)),
-    nullif(sum(case when direction = "inflow" and transaction_class = "income" then signed_amount else 0 end), 0)
-  ) as savings_rate,
+  scalars.user_id,
+  scalars.total_balance,
+  scalars.available_cash,
+  scalars.month_to_date_spend,
+  scalars.month_to_date_income,
+  scalars.savings_rate,
   struct(
-    (select merchant_raw from base where direction = "outflow" and transaction_class not in ("transfer", "credit_payment") order by abs(signed_amount) desc limit 1) as merchant,
-    (select abs(signed_amount) from base where direction = "outflow" and transaction_class not in ("transfer", "credit_payment") order by abs(signed_amount) desc limit 1) as amount,
-    (select cast(posted_at as string) from base where direction = "outflow" and transaction_class not in ("transfer", "credit_payment") order by abs(signed_amount) desc limit 1) as posted_at
+    largest.merchant as merchant,
+    largest.amount as amount,
+    largest.posted_at as posted_at
   ) as largest_expense,
-  array(
-    with account_totals as (
-      select
-        account_id,
-        sum(signed_amount) as current_balance,
-        sum(signed_amount) as available_balance
-      from base
-      group by account_id
-    )
-    select as struct
-      accounts.account_id as id,
-      accounts.name,
-      accounts.institution,
-      accounts.type,
-      accounts.subtype,
-      accounts.currency,
-      accounts.mask,
-      coalesce(account_totals.current_balance, accounts.current_balance, 0) as current_balance,
-      coalesce(account_totals.available_balance, accounts.available_balance, 0) as available_balance
-    from dim_accounts as accounts
-    left join account_totals
-      on account_totals.account_id = accounts.account_id
-    order by accounts.name
-  ) as accounts,
-  array(
-    select as struct
-      cast(date as string) as date,
-      inflow,
-      outflow,
-      net
-    from cashflow
-    order by date desc
-    limit 30
-  ) as cashflow,
-  array(
-    select as struct
-      category_id,
-      label,
-      amount,
-      safe_divide(amount, sum(amount) over ()) as share
-    from category_mix
-    order by amount desc
-    limit 8
-  ) as category_mix,
-  array(
-    select as struct
-      merchant,
-      amount,
-      transactions,
-      change_vs_prior
-    from merchant_spend
-    order by amount desc
-    limit 8
-  ) as top_merchants,
-  (select count(*) from ${ref("review_queue")}) as review_queue_count
-from base
-limit 1
+  accounts_arr.accounts as accounts,
+  cashflow_arr.cashflow as cashflow,
+  category_arr.category_mix as category_mix,
+  merchant_arr.top_merchants as top_merchants,
+  coalesce(review_counts.review_queue_count, 0) as review_queue_count
+from scalars
+left join largest on largest.user_id = scalars.user_id
+left join accounts_arr on accounts_arr.user_id = scalars.user_id
+left join cashflow_arr on cashflow_arr.user_id = scalars.user_id
+left join category_arr on category_arr.user_id = scalars.user_id
+left join merchant_arr on merchant_arr.user_id = scalars.user_id
+left join review_counts on review_counts.user_id = scalars.user_id

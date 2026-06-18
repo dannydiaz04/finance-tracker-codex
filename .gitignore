@@ -18,6 +18,11 @@
 /out/
 /landing-zone/
 
+# local raw-data drop folder (financial exports — never commit)
+/dropbox/*
+!/dropbox/README.md
+!/dropbox/.gitkeep
+
 # production
 /build
 

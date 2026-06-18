@@ -11,6 +11,7 @@ Options:
   --gcs-prefix <prefix>   Optional prefix under --gcs-bucket
   --max-files <count>     Maximum number of incoming files to process. Defaults to 1
   --source-system <name>  Only process files under incoming/<name>/
+  --user-id <id>          Owning user id stamped on ingested rows (overridden by a per-file context.json userId)
   --json                  Print the full run summary as JSON
   --help                  Show this help text
 
@@ -19,6 +20,7 @@ Landing contract:
   incoming/.../<file>.csv.context.json
 
 Context manifest fields:
+  userId
   sourceAccountId
   accountName
   accountMask
@@ -60,6 +62,9 @@ async function main() {
       "source-system": {
         type: "string",
       },
+      "user-id": {
+        type: "string",
+      },
       json: {
         type: "boolean",
       },
@@ -97,6 +102,7 @@ async function main() {
     landingRoot,
     maxFiles,
     sourceSystem: values["source-system"],
+    userId: values["user-id"],
   });
 
   if (values.json) {

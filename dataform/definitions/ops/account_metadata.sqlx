@@ -7,6 +7,7 @@ config {
 }
 
 create table if not exists ${self()} (
+  user_id string,
   account_id string not null,
   account_name string,
   institution string,
@@ -14,6 +15,8 @@ create table if not exists ${self()} (
   account_subtype string,
   currency string,
   mask string,
+  current_balance numeric,
+  available_balance numeric,
   is_active bool,
   notes string,
   updated_at timestamp

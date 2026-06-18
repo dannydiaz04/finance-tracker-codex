@@ -1,5 +1,6 @@
 import "server-only";
 
+import { getCurrentUserId } from "@/lib/auth/session";
 import { getBigQueryProjectId, runBigQueryQuery } from "@/lib/bigquery/client";
 import { coerceDateString, coerceNullableNumber, coerceNumber } from "@/lib/queries/coerce";
 import {
@@ -40,9 +41,11 @@ type RawInternalMovementReconciliationItem = Omit<
 };
 
 export async function getRules() {
+  const userId = await getCurrentUserId();
   const projectId = getBigQueryProjectId() ?? "project";
-  const rows = await runBigQueryQuery<Rule>(
-    `
+  const rows = userId
+    ? await runBigQueryQuery<Rule>(
+        `
       SELECT
         rule_id AS id,
         name,
@@ -57,17 +60,22 @@ export async function getRules() {
         hit_rate AS hitRate,
         last_matched_at AS lastMatchedAt
       FROM \`${projectId}.ops_finance.category_rules\`
+      WHERE user_id = @userId
       ORDER BY priority DESC
     `,
-  );
+        { userId },
+      )
+    : null;
 
   return rows ?? sampleRules;
 }
 
 export async function getLowConfidenceReviewItems(timeFilter?: TimeFilter) {
+  const userId = await getCurrentUserId();
   const projectId = getBigQueryProjectId() ?? "project";
-  const rows = await runBigQueryQuery<ReviewQueueItem>(
-    `
+  const rows = userId
+    ? await runBigQueryQuery<ReviewQueueItem>(
+        `
       SELECT
         transaction_id AS transactionId,
         merchant,
@@ -78,25 +86,29 @@ export async function getLowConfidenceReviewItems(timeFilter?: TimeFilter) {
         confidence_score AS confidenceScore,
         reason
       FROM \`${projectId}.ops_finance.review_queue\`
-      WHERE (@from = '' OR posted_at >= DATE(@from))
+      WHERE user_id = @userId
+        AND (@from = '' OR posted_at >= DATE(@from))
         AND (@to = '' OR posted_at <= DATE(@to))
       ORDER BY confidence_score ASC
       LIMIT 25
     `,
-    buildTimeFilterQueryParams(timeFilter ?? { preset: "all" }),
-  );
+        { ...buildTimeFilterQueryParams(timeFilter ?? { preset: "all" }), userId },
+      )
+    : null;
 
   return rows ?? filterByPostedAt(sampleReviewQueue, timeFilter ?? { preset: "all" });
 }
 
 export async function getRuleSuggestions() {
+  const userId = await getCurrentUserId();
   const configuredProjectId = getBigQueryProjectId();
   const projectId = configuredProjectId ?? "project";
   let rows: RawRuleSuggestion[] | null = null;
 
-  try {
-    rows = await runBigQueryQuery<RawRuleSuggestion>(
-      `
+  if (userId) {
+    try {
+      rows = await runBigQueryQuery<RawRuleSuggestion>(
+        `
         SELECT
           suggestion_id AS suggestionId,
           transaction_id AS transactionId,
@@ -120,15 +132,18 @@ export async function getRuleSuggestions() {
               ORDER BY updated_at DESC
             ) AS suggestion_rank
           FROM \`${projectId}.ops_finance.category_rule_suggestions\`
+          WHERE user_id = @userId
         )
         WHERE suggestion_rank = 1
           AND status = "pending"
         ORDER BY created_at DESC
         LIMIT 25
       `,
-    );
-  } catch {
-    rows = null;
+        { userId },
+      );
+    } catch {
+      rows = null;
+    }
   }
 
   if (rows) {
@@ -146,13 +161,15 @@ export async function getRuleSuggestions() {
 export async function getInternalMovementReconciliationItems(
   timeFilter?: TimeFilter,
 ) {
+  const userId = await getCurrentUserId();
   const configuredProjectId = getBigQueryProjectId();
   const projectId = configuredProjectId ?? "project";
   let rows: RawInternalMovementReconciliationItem[] | null = null;
 
-  try {
-    rows = await runBigQueryQuery<RawInternalMovementReconciliationItem>(
-      `
+  if (userId) {
+    try {
+      rows = await runBigQueryQuery<RawInternalMovementReconciliationItem>(
+        `
         SELECT
           transaction_id AS transactionId,
           counterpart_transaction_id AS counterpartTransactionId,
@@ -168,15 +185,17 @@ export async function getInternalMovementReconciliationItems(
           reconciliation_group_id AS reconciliationGroupId
         FROM \`${projectId}.ops_finance.internal_movement_reconciliation\`
         WHERE match_status = "unmatched"
+          AND user_id = @userId
           AND (@from = '' OR posted_at >= DATE(@from))
           AND (@to = '' OR posted_at <= DATE(@to))
         ORDER BY posted_at DESC, ABS(signed_amount) DESC
         LIMIT 25
       `,
-      buildTimeFilterQueryParams(timeFilter ?? { preset: "all" }),
-    );
-  } catch {
-    rows = null;
+        { ...buildTimeFilterQueryParams(timeFilter ?? { preset: "all" }), userId },
+      );
+    } catch {
+      rows = null;
+    }
   }
 
   if (rows) {

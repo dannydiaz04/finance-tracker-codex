@@ -7,6 +7,7 @@ config {
 }
 
 select
+  user_id,
   date_trunc(posted_at, month) as month,
   sum(
     case
@@ -33,4 +34,4 @@ select
     end
   ) as net
 from ${ref("fact_transaction_current")}
-group by month
+group by user_id, month

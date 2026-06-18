@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
+import { resolveRouteUserId } from "@/lib/auth/session";
 import {
   getBigQueryProjectId,
   insertBigQueryRows,
   isBigQueryConfigured,
   runBigQueryQuery,
 } from "@/lib/bigquery/client";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 const actionSchema = z.object({
   action: z.enum(["accept", "dismiss"]),
@@ -26,7 +30,7 @@ type RawSuggestion = {
   created_at: string;
 };
 
-async function loadSuggestion(suggestionId: string) {
+async function loadSuggestion(suggestionId: string, userId: string) {
   const projectId = getBigQueryProjectId();
 
   if (!projectId) {
@@ -48,6 +52,7 @@ async function loadSuggestion(suggestionId: string) {
         note,
         CAST(created_at AS STRING) AS created_at
       FROM \`${projectId}.ops_finance.category_rule_suggestions\`
+      WHERE user_id = @userId
       QUALIFY
         ROW_NUMBER() OVER (
           PARTITION BY suggestion_id
@@ -56,7 +61,7 @@ async function loadSuggestion(suggestionId: string) {
         AND suggestion_id = @suggestionId
         AND status = "pending"
     `,
-    { suggestionId },
+    { suggestionId, userId },
   );
 
   return rows?.[0] ?? null;
@@ -65,14 +70,17 @@ async function loadSuggestion(suggestionId: string) {
 async function insertSuggestionStatus({
   suggestion,
   status,
+  userId,
 }: {
   suggestion: RawSuggestion;
   status: "accepted" | "dismissed";
+  userId: string;
 }) {
   const now = new Date().toISOString();
 
   await insertBigQueryRows("ops_finance", "category_rule_suggestions", [
     {
+      user_id: userId,
       suggestion_id: suggestion.suggestion_id,
       transaction_id: suggestion.transaction_id,
       category_id: suggestion.category_id,
@@ -96,6 +104,12 @@ export async function POST(
   { params }: { params: Promise<{ suggestionId: string }> },
 ) {
   try {
+    const { userId, response } = await resolveRouteUserId();
+
+    if (response) {
+      return response;
+    }
+
     const { suggestionId } = await params;
     const payload = actionSchema.parse(await request.json());
 
@@ -106,7 +120,7 @@ export async function POST(
       });
     }
 
-    const suggestion = await loadSuggestion(suggestionId);
+    const suggestion = await loadSuggestion(suggestionId, userId);
 
     if (!suggestion) {
       return NextResponse.json(
@@ -116,12 +130,13 @@ export async function POST(
     }
 
     if (payload.action === "dismiss") {
-      await insertSuggestionStatus({ suggestion, status: "dismissed" });
+      await insertSuggestionStatus({ suggestion, status: "dismissed", userId });
       return NextResponse.json({ status: "dismissed", persisted: true });
     }
 
     const now = new Date().toISOString();
     const rule = {
+      user_id: userId,
       rule_id: `learned-${suggestion.suggestion_id}`,
       name: suggestion.rule_name,
       description: suggestion.rule_description,
@@ -138,7 +153,7 @@ export async function POST(
     };
 
     await insertBigQueryRows("ops_finance", "category_rules", [rule]);
-    await insertSuggestionStatus({ suggestion, status: "accepted" });
+    await insertSuggestionStatus({ suggestion, status: "accepted", userId });
 
     return NextResponse.json({
       status: "accepted",

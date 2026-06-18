@@ -1,5 +1,6 @@
 import "server-only";
 
+import { getCurrentUserId } from "@/lib/auth/session";
 import { getBigQueryProjectId, runBigQueryQuery } from "@/lib/bigquery/client";
 import { coerceNumber } from "@/lib/queries/coerce";
 import { sampleAccounts, sampleCategories } from "@/lib/sample-data";
@@ -11,9 +12,11 @@ type RawAccount = Omit<Account, "currentBalance" | "availableBalance"> & {
 };
 
 export async function getAccounts() {
+  const userId = await getCurrentUserId();
   const projectId = getBigQueryProjectId() ?? "project";
-  const rows = await runBigQueryQuery<RawAccount>(
-    `
+  const rows = userId
+    ? await runBigQueryQuery<RawAccount>(
+        `
       SELECT
         account_id AS id,
         name,
@@ -25,9 +28,12 @@ export async function getAccounts() {
         current_balance AS currentBalance,
         available_balance AS availableBalance
       FROM \`${projectId}.core_finance.dim_account\`
+      WHERE user_id = @userId
       ORDER BY name
     `,
-  );
+        { userId },
+      )
+    : null;
 
   return rows
     ? rows.map((row) => ({

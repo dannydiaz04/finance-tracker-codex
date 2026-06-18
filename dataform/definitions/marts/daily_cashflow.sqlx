@@ -7,6 +7,7 @@ config {
 }
 
 select
+  user_id,
   posted_at as date,
   sum(
     case
@@ -33,4 +34,4 @@ select
     end
   ) as net
 from ${ref("fact_transaction_current")}
-group by posted_at
+group by user_id, posted_at

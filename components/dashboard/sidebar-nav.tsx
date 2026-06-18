@@ -9,6 +9,7 @@ import {
   Banknote,
   CandlestickChart,
   ChartColumnBig,
+  Landmark,
   Layers3,
   ReceiptText,
   ShieldCheck,
@@ -29,6 +30,7 @@ const navigation = [
   { href: "/categories", label: "Categories", icon: Layers3 },
   { href: "/merchants", label: "Merchants", icon: Banknote },
   { href: "/rules", label: "Rules & Review", icon: ShieldCheck },
+  { href: "/connections" as Route, label: "Connections", icon: Landmark },
   { href: "/assistant" as Route, label: "Assistant", icon: Sparkles },
 ] as const satisfies ReadonlyArray<{
   href: Route;
@@ -123,8 +125,8 @@ export function SidebarNav() {
           Next phase
         </p>
         <p className="mt-2 text-sm text-slate-300">
-          Plaid sync, AI fallback for low-confidence rows, and alerting for abnormal
-          cash flow.
+          AI fallback for low-confidence rows and alerting for abnormal cash flow,
+          alongside live Plaid + CSV ingestion.
         </p>
       </div>
     </aside>

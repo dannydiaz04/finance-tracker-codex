@@ -113,6 +113,7 @@ const sampleRawEvents: TransactionEvent[] = [
   {
     eventId: "evt-001",
     importBatchId: "batch-csv-demo",
+    userId: null,
     sourceName: "csv",
     sourceTransactionId: "csv-001",
     sourceAccountId: "acct-checking",
@@ -126,6 +127,7 @@ const sampleRawEvents: TransactionEvent[] = [
   {
     eventId: "evt-002",
     importBatchId: "batch-csv-demo",
+    userId: null,
     sourceName: "csv",
     sourceTransactionId: "csv-002",
     sourceAccountId: "acct-checking",

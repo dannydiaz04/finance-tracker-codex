@@ -1,5 +1,6 @@
 import "server-only";
 
+import { getCurrentUserId } from "@/lib/auth/session";
 import { getBigQueryProjectId, runBigQueryQuery } from "@/lib/bigquery/client";
 import { coerceDateString, coerceNumber } from "@/lib/queries/coerce";
 import { sampleCashflow } from "@/lib/sample-data";
@@ -17,22 +18,26 @@ type RawCashflowPoint = {
 };
 
 export async function getCashflowSeries(timeFilter?: TimeFilter) {
+  const userId = await getCurrentUserId();
   const projectId = getBigQueryProjectId() ?? "project";
-  const rows = await runBigQueryQuery<RawCashflowPoint>(
-    `
+  const rows = userId
+    ? await runBigQueryQuery<RawCashflowPoint>(
+        `
       SELECT
         date,
         inflow,
         outflow,
         net
       FROM \`${projectId}.mart_finance.daily_cashflow\`
-      WHERE (@from = '' OR date >= DATE(@from))
+      WHERE user_id = @userId
+        AND (@from = '' OR date >= DATE(@from))
         AND (@to = '' OR date <= DATE(@to))
       ORDER BY date DESC
       LIMIT 90
     `,
-    buildTimeFilterQueryParams(timeFilter ?? { preset: "all" }),
-  );
+        { ...buildTimeFilterQueryParams(timeFilter ?? { preset: "all" }), userId },
+      )
+    : null;
 
   return rows
     ? rows.map((row) => ({

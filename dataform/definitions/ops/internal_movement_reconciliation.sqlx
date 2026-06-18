@@ -8,6 +8,7 @@ config {
 
 with internal_movements as (
   select
+    user_id,
     transaction_id,
     account_id,
     account_name,
@@ -42,7 +43,8 @@ candidate_pairs as (
     ) as inflow_rank
   from internal_movements as outflow
   join internal_movements as inflow
-    on outflow.signed_amount < 0
+    on outflow.user_id = inflow.user_id
+   and outflow.signed_amount < 0
    and inflow.signed_amount > 0
    and outflow.transaction_class = inflow.transaction_class
    and abs(cast(outflow.signed_amount as float64) + cast(inflow.signed_amount as float64)) < 0.01
@@ -73,6 +75,7 @@ reconciled as (
   from matched_pairs
 )
 select
+  movements.user_id,
   movements.transaction_id,
   movements.account_id,
   movements.account_name,

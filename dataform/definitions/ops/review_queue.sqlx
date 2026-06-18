@@ -21,6 +21,7 @@ with ai_review_suggestions as (
 )
 
 select
+  current_txn.user_id,
   current_txn.transaction_id,
   current_txn.merchant_raw as merchant,
   current_txn.description_raw as description,

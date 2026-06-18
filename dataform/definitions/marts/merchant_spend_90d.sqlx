@@ -8,6 +8,7 @@ config {
 
 with merchant_totals as (
   select
+    user_id,
     merchant_raw as merchant,
     abs(sum(signed_amount)) as amount,
     count(*) as transactions
@@ -15,10 +16,11 @@ with merchant_totals as (
   where direction = "outflow"
     and posted_at >= date_sub(current_date(), interval 90 day)
     and transaction_class in ("expense", "fee", "adjustment")
-  group by merchant_raw
+  group by user_id, merchant_raw
 ),
 merchant_prior as (
   select
+    user_id,
     merchant_raw as merchant,
     abs(sum(signed_amount)) as prior_amount
   from ${ref("fact_transaction_current")}
@@ -26,9 +28,10 @@ merchant_prior as (
     and posted_at between date_sub(current_date(), interval 180 day)
       and date_sub(current_date(), interval 91 day)
     and transaction_class in ("expense", "fee", "adjustment")
-  group by merchant_raw
+  group by user_id, merchant_raw
 )
 select
+  totals.user_id,
   totals.merchant,
   totals.amount,
   totals.transactions,
@@ -37,3 +40,4 @@ select
 from merchant_totals as totals
 left join merchant_prior as prior
   on prior.merchant = totals.merchant
+ and prior.user_id = totals.user_id

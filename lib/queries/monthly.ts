@@ -1,5 +1,6 @@
 import "server-only";
 
+import { getCurrentUserId } from "@/lib/auth/session";
 import { getBigQueryProjectId, runBigQueryQuery } from "@/lib/bigquery/client";
 import { coerceNumber } from "@/lib/queries/coerce";
 import { deriveMonthlySummariesFromTransactions } from "@/lib/queries/finance-aggregates";
@@ -32,9 +33,11 @@ function mapMonthlySummary(row: RawMonthlyFinanceSummary): MonthlyFinanceSummary
 }
 
 export async function getMonthlyFinanceSummaries() {
+  const userId = await getCurrentUserId();
   const projectId = getBigQueryProjectId() ?? "project";
-  const rows = await runBigQueryQuery<RawMonthlyFinanceSummary>(
-    `
+  const rows = userId
+    ? await runBigQueryQuery<RawMonthlyFinanceSummary>(
+        `
       SELECT
         FORMAT_DATE('%Y-%m', posted_at) AS month,
         SUM(IF(signed_amount > 0 AND transaction_class = 'income', signed_amount, 0)) AS income,
@@ -49,10 +52,13 @@ export async function getMonthlyFinanceSummaries() {
         COUNT(*) AS transaction_count
       FROM \`${projectId}.core_finance.fact_transaction_current\`
       WHERE NOT pending
+        AND user_id = @userId
       GROUP BY month
       ORDER BY month DESC
     `,
-  );
+        { userId },
+      )
+    : null;
 
   return rows
     ? rows.map(mapMonthlySummary)

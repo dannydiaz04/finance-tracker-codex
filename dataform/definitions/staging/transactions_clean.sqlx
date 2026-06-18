@@ -8,6 +8,7 @@ config {
 
 with ranked_events as (
   select
+    user_id,
     event_id,
     import_batch_id,
     source_name,
@@ -36,7 +37,7 @@ with ranked_events as (
       cast([] as array<json>)
     ) as keyword_array_json,
     row_number() over (
-      partition by source_transaction_id, source_account_id
+      partition by user_id, source_transaction_id, source_account_id
       order by timestamp(event_timestamp) desc
     ) as latest_rank
   from ${ref("transaction_events")}
@@ -49,6 +50,7 @@ survivors as (
 ),
 payment_aliases as (
   select
+    user_id,
     alias_pattern,
     coalesce(match_strategy, "description_contains") as match_strategy
   from ${ref("credit_card_payment_aliases")}
@@ -66,7 +68,8 @@ classified_survivors as (
   from survivors
 )
 select
-  to_hex(md5(concat(source_account_id, "::", source_transaction_id))) as transaction_id,
+  user_id,
+  to_hex(md5(concat(coalesce(user_id, ""), "::", source_account_id, "::", source_transaction_id))) as transaction_id,
   source_transaction_id,
   source_account_id as account_id,
   coalesce(account_name, source_account_id) as account_name,
@@ -85,19 +88,22 @@ select
         exists (
           select 1
           from payment_aliases
-          where (
-            match_strategy = "description_regex"
-            and regexp_contains(
-              concat(description_search, " ", merchant_search),
-              alias_pattern
+          where payment_aliases.user_id = classified_survivors.user_id
+          and (
+            (
+              match_strategy = "description_regex"
+              and regexp_contains(
+                concat(description_search, " ", merchant_search),
+                alias_pattern
+              )
             )
-          )
-          or (
-            match_strategy != "description_regex"
-            and concat(description_search, " ", merchant_search) like concat(
-              "%",
-              regexp_replace(lower(alias_pattern), r"[^a-z0-9]+", "%"),
-              "%"
+            or (
+              match_strategy != "description_regex"
+              and concat(description_search, " ", merchant_search) like concat(
+                "%",
+                regexp_replace(lower(alias_pattern), r"[^a-z0-9]+", "%"),
+                "%"
+              )
             )
           )
         )
@@ -135,6 +141,8 @@ select
   to_hex(
     md5(
       concat(
+        coalesce(user_id, ""),
+        "::",
         coalesce(merchant_norm, merchant_raw, ""),
         "::",
         cast(posted_at as string),
