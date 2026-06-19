@@ -85,17 +85,63 @@ Status: complete.
 
 Goal: production has all required backing services and secrets.
 
-- [ ] Provision production Postgres.
-- [ ] Set `DATABASE_URL`.
+Status: in progress. Repo-side service readiness is complete; external
+production secret values and cloud-provider setup are still pending.
+
+- [x] Add a production service/env contract.
+  - Added `.env.example` with the production service variable names and no
+    secret values.
+  - Added `PRODUCTION_SERVICES.md` with setup steps for Vercel env vars,
+    Postgres, Auth.js/Google OAuth, BigQuery, Plaid, GCS landing, and OpenAI.
+- [x] Add production environment validation tooling.
+  - Added `npm run env:check:production`.
+  - The checker validates required keys, required either/or groups, and Google
+    service account JSON shape without printing secret values.
+- [x] Add Vercel-compatible Google Cloud credentials support.
+  - Added `lib/google-cloud/credentials.ts`.
+  - BigQuery and GCS runner clients now support service account credentials from
+    `GOOGLE_CLOUD_CREDENTIALS_JSON`, `GOOGLE_CLOUD_CREDENTIALS_BASE64`,
+    `GOOGLE_APPLICATION_CREDENTIALS_JSON`, or
+    `GOOGLE_APPLICATION_CREDENTIALS_BASE64`.
+- [x] Provision production Postgres.
+  - Vercel production env already contains Neon/Postgres variables for the
+    linked `finance-tracker` project, including `DATABASE_URL`.
+  - Running migrations against production belongs to Milestone 4.
+- [x] Set `DATABASE_URL`.
+  - Verified present in Vercel production env via `vercel env ls production`.
 - [ ] Generate and set `AUTH_SECRET`.
+  - Not present in Vercel production env yet.
 - [ ] Configure production Google OAuth client and callback URLs.
+  - `AUTH_GOOGLE_ID` and `AUTH_GOOGLE_SECRET` are not present in Vercel
+    production env yet.
+  - Callback URL should be
+    `https://<production-domain>/api/auth/callback/google` after the production
+    domain is selected.
 - [ ] Configure BigQuery project, location, datasets, and service account.
+  - Repo now supports Vercel-safe service account credentials, but production
+    BigQuery env values and service account JSON/base64 are not present in
+    Vercel production env yet.
 - [ ] Configure Plaid production client, secret, redirect URI, and webhook URL.
+  - Plaid production env values are not present in Vercel production env yet.
 - [ ] Configure OpenAI key/model variables if assistant or AI enrichment is
   enabled.
+  - OpenAI production env values are not present in Vercel production env yet.
 - [ ] Configure GCS landing bucket variables for ETL.
+  - `WAREHOUSE_LANDING_BUCKET` / `WAREHOUSE_LANDING_URI` is not present in
+    Vercel production env yet.
 - [ ] Store all secrets in the deployment platform or secret manager, not repo
   files.
+  - Postgres/Neon values are in Vercel. Remaining production secrets still need
+    to be added as Vercel sensitive env vars or stored in the chosen secret
+    manager.
+- [x] Verification completed for repo-side Milestone 3 work.
+  - `npm run env:check:production`: pass with synthetic non-secret production
+    values.
+  - `npm run typecheck`: pass.
+  - `npm run test:imports`: pass.
+  - `npm run lint`: pass.
+  - `npm run build`: pass.
+  - `npm audit --omit=dev`: pass.
 
 ## Milestone 4: Bring Data Stores Up Cleanly
 

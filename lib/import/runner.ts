@@ -6,6 +6,8 @@ import { mkdir, readdir, readFile, rename, stat, writeFile } from "node:fs/promi
 import { basename, dirname, extname, join, relative, resolve } from "node:path";
 import pathPosix from "node:path/posix";
 
+import { getGoogleCloudClientOptions } from "../google-cloud/credentials.ts";
+
 import {
   parseCsvImport,
   persistCsvImport,
@@ -156,7 +158,7 @@ function getLandingPaths(landingRoot?: string): LandingPaths {
 }
 
 function getStorageClient() {
-  storageClient ??= new Storage();
+  storageClient ??= new Storage(getGoogleCloudClientOptions(null));
   return storageClient;
 }
 

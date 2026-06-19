@@ -16,6 +16,7 @@
     "test:imports": "node --conditions=react-server --experimental-strip-types --test tests/import/*.test.mjs",
     "typecheck": "tsc --noEmit",
     "dataform:compile": "dataform compile dataform",
+    "env:check:production": "node scripts/check-production-env.mjs",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push"

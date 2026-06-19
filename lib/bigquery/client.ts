@@ -6,6 +6,8 @@ import {
   type InsertRowsOptions,
 } from "@google-cloud/bigquery";
 
+import { getGoogleCloudClientOptions } from "../google-cloud/credentials.ts";
+
 let bigQueryClient: BigQuery | null | undefined;
 
 function readEnvValue(...keys: string[]) {
@@ -54,7 +56,7 @@ export function getBigQueryClient() {
   }
 
   const options: BigQueryOptions = {
-    projectId,
+    ...getGoogleCloudClientOptions(projectId),
     location: getBigQueryLocation(),
   };
 
