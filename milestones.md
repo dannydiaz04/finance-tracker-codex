@@ -93,6 +93,9 @@ production secret values and cloud-provider setup are still pending.
     secret values.
   - Added `PRODUCTION_SERVICES.md` with setup steps for Vercel env vars,
     Postgres, Auth.js/Google OAuth, BigQuery, Plaid, GCS landing, and OpenAI.
+  - Added `production-env-status/`, a small static HTML/CSS/JS status app that
+    shows which production env vars are ready in Vercel and which values are
+    still missing.
 - [x] Add production environment validation tooling.
   - Added `npm run env:check:production`.
   - The checker validates required keys, required either/or groups, and Google

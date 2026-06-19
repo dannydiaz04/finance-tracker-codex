@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Finance Tracker Production Env Status</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="./app.js" defer></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar" aria-labelledby="page-title">
+        <div>
+          <p class="eyeline">Finance Tracker</p>
+          <h1 id="page-title">Production Env Readiness</h1>
+        </div>
+        <div class="topbar-meta" aria-label="Current production check">
+          <span id="checked-on"></span>
+          <span id="project-name"></span>
+          <span id="check-source"></span>
+        </div>
+      </header>
+
+      <main>
+        <section class="status-grid" aria-label="Readiness summary">
+          <article class="summary-panel summary-panel-primary">
+            <div class="summary-label">Launch env readiness</div>
+            <div class="summary-value" id="launch-ratio">0/0</div>
+            <div class="progress-track" aria-hidden="true">
+              <div class="progress-fill" id="launch-progress"></div>
+            </div>
+            <p class="summary-note" id="launch-note"></p>
+          </article>
+
+          <article class="summary-panel">
+            <div class="summary-label">Ready in Vercel</div>
+            <div class="summary-value" id="ready-count">0</div>
+            <p class="summary-note">Encrypted production variables already present.</p>
+          </article>
+
+          <article class="summary-panel">
+            <div class="summary-label">Missing launch vars</div>
+            <div class="summary-value danger" id="missing-count">0</div>
+            <p class="summary-note">Should remain zero before pushing production code.</p>
+          </article>
+
+          <article class="summary-panel">
+            <div class="summary-label">Production deploy</div>
+            <div class="summary-value warning">Pending</div>
+            <p class="summary-note">No Vercel production deployment has been pushed yet.</p>
+          </article>
+        </section>
+
+        <section class="toolbar" aria-label="Environment variable filters">
+          <label class="search-field">
+            <span>Search</span>
+            <input id="search-input" type="search" placeholder="AUTH_SECRET, Plaid, BigQuery" />
+          </label>
+
+          <div class="segmented-control" role="tablist" aria-label="Status filter">
+            <button class="segment is-active" type="button" data-filter="all">All</button>
+            <button class="segment" type="button" data-filter="ready">Ready</button>
+            <button class="segment" type="button" data-filter="missing">Missing</button>
+            <button class="segment" type="button" data-filter="optional">Optional</button>
+          </div>
+        </section>
+
+        <section class="table-panel" aria-labelledby="contract-title">
+          <div class="section-heading">
+            <div>
+              <h2 id="contract-title">Production Env Contract</h2>
+              <p>Tracked from `.env.example`, `PRODUCTION_SERVICES.md`, and the current Vercel production env list.</p>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">Variable</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Role</th>
+                  <th scope="col">Value / Source</th>
+                  <th scope="col">Where To Get It</th>
+                  <th scope="col">Action</th>
+                </tr>
+              </thead>
+              <tbody id="env-table-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="split-layout" aria-label="Verification and existing Vercel variables">
+          <article class="table-panel">
+            <div class="section-heading">
+              <div>
+                <h2>Ready Production Variables</h2>
+                <p>Confirmed in Vercel production as encrypted values.</p>
+              </div>
+              <span class="count-pill" id="platform-count">0 vars</span>
+            </div>
+            <div class="compact-list" id="platform-list"></div>
+          </article>
+
+          <article class="table-panel">
+            <div class="section-heading">
+              <div>
+                <h2>Readiness Check</h2>
+                <p>Run before deployment or after any production env change.</p>
+              </div>
+            </div>
+            <pre class="command-block"><code>vercel env pull .env.production.local --environment=production --yes
+set -a
+source .env.production.local
+set +a
+npm run env:check:production</code></pre>
+            <button class="copy-button" type="button" id="copy-verify">
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <path d="M8 8h10v12H8z"></path>
+                <path d="M6 16H4V4h12v2"></path>
+              </svg>
+              <span data-copy-label>Copy check</span>
+            </button>
+          </article>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

@@ -1,3 +1,9 @@
+import nextEnv from "@next/env";
+
+const { loadEnvConfig } = nextEnv;
+
+loadEnvConfig(process.cwd(), false);
+
 const requiredKeys = [
   "DATABASE_URL",
   "AUTH_SECRET",

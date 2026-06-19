@@ -9,11 +9,11 @@ Checked on 2026-06-19:
 
 - Vercel CLI account: `dannydiaz04`
 - Linked Vercel project: `finance-tracker`
-- Production env keys currently present in Vercel: Neon/Postgres variables such
-  as `DATABASE_URL`, `POSTGRES_URL`, `PGHOST`, `PGUSER`, and related Neon values.
-- Production env keys still to add before first deploy: Auth.js secret and
-  Google OAuth, BigQuery/Google Cloud credentials, Plaid production credentials,
-  landing bucket, and optional OpenAI keys.
+- Production env keys currently present in Vercel: Neon/Postgres variables,
+  Auth.js/Google OAuth, BigQuery/Google Cloud credentials, Plaid production
+  credentials, GCS landing bucket, and optional OpenAI keys.
+- `npm run env:check:production` passes against the local production env
+  contract.
 
 ## Required Production Environment
 
