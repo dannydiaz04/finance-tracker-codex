@@ -1,5 +1,6 @@
 import type { NextAuthConfig } from "next-auth";
-import Google from "next-auth/providers/google";
+
+import { getGoogleOAuthProvider } from "@/lib/auth/google-oauth";
 
 // Edge-safe base config shared by middleware and the full server config.
 // It must NOT import Node-only modules (pg, bcrypt, the Drizzle adapter).
@@ -7,7 +8,7 @@ export const authConfig = {
   pages: {
     signIn: "/sign-in",
   },
-  providers: [Google],
+  providers: [getGoogleOAuthProvider()],
   callbacks: {
     jwt({ token, user }) {
       if (user) {

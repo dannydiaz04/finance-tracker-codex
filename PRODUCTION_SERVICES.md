@@ -44,6 +44,7 @@ for secret-bearing values.
 
 ```bash
 vercel env add AUTH_SECRET production --sensitive
+vercel env add AUTH_URL production
 vercel env add AUTH_GOOGLE_ID production
 vercel env add AUTH_GOOGLE_SECRET production --sensitive
 
@@ -99,7 +100,8 @@ Run migrations only against the intended production database.
 Required:
 
 - `AUTH_SECRET`
-- `AUTH_GOOGLE_ID`
+- `AUTH_URL` (canonical app origin, e.g. `https://www.financetracker.dev`)
+- `AUTH_GOOGLE_ID` (Google OAuth Web client ID ending in `.apps.googleusercontent.com`)
 - `AUTH_GOOGLE_SECRET`
 
 Generate `AUTH_SECRET` with:
@@ -108,11 +110,19 @@ Generate `AUTH_SECRET` with:
 npx auth secret
 ```
 
-Configure Google OAuth callback URLs after the production domain is known:
+Configure Google OAuth callback URLs on the same OAuth client used by
+`AUTH_GOOGLE_ID` after the production domain is known:
 
 ```text
-https://<production-domain>/api/auth/callback/google
+https://www.financetracker.dev/api/auth/callback/google
 ```
+
+Also add `https://financetracker.dev/api/auth/callback/google` only if the apex
+domain can serve the app without redirecting to `www`.
+
+Enter the raw Vercel values without quotes, brackets, or `KEY=` prefixes. After
+changing these variables, create a new production deployment so the running app
+receives the updated values.
 
 Use the Vercel production URL as a temporary callback only if no custom domain
 exists yet.

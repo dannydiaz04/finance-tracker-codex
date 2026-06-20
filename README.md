@@ -70,6 +70,7 @@ Required environment variables:
 ```bash
 DATABASE_URL=postgres://user:pass@host:5432/dbname
 AUTH_SECRET=generate_with_npx_auth_secret
+AUTH_URL=https://www.financetracker.dev
 AUTH_GOOGLE_ID=your_google_oauth_client_id
 AUTH_GOOGLE_SECRET=your_google_oauth_client_secret
 ```
@@ -92,8 +93,20 @@ bq query --use_legacy_sql=false < sql/warehouse/08_add_account_balances.sql
    user id, run it, and rerun `npx dataform run dataform`.
 
 Routes outside the sign-in/sign-up pages, the Auth.js endpoints, and the Plaid
-webhook are gated by `middleware.ts`. The Plaid webhook resolves the owning user
-from the stored Item, so it needs no session.
+webhook are gated by `proxy.ts`. The Plaid webhook resolves the owning user from
+the stored Item, so it needs no session.
+
+For production, set `AUTH_GOOGLE_ID` to the raw Google OAuth Web client ID ending
+in `.apps.googleusercontent.com`; do not include quotes, brackets, or the
+`AUTH_GOOGLE_ID=` prefix in the Vercel value. Set `AUTH_URL` to the canonical
+origin, currently `https://www.financetracker.dev`. The Google OAuth client used
+by `AUTH_GOOGLE_ID` must authorize this exact redirect URI:
+
+```text
+https://www.financetracker.dev/api/auth/callback/google
+```
+
+Vercel needs a fresh production deployment after auth env changes.
 
 ## Data Sources
 

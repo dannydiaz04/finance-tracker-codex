@@ -7,6 +7,7 @@ loadEnvConfig(process.cwd(), false);
 const requiredKeys = [
   "DATABASE_URL",
   "AUTH_SECRET",
+  "AUTH_URL",
   "AUTH_GOOGLE_ID",
   "AUTH_GOOGLE_SECRET",
   "BIGQUERY_PROJECT_ID",
@@ -45,17 +46,107 @@ const optionalKeys = [
   "OPENAI_CATEGORIZATION_MODEL",
 ];
 
+const GOOGLE_OAUTH_CLIENT_ID_SUFFIX = ".apps.googleusercontent.com";
+const GOOGLE_OAUTH_CALLBACK_PATH = "/api/auth/callback/google";
+const MIN_AUTH_SECRET_LENGTH = 32;
+const MIN_GOOGLE_CLIENT_SECRET_LENGTH = 16;
+
+let googleOAuthCallbackUrl = null;
+
+function unwrapEnvValue(value = "") {
+  let next = value.trim();
+
+  for (let index = 0; index < 2; index += 1) {
+    const first = next.at(0);
+    const last = next.at(-1);
+
+    if (
+      (first === `"` && last === `"`) ||
+      (first === `'` && last === `'`)
+    ) {
+      next = next.slice(1, -1).trim();
+      continue;
+    }
+
+    break;
+  }
+
+  return next;
+}
+
+function getValue(key) {
+  return unwrapEnvValue(process.env[key] ?? "");
+}
+
 function hasValue(key) {
-  return Boolean(process.env[key]?.trim());
+  return Boolean(getValue(key));
+}
+
+function validateAuthValues() {
+  const errors = [];
+  const authSecret = getValue("AUTH_SECRET");
+  const authUrl = getValue("AUTH_URL");
+  const googleClientId = getValue("AUTH_GOOGLE_ID");
+  const googleClientSecret = getValue("AUTH_GOOGLE_SECRET");
+
+  if (authSecret && authSecret.length < MIN_AUTH_SECRET_LENGTH) {
+    errors.push("AUTH_SECRET is too short to be a production session secret.");
+  }
+
+  if (authUrl) {
+    try {
+      const parsedAuthUrl = new URL(authUrl);
+      const isLocalhost = parsedAuthUrl.hostname === "localhost";
+
+      if (parsedAuthUrl.protocol !== "https:" && !isLocalhost) {
+        errors.push("AUTH_URL must use https outside localhost.");
+      }
+
+      if (parsedAuthUrl.pathname !== "/") {
+        errors.push("AUTH_URL should be an origin only, without a path.");
+      }
+
+      googleOAuthCallbackUrl = new URL(
+        GOOGLE_OAUTH_CALLBACK_PATH,
+        parsedAuthUrl.origin,
+      ).toString();
+    } catch {
+      errors.push("AUTH_URL must be a valid absolute URL.");
+    }
+  }
+
+  if (googleClientId) {
+    if (/\s/.test(googleClientId)) {
+      errors.push("AUTH_GOOGLE_ID must not contain whitespace.");
+    }
+
+    if (!googleClientId.endsWith(GOOGLE_OAUTH_CLIENT_ID_SUFFIX)) {
+      errors.push(
+        `AUTH_GOOGLE_ID must end with ${GOOGLE_OAUTH_CLIENT_ID_SUFFIX}.`,
+      );
+    }
+  }
+
+  if (googleClientSecret) {
+    if (/\s/.test(googleClientSecret)) {
+      errors.push("AUTH_GOOGLE_SECRET must not contain whitespace.");
+    }
+
+    if (googleClientSecret.length < MIN_GOOGLE_CLIENT_SECRET_LENGTH) {
+      errors.push("AUTH_GOOGLE_SECRET is too short to be a valid secret.");
+    }
+  }
+
+  return errors;
 }
 
 function validateGoogleCredentials() {
   const json =
-    process.env.GOOGLE_CLOUD_CREDENTIALS_JSON?.trim() ||
-    process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON?.trim();
+    getValue("GOOGLE_CLOUD_CREDENTIALS_JSON") ||
+    getValue("GOOGLE_APPLICATION_CREDENTIALS_JSON");
   const base64 =
-    process.env.GOOGLE_CLOUD_CREDENTIALS_BASE64?.trim() ||
-    process.env.GOOGLE_APPLICATION_CREDENTIALS_BASE64?.trim();
+    getValue("GOOGLE_CLOUD_CREDENTIALS_BASE64") ||
+    getValue("GOOGLE_APPLICATION_CREDENTIALS_BASE64");
 
   if (!json && !base64) {
     return [];
@@ -93,15 +184,25 @@ const missingKeys = requiredKeys.filter((key) => !hasValue(key));
 const missingGroups = requiredGroups.filter(
   (group) => !group.keys.some((key) => hasValue(key)),
 );
-const validationErrors = validateGoogleCredentials();
+const validationErrors = [
+  ...validateAuthValues(),
+  ...validateGoogleCredentials(),
+];
 
-if (missingKeys.length === 0 && missingGroups.length === 0 && validationErrors.length === 0) {
+if (
+  missingKeys.length === 0 &&
+  missingGroups.length === 0 &&
+  validationErrors.length === 0
+) {
   console.log("Production environment contract: OK");
   console.log(`Required keys present: ${requiredKeys.length}`);
   console.log(`Required groups present: ${requiredGroups.length}`);
   console.log(
     `Optional keys present: ${optionalKeys.filter((key) => hasValue(key)).length}/${optionalKeys.length}`,
   );
+  if (googleOAuthCallbackUrl) {
+    console.log(`Google OAuth callback URI: ${googleOAuthCallbackUrl}`);
+  }
   process.exit(0);
 }
 
