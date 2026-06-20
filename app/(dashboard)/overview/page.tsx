@@ -1,6 +1,8 @@
 import { Suspense } from "react";
 import { ArrowUpRight, CircleAlert, Wallet2 } from "lucide-react";
 
+import { AiFallbackCard } from "@/components/dashboard/ai-fallback-card";
+import { CashflowAlerts } from "@/components/dashboard/cashflow-alerts";
 import { CashflowChart } from "@/components/dashboard/cashflow-chart";
 import { CategoryTreemap } from "@/components/dashboard/category-treemap";
 import { KpiCards } from "@/components/dashboard/kpi-cards";
@@ -16,7 +18,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { isBigQueryConfigured } from "@/lib/bigquery/client";
+import { getCashflowAlerts } from "@/lib/queries/alerts";
 import { getCategoryInsights } from "@/lib/queries/categories";
+import { getLowConfidenceSummary } from "@/lib/queries/enrichment";
 import { getMerchantInsights } from "@/lib/queries/merchants";
 import { getMonthlyFinanceSummaries } from "@/lib/queries/monthly";
 import { getOverviewSnapshot } from "@/lib/queries/overview";
@@ -74,11 +79,16 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
   const timeFilter = selectedMonth
     ? { ...getMonthRange(selectedMonth), preset: "custom" as const }
     : normalizeTimeFilter(resolvedSearchParams);
-  const [overview, categories, merchants] = await Promise.all([
-    getOverviewSnapshot(timeFilter),
-    getCategoryInsights(timeFilter),
-    getMerchantInsights(timeFilter),
-  ]);
+  const [overview, categories, merchants, alerts, lowConfidence] =
+    await Promise.all([
+      getOverviewSnapshot(timeFilter),
+      getCategoryInsights(timeFilter),
+      getMerchantInsights(timeFilter),
+      getCashflowAlerts(timeFilter),
+      getLowConfidenceSummary(),
+    ]);
+  const openAiConfigured = Boolean(process.env.OPENAI_API_KEY?.trim());
+  const bigQueryConfigured = isBigQueryConfigured();
 
   return (
     <div className="space-y-6">
@@ -168,6 +178,17 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
+        <CashflowAlerts result={alerts} tone="review" />
+        <AiFallbackCard
+          initialCount={lowConfidence.count}
+          threshold={lowConfidence.threshold}
+          openAiConfigured={openAiConfigured}
+          bigQueryConfigured={bigQueryConfigured}
+          source={lowConfidence.source}
+        />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">

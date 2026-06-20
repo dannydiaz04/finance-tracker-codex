@@ -11,6 +11,7 @@ Options:
   --model <name>              Overrides OPENAI_CATEGORIZATION_MODEL / OPENAI_MODEL
   --auto-accept-threshold <n> Minimum final confidence for canonical AI acceptance. Defaults to 0.90
   --include-existing          Reprocess transactions with accepted or needs_review AI results
+  --user-id <id>              Only enrich rows for this user. Defaults to all users
   --json                      Print the full run summary as JSON
   --help                      Show this help text
 
@@ -67,6 +68,9 @@ async function main() {
       "include-existing": {
         type: "boolean",
       },
+      "user-id": {
+        type: "string",
+      },
       json: {
         type: "boolean",
       },
@@ -87,6 +91,7 @@ async function main() {
     model: values.model,
     includeExisting: values["include-existing"],
     autoAcceptThreshold: parseThreshold(values["auto-accept-threshold"]),
+    userId: values["user-id"]?.trim() || undefined,
   });
 
   if (values.json) {
