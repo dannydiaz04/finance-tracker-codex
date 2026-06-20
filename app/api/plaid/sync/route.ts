@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { resolveRouteUserId } from "@/lib/auth/session";
+import { runPostIngestEnrichment } from "@/lib/ingestion/post-ingest";
 import { getPlaidStatus } from "@/lib/plaid/client";
 import { getPlaidItem, listPlaidItemsByUser } from "@/lib/plaid/items";
 import { syncPlaidItem, syncPlaidItemsForUser } from "@/lib/plaid/sync";
@@ -38,10 +39,12 @@ export async function POST(request: NextRequest) {
   }
 
   let itemId: string | undefined;
+  let enrich = false;
 
   try {
-    const body = (await request.json()) as { itemId?: string };
+    const body = (await request.json()) as { itemId?: string; enrich?: boolean };
     itemId = body.itemId?.trim() || undefined;
+    enrich = body.enrich ?? false;
   } catch {
     // No body: sync all of this user's items.
   }
@@ -57,9 +60,23 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await syncPlaidItem(item);
-    return NextResponse.json({ results: [result] });
+    const enrichment = enrich
+      ? await runPostIngestEnrichment({ userId })
+      : undefined;
+
+    return NextResponse.json({
+      results: [result],
+      ...(enrichment ? { enrichment } : {}),
+    });
   }
 
   const results = await syncPlaidItemsForUser(userId);
-  return NextResponse.json({ results });
+  const enrichment = enrich
+    ? await runPostIngestEnrichment({ userId })
+    : undefined;
+
+  return NextResponse.json({
+    results,
+    ...(enrichment ? { enrichment } : {}),
+  });
 }

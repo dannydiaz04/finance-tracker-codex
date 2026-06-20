@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { resolveRouteUserId } from "@/lib/auth/session";
 import { parseCsvImport, persistCsvImport } from "@/lib/import/csv";
+import { runPostIngestEnrichment } from "@/lib/ingestion/post-ingest";
 import type { CsvImportRuntimeAccountContext } from "@/lib/import/mapping";
 
 export const runtime = "nodejs";
@@ -74,6 +75,7 @@ export async function POST(request: NextRequest) {
     let csv = "";
     let fileName = "manual-upload.csv";
     let persist = false;
+    let enrich = false;
     let runtimeAccountContext: Partial<CsvImportRuntimeAccountContext> = {};
 
     if (contentType.includes("application/json")) {
@@ -81,6 +83,7 @@ export async function POST(request: NextRequest) {
         csv?: string;
         fileName?: string;
         persist?: boolean;
+        enrich?: boolean;
         runtimeAccountContext?: Partial<CsvImportRuntimeAccountContext>;
         sourceAccountId?: string;
         accountName?: string;
@@ -90,11 +93,13 @@ export async function POST(request: NextRequest) {
       csv = body.csv ?? "";
       fileName = body.fileName ?? fileName;
       persist = body.persist ?? false;
+      enrich = body.enrich ?? false;
       runtimeAccountContext = buildRuntimeAccountContext(body);
     } else if (contentType.includes("multipart/form-data")) {
       const formData = await request.formData();
       const file = formData.get("file");
       persist = formData.get("persist") === "true";
+      enrich = formData.get("enrich") === "true";
 
       if (!(file instanceof File)) {
         return NextResponse.json(
@@ -133,12 +138,20 @@ export async function POST(request: NextRequest) {
           reason: "Preview mode only.",
         };
 
+    // Opt-in: close the loop by running AI fallback over the user's
+    // low-confidence queue once the import is persisted.
+    const enrichment =
+      persist && enrich
+        ? await runPostIngestEnrichment({ userId })
+        : undefined;
+
     return NextResponse.json({
       importBatch: parsedImport.importBatch,
       rowCount: parsedImport.normalizedRows.length,
       mappingResolution: parsedImport.mappingResolution,
       preview: parsedImport.normalizedRows.slice(0, 10),
       persistenceResult,
+      ...(enrichment ? { enrichment } : {}),
     });
   } catch (error) {
     return NextResponse.json(

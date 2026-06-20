@@ -121,12 +121,19 @@ export function SidebarNav() {
       </nav>
 
       <div className="mt-auto rounded-3xl border border-white/10 bg-[radial-gradient(circle_at_top,#1c2840,transparent_60%)] p-4">
-        <p className="text-xs uppercase tracking-[0.28em] text-slate-500">
+        <p className="text-xs uppercase tracking-[0.28em] text-emerald-300/80">
+          Now live
+        </p>
+        <p className="mt-2 text-sm text-slate-300">
+          On-demand AI fallback for low-confidence rows and abnormal cash-flow
+          alerts now run on top of Plaid + CSV ingestion.
+        </p>
+        <p className="mt-3 text-xs uppercase tracking-[0.28em] text-slate-500">
           Next phase
         </p>
         <p className="mt-2 text-sm text-slate-300">
-          AI fallback for low-confidence rows and alerting for abnormal cash flow,
-          alongside live Plaid + CSV ingestion.
+          Scheduled syncs and warehouse refreshes so enrichment and alerts stay
+          current without manual runs.
         </p>
       </div>
     </aside>

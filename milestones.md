@@ -12,6 +12,7 @@ Verified locally on 2026-06-19:
 - [x] `npm run typecheck`
 - [x] `npm run lint`
 - [x] `npm run test:imports`
+- [x] `npm run test:alerts` (cash-flow anomaly detector)
 - [x] `npm run build`
 - [x] `npm run dataform:compile`
 
@@ -211,3 +212,78 @@ Goal: docs and in-product assistant guidance match current behavior.
 - [ ] Add production runbook for deploy, data refresh, incident checks, and
   rollback.
 - [ ] Keep this file updated as milestones complete.
+
+## Product Phase: AI Fallback, Cash-Flow Alerting, and Live Ingestion
+
+Goal: ship the in-product "Next phase" roadmap callout — AI fallback for
+low-confidence rows and alerting for abnormal cash flow, tied to the existing
+live Plaid + CSV ingestion.
+
+Status: complete (code shipped 2026-06-19). All three features degrade
+gracefully to sample mode; running them against production data still depends on
+OpenAI / BigQuery / Plaid being provisioned per Milestone 3.
+
+### AI fallback for low-confidence rows
+
+- [x] Made the batch AI enrichment runner user-scopable.
+  - `runAiCategoryEnrichment` accepts an optional `userId`; the
+    `ai_enrichment_queue` and manual-example loaders now filter by user.
+  - Added a `--user-id` flag to `npm run etl:ai-enrich`.
+- [x] Added an on-demand, per-user enrichment endpoint.
+  - `GET /api/enrich/low-confidence` returns the low-confidence queue count plus
+    OpenAI/BigQuery config flags; `POST` runs AI fallback for the current user.
+  - Both require auth; `POST` returns a `skipped` result (not a 500) when OpenAI
+    or BigQuery is unconfigured, and an `error` result if a run fails.
+- [x] Surfaced it in the dashboard UI.
+  - `components/dashboard/ai-fallback-card.tsx` shows the low-confidence count
+    and a "Run AI fallback" button; added to the Overview page.
+  - `lib/queries/enrichment.ts` counts the waiting queue (warehouse) or sample
+    rows below the 0.85 confidence bar (sample mode).
+
+### Alerting for abnormal cash flow
+
+- [x] Added a pure, dependency-free anomaly detector.
+  - `lib/alerts/cashflow-anomalies.ts` flags unusually large single charges,
+    daily outflow spikes (deduped against large charges), sustained
+    net-negative streaks, and net-negative windows, with tunable thresholds and
+    a severity summary.
+- [x] Added a server query and route.
+  - `lib/queries/alerts.ts` composes cash flow + transactions (sample-safe);
+    `GET /api/alerts` returns alerts + summary for the active time scope.
+- [x] Surfaced it in the dashboard UI.
+  - `components/dashboard/cashflow-alerts.tsx` on the Overview and Cash Flow
+    pages.
+- [x] Added unit tests.
+  - `tests/alerts/cashflow-anomalies.test.mjs` (12 cases) via
+    `npm run test:alerts`; `npm test` now runs the import + alert suites.
+
+### Live Plaid + CSV ingestion (closed loop)
+
+- [x] Added a shared post-ingest enrichment helper.
+  - `lib/ingestion/post-ingest.ts` runs AI fallback after data lands; it never
+    throws and reports `ran` / `skipped` / `error`.
+- [x] Wired ingestion endpoints to trigger it on request.
+  - `POST /api/import/csv` (when `persist` + `enrich`) and `POST /api/plaid/sync`
+    (when `enrich`) return an `enrichment` result alongside their normal output.
+  - Note: the AI queue reflects Dataform-modeled rows, so freshly-landed raw
+    events become eligible for fallback only after the warehouse models refresh.
+- [x] Updated the sidebar roadmap callout from "Next phase" to "Now live" and
+  pointed the next phase at scheduling/automation.
+
+### Verification (2026-06-19)
+
+- `npm run typecheck`: pass.
+- `npm run lint`: pass.
+- `npm test` (import + cash-flow alert suites): pass.
+- `npm run build`: pass; `/api/alerts` and `/api/enrich/low-confidence` register
+  as dynamic route handlers.
+- `npm run dataform:compile`: not re-run this phase; no `dataform/` files changed.
+
+### Follow-ups (feed Milestones 6–8)
+
+- Schedule AI fallback and warehouse refresh so enrichment and alerts stay
+  current without manual runs (Milestone 6 — "Schedule AI categorization
+  enrichment if enabled").
+- Consider persisting alerts and adding notification channels for criticals.
+- Update assistant knowledge text to mention AI fallback and cash-flow alerts
+  (Milestone 8).

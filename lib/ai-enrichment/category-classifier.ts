@@ -140,6 +140,8 @@ export type RunAiCategoryEnrichmentOptions = {
   model?: string;
   openAiApiKey?: string;
   autoAcceptThreshold?: number;
+  /** When set, only enrich rows belonging to this user. */
+  userId?: string | null;
 };
 
 export type AiCategoryEnrichmentSummary = {
@@ -807,9 +809,11 @@ async function loadCategoryTaxonomy() {
 async function loadAiEnrichmentQueue({
   limit,
   includeExisting,
+  userId,
 }: {
   limit: number;
   includeExisting: boolean;
+  userId?: string | null;
 }) {
   const projectId = getBigQueryProjectId();
 
@@ -839,12 +843,15 @@ async function loadAiEnrichmentQueue({
         q.keyword_array AS keywordArray,
         q.enrichment_reason AS enrichmentReason
       FROM \`${projectId}.ops_finance.ai_enrichment_queue\` AS q
-      WHERE @includeExisting
-         OR NOT EXISTS (
-          SELECT 1
-          FROM \`${projectId}.ops_finance.ai_enrichment_results\` AS results
-          WHERE results.transaction_id = q.transaction_id
-            AND results.status IN ("accepted", "needs_review")
+      WHERE (@userId = '' OR q.user_id = @userId)
+        AND (
+          @includeExisting
+          OR NOT EXISTS (
+            SELECT 1
+            FROM \`${projectId}.ops_finance.ai_enrichment_results\` AS results
+            WHERE results.transaction_id = q.transaction_id
+              AND results.status IN ("accepted", "needs_review")
+          )
         )
       ORDER BY q.confidence_score ASC, q.posted_at DESC
       LIMIT @limit
@@ -852,13 +859,14 @@ async function loadAiEnrichmentQueue({
     {
       includeExisting,
       limit,
+      userId: userId ?? "",
     },
   );
 
   return (rows ?? []).map(normalizeQueueRow);
 }
 
-async function loadManualCategoryExamples() {
+async function loadManualCategoryExamples(userId?: string | null) {
   const projectId = getBigQueryProjectId();
 
   if (!projectId) {
@@ -894,9 +902,13 @@ async function loadManualCategoryExamples() {
       LEFT JOIN \`${projectId}.core_finance.dim_category\` AS categories
         ON categories.category_id = overrides.category_id
       WHERE overrides.override_rank = 1
+        AND (@userId = '' OR current_txn.user_id = @userId)
       ORDER BY current_txn.posted_at DESC
       LIMIT 50
     `,
+    {
+      userId: userId ?? "",
+    },
   );
 
   return (rows ?? []).map((row) => ({
@@ -939,8 +951,9 @@ export async function runAiCategoryEnrichment(
   const candidates = await loadAiEnrichmentQueue({
     limit,
     includeExisting: Boolean(options.includeExisting),
+    userId: options.userId,
   });
-  const manualExamples = await loadManualCategoryExamples();
+  const manualExamples = await loadManualCategoryExamples(options.userId);
   let insertedCount = 0;
   let acceptedCount = 0;
   let needsReviewCount = 0;
