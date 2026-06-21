@@ -29,6 +29,12 @@ export async function POST(request: NextRequest) {
   const { webhook_type: webhookType, webhook_code: webhookCode, item_id: itemId } =
     payload;
 
+  console.info("[plaid:webhook] received", {
+    webhookType,
+    webhookCode,
+    itemId,
+  });
+
   // Plaid expects a 2xx quickly; do the work inline since volume is low for a
   // single-user app, but never fail the webhook because of downstream errors.
   try {
@@ -51,6 +57,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ received: true, action: "item_error" });
     }
   } catch (error) {
+    // Log only the message — never the raw error. A downstream BigQuery
+    // PartialFailureError embeds the offending transaction rows (user PII), and
+    // a Plaid error would carry tokens/secrets in its axios config.
+    console.error("[plaid:webhook] handler failed", {
+      webhookType,
+      webhookCode,
+      itemId,
+      message: error instanceof Error ? error.message : "Webhook handler failed.",
+    });
     return NextResponse.json({
       received: true,
       action: "deferred",

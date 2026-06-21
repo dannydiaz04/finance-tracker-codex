@@ -63,6 +63,12 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  console.info("[plaid:exchange] received public token", {
+    userId,
+    institutionId: body.institutionId ?? null,
+    institutionName: body.institutionName ?? null,
+  });
+
   try {
     const exchange = await client.itemPublicTokenExchange({
       public_token: publicToken,
@@ -85,12 +91,36 @@ export async function POST(request: NextRequest) {
 
     const syncResult = await syncPlaidItemById(itemId);
 
+    console.info("[plaid:exchange] stored and synced item", {
+      userId,
+      itemId,
+      institutionName,
+      sync: syncResult
+        ? {
+            status: syncResult.status,
+            added: syncResult.added,
+            modified: syncResult.modified,
+            removed: syncResult.removed,
+            accounts: syncResult.accounts,
+            persisted: syncResult.persisted,
+            reason: syncResult.reason,
+          }
+        : null,
+    });
+
     return NextResponse.json({
       itemId,
       institutionName,
       syncResult,
     });
   } catch (error) {
+    // Log only the extracted, safe message — never the raw axios/Plaid error,
+    // whose `.config` carries the public_token (body) and the PLAID-SECRET
+    // request header.
+    console.error("[plaid:exchange] failed", {
+      userId,
+      message: extractPlaidErrorMessage(error),
+    });
     return NextResponse.json(
       { error: extractPlaidErrorMessage(error) },
       { status: 502 },

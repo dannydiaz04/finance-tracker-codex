@@ -267,6 +267,12 @@ export async function syncPlaidItem(
   let hasMore = true;
   let nextCursor = cursor ?? "";
 
+  console.info("[plaid:sync] start", {
+    itemId: item.itemId,
+    userId,
+    incremental: Boolean(item.cursor),
+  });
+
   try {
     while (hasMore) {
       const response = await client.transactionsSync({
@@ -290,6 +296,13 @@ export async function syncPlaidItem(
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Plaid transactions sync failed.";
+    // Log only the safe message — never the raw axios/Plaid error, whose
+    // `.config` carries the Item access_token (body) and the PLAID-SECRET header.
+    console.error("[plaid:sync] transactions/sync failed", {
+      itemId: item.itemId,
+      userId,
+      message,
+    });
     await updatePlaidItemStatus(item.itemId, "error", message);
     return { ...base, status: "error", reason: message };
   }
@@ -305,6 +318,16 @@ export async function syncPlaidItem(
   });
 
   const cursorUpdated = await updatePlaidItemCursor(item.itemId, nextCursor);
+
+  console.info("[plaid:sync] complete", {
+    itemId: item.itemId,
+    userId,
+    added: added.length,
+    modified: modified.length,
+    removed: removed.length,
+    accounts: accountsById.size,
+    cursorUpdated,
+  });
 
   return {
     ...base,
