@@ -14,6 +14,44 @@ with observed as (
     any_value(source_name) as source_name
   from ${ref("transactions_clean")}
   group by user_id, account_id
+),
+metadata as (
+  -- Collapse duplicate account_metadata rows to the latest one per account. A
+  -- concurrent Plaid-sync MERGE race can insert the same (user_id, account_id)
+  -- more than once; without this, the join below fans out the account dimension
+  -- and every transaction for that account is duplicated downstream.
+  select
+    user_id,
+    account_id,
+    account_name,
+    institution,
+    account_type,
+    account_subtype,
+    currency,
+    mask,
+    current_balance,
+    available_balance,
+    is_active
+  from (
+    select
+      user_id,
+      account_id,
+      account_name,
+      institution,
+      account_type,
+      account_subtype,
+      currency,
+      mask,
+      current_balance,
+      available_balance,
+      is_active,
+      row_number() over (
+        partition by user_id, account_id
+        order by updated_at desc
+      ) as metadata_rank
+    from ${ref("account_metadata")}
+  )
+  where metadata_rank = 1
 )
 select
   observed.user_id,
@@ -47,7 +85,7 @@ select
   metadata.current_balance as current_balance,
   metadata.available_balance as available_balance
 from observed
-left join ${ref("account_metadata")} as metadata
+left join metadata
   on metadata.account_id = observed.account_id
  and metadata.user_id = observed.user_id
  and coalesce(metadata.is_active, true)

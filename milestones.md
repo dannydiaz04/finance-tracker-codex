@@ -352,13 +352,27 @@ Goal: clean, cheap, idempotent ingestion.
 Status: not started. Marts already dedupe, so this is cost/cleanliness, not
 correctness.
 
-- [ ] Fix the ~3× duplicate raw events (Capital One's initial load wrote 1,058
-  `added` events for 359 transactions): make `event_id` deterministic per
-  `(source_transaction_id, event_type)` and serialize the exchange-triggered sync
-  vs the webhook-triggered sync so they don't both run from a null cursor.
+- [x] Stop duplicate account rows from fanning out the warehouse. The concurrent
+  initial syncs wrote the Capital One account 3× into
+  `ops_finance.account_metadata`; `stg_finance.accounts_clean` joined that
+  un-deduped table and tripled every Capital One transaction in
+  `core_finance.fact_transaction_current` (309 duplicate keys, overview totals
+  inflated ~3×, `duplicate_transaction_ids` assertion failing). Fixed 2026-06-21
+  by deduping `account_metadata` to the latest row per `(user_id, account_id)` in
+  `accounts_clean`; after re-running Dataform all assertions pass and overview
+  totals are correct.
+- [ ] Root cause: serialize the exchange-triggered sync vs the webhook-triggered
+  sync (and/or make writes deterministic) so concurrent runs from a null cursor
+  stop creating duplicate raw events and duplicate `account_metadata` rows.
+- [ ] Make `event_id` deterministic per `(source_transaction_id, event_type)` so
+  re-syncs upsert instead of appending (~3× raw-event bloat today).
+- [ ] Optionally clean the 2 stale duplicate Capital One rows in
+  `account_metadata` (cosmetic; the `accounts_clean` dedup already neutralizes
+  them downstream).
 - [ ] Persist `available_balance` where Plaid returns it (null for CapOne
   checking today) and/or enable the Balances product (Phase E, Tier 3).
-- [ ] Keep `duplicate_transaction_ids` and the other Dataform assertions green.
+- [x] Keep `duplicate_transaction_ids` and the other Dataform assertions green
+  (all passing as of the 2026-06-21 refresh).
 
 ## Phase C: LLM Transaction Categorization (harden + extend existing)
 
