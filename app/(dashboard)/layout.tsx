@@ -22,13 +22,15 @@ export default async function DashboardLayout({
           <Suspense fallback={null}>
             <MobileNav />
           </Suspense>
-          <div className="flex items-center justify-end px-4 pt-4 md:px-8">
+          <div className="flex items-center justify-end px-4 pt-4 md:px-8 md:pr-44">
             <UserMenu
               email={session?.user?.email}
               name={session?.user?.name}
             />
           </div>
-          <main className="flex-1 px-4 py-6 md:px-8 md:py-8">{children}</main>
+          <main className="flex-1 px-4 pb-24 pt-6 md:px-8 md:py-8">
+            {children}
+          </main>
         </div>
       </div>
       <Suspense fallback={null}>
