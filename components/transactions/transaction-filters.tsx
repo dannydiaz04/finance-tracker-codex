@@ -109,8 +109,8 @@ export function TransactionFilters({
         warehouse `posted_at`.
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-5">
-        <div className="lg:col-span-2">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="sm:col-span-2 lg:col-span-2">
           <label className="mb-2 block text-xs uppercase tracking-[0.24em] text-slate-500">
             Search
           </label>
@@ -174,7 +174,7 @@ export function TransactionFilters({
         </div>
       </div>
 
-      <div className="mt-3 grid gap-3 lg:grid-cols-6">
+      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
         <div>
           <label className="mb-2 block text-xs uppercase tracking-[0.24em] text-slate-500">
             Class

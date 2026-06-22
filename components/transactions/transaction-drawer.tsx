@@ -100,7 +100,7 @@ export function TransactionDrawer({
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: 480, opacity: 0 }}
             transition={{ type: "spring", stiffness: 220, damping: 25 }}
-            className="fixed right-0 top-0 z-40 h-screen w-full max-w-xl overflow-y-auto border-l border-white/10 bg-slate-950/96 p-6 shadow-[0_0_120px_rgba(8,15,30,0.65)]"
+            className="fixed right-0 top-0 z-40 h-screen w-full max-w-xl overflow-y-auto border-l border-white/10 bg-slate-950/96 p-4 shadow-[0_0_120px_rgba(8,15,30,0.65)] sm:p-6"
           >
             <div className="mb-6 flex items-start justify-between gap-4">
               <div>
