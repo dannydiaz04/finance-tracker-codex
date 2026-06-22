@@ -18,7 +18,7 @@ export default async function DashboardLayout({
         <Suspense fallback={null}>
           <SidebarNav />
         </Suspense>
-        <div className="flex min-h-screen flex-1 flex-col">
+        <div className="flex min-h-screen min-w-0 flex-1 flex-col">
           <Suspense fallback={null}>
             <MobileNav />
           </Suspense>

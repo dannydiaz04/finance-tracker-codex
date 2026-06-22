@@ -22,6 +22,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { cn, formatCurrency } from "@/lib/utils";
 import type { Transaction } from "@/lib/types/finance";
 
@@ -224,7 +225,7 @@ export function TransactionTable({
 
   return (
     <div className="rounded-3xl border border-white/10 bg-slate-950/40">
-      <div className="grid grid-cols-[1.2fr_0.72fr_1fr_0.8fr_0.8fr_0.8fr] items-center gap-4 border-b border-white/10 px-5 py-4 text-xs uppercase tracking-[0.24em] text-slate-500">
+      <div className="hidden items-center gap-4 border-b border-white/10 px-5 py-4 text-xs uppercase tracking-[0.24em] text-slate-500 lg:grid lg:grid-cols-[1.2fr_0.72fr_1fr_0.8fr_0.8fr_0.8fr]">
         <ColumnHeader
           id="merchant"
           label="Merchant"
@@ -313,8 +314,42 @@ export function TransactionTable({
         </div>
       ) : null}
 
+      <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3 lg:hidden">
+        <label
+          htmlFor="transaction-sort"
+          className="text-xs uppercase tracking-[0.24em] text-slate-500"
+        >
+          Sort
+        </label>
+        <Select
+          id="transaction-sort"
+          aria-label="Sort transactions"
+          className="h-9 max-w-[14rem]"
+          value={sort ? `${sort.column}:${sort.direction}` : ""}
+          onChange={(event) => {
+            const value = event.target.value;
+            if (!value) {
+              setSort(null);
+              return;
+            }
+            const [column, direction] = value.split(":") as [
+              ColumnId,
+              SortDirection,
+            ];
+            setSort({ column, direction });
+          }}
+        >
+          <option value="">Default order</option>
+          <option value="date:desc">Newest first</option>
+          <option value="date:asc">Oldest first</option>
+          <option value="amount:desc">Amount: high → low</option>
+          <option value="amount:asc">Amount: low → high</option>
+          <option value="merchant:asc">Merchant A → Z</option>
+        </Select>
+      </div>
+
       <div className="overflow-hidden rounded-b-[calc(1.5rem-1px)]">
-        <div className="divide-y divide-white/6">
+        <div className="grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 lg:grid-cols-1 lg:gap-0 lg:divide-y lg:divide-white/6 lg:p-0">
           {visibleTransactions.map((transaction, index) => (
             <motion.button
               key={transaction.transactionId}
@@ -323,50 +358,104 @@ export function TransactionTable({
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: Math.min(index, 12) * 0.02, duration: 0.2 }}
               className={cn(
-                "grid w-full grid-cols-[1.2fr_0.72fr_1fr_0.8fr_0.8fr_0.8fr] gap-4 px-5 py-4 text-left transition-colors hover:bg-white/[0.03]",
-                selectedId === transaction.transactionId && "bg-cyan-400/6",
+                "w-full rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-4 text-left transition-colors hover:bg-white/[0.05]",
+                "lg:rounded-none lg:border-0 lg:bg-transparent lg:hover:bg-white/[0.03]",
+                selectedId === transaction.transactionId &&
+                  "border-cyan-400/30 bg-cyan-400/[0.06] lg:border-0 lg:bg-cyan-400/6",
               )}
               onClick={() => openTransaction(transaction.transactionId)}
             >
-              <div>
-                <p className="font-medium text-white">{transaction.merchantRaw}</p>
-                <p className="mt-1 text-sm text-slate-400">
-                  {transaction.descriptionRaw}
-                </p>
-              </div>
-              <div className="flex items-center text-sm text-slate-300">
-                {formatTransactionDate(transaction.postedAt)}
-              </div>
-              <div className="flex items-center">
-                <Badge>{transaction.categoryLabel}</Badge>
-              </div>
-              <div className="flex items-center text-sm text-slate-300">
-                {transaction.accountName}
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge
+              {/* Desktop table row (lg+) */}
+              <div className="hidden lg:grid lg:w-full lg:grid-cols-[1.2fr_0.72fr_1fr_0.8fr_0.8fr_0.8fr] lg:gap-4">
+                <div>
+                  <p className="font-medium text-white">
+                    {transaction.merchantRaw}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-400">
+                    {transaction.descriptionRaw}
+                  </p>
+                </div>
+                <div className="flex items-center text-sm text-slate-300">
+                  {formatTransactionDate(transaction.postedAt)}
+                </div>
+                <div className="flex items-center">
+                  <Badge>{transaction.categoryLabel}</Badge>
+                </div>
+                <div className="flex items-center text-sm text-slate-300">
+                  {transaction.accountName}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge
+                    className={cn(
+                      transaction.pending
+                        ? "border-amber-300/20 bg-amber-300/10 text-amber-100"
+                        : "border-emerald-300/20 bg-emerald-300/10 text-emerald-100",
+                    )}
+                  >
+                    {transaction.pending ? "Pending" : "Posted"}
+                  </Badge>
+                  <Badge>
+                    {transaction.classificationSource.replace("_", " ")}
+                  </Badge>
+                </div>
+                <div
                   className={cn(
-                    transaction.pending
-                      ? "border-amber-300/20 bg-amber-300/10 text-amber-100"
-                      : "border-emerald-300/20 bg-emerald-300/10 text-emerald-100",
+                    "flex items-center justify-end text-right font-medium",
+                    transaction.signedAmount < 0
+                      ? "text-white"
+                      : "text-emerald-300",
                   )}
                 >
-                  {transaction.pending ? "Pending" : "Posted"}
-                </Badge>
-                <Badge>{transaction.classificationSource.replace("_", " ")}</Badge>
+                  {formatCurrency(transaction.signedAmount)}
+                </div>
               </div>
-              <div
-                className={cn(
-                  "flex items-center justify-end text-right font-medium",
-                  transaction.signedAmount < 0 ? "text-white" : "text-emerald-300",
-                )}
-              >
-                {formatCurrency(transaction.signedAmount)}
+
+              {/* Mobile / tablet card (below lg) */}
+              <div className="flex flex-col gap-2 lg:hidden">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="min-w-0 flex-1 truncate font-medium text-white">
+                    {transaction.merchantRaw}
+                  </p>
+                  <p
+                    className={cn(
+                      "shrink-0 font-semibold",
+                      transaction.signedAmount < 0
+                        ? "text-white"
+                        : "text-emerald-300",
+                    )}
+                  >
+                    {formatCurrency(transaction.signedAmount)}
+                  </p>
+                </div>
+                {transaction.descriptionRaw ? (
+                  <p className="line-clamp-2 text-sm text-slate-400">
+                    {transaction.descriptionRaw}
+                  </p>
+                ) : null}
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge>{transaction.categoryLabel}</Badge>
+                  <Badge
+                    className={cn(
+                      transaction.pending
+                        ? "border-amber-300/20 bg-amber-300/10 text-amber-100"
+                        : "border-emerald-300/20 bg-emerald-300/10 text-emerald-100",
+                    )}
+                  >
+                    {transaction.pending ? "Pending" : "Posted"}
+                  </Badge>
+                  <Badge>
+                    {transaction.classificationSource.replace("_", " ")}
+                  </Badge>
+                  <span className="ml-auto text-xs text-slate-400">
+                    {formatTransactionDate(transaction.postedAt)} ·{" "}
+                    {transaction.accountName}
+                  </span>
+                </div>
               </div>
             </motion.button>
           ))}
           {visibleTransactions.length === 0 ? (
-            <div className="px-5 py-12 text-center text-sm text-slate-400">
+            <div className="px-5 py-12 text-center text-sm text-slate-400 sm:col-span-2 lg:col-span-1">
               No transactions match the current column filters.
             </div>
           ) : null}
