@@ -11,6 +11,7 @@ Options:
   --model <name>              Overrides OPENAI_CATEGORIZATION_MODEL / OPENAI_MODEL
   --auto-accept-threshold <n> Minimum final confidence for canonical AI acceptance. Defaults to 0.90
   --include-existing          Reprocess transactions with accepted or needs_review AI results
+  --token-budget <count>      Stop dispatching batches once this many model tokens are spent
   --user-id <id>              Only enrich rows for this user. Defaults to all users
   --json                      Print the full run summary as JSON
   --help                      Show this help text
@@ -68,6 +69,9 @@ async function main() {
       "include-existing": {
         type: "boolean",
       },
+      "token-budget": {
+        type: "string",
+      },
       "user-id": {
         type: "string",
       },
@@ -91,6 +95,7 @@ async function main() {
     model: values.model,
     includeExisting: values["include-existing"],
     autoAcceptThreshold: parseThreshold(values["auto-accept-threshold"]),
+    tokenBudget: parsePositiveInteger(values["token-budget"], "--token-budget"),
     userId: values["user-id"]?.trim() || undefined,
   });
 
@@ -100,10 +105,15 @@ async function main() {
   }
 
   console.log(
-    `AI enrichment run ${summary.runId} processed ${summary.enrichedCount} candidate transaction(s) with ${summary.model}.`,
+    `AI enrichment run ${summary.runId} processed ${summary.enrichedCount} candidate transaction(s) with ${summary.modelProvider}/${summary.model}.`,
   );
   console.log(
     `Inserted ${summary.insertedCount} result row(s): ${summary.acceptedCount} accepted, ${summary.needsReviewCount} needs review, ${summary.rejectedCount} rejected.`,
+  );
+  console.log(
+    `Skipped ${summary.skippedUnchangedCount} unchanged row(s); spent ${summary.tokensUsed} token(s) (${summary.inputTokens} in / ${summary.outputTokens} out)${
+      summary.stoppedForBudget ? " — stopped early on token budget" : ""
+    }.`,
   );
 }
 

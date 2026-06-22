@@ -84,7 +84,16 @@ test("AI enrichment rows accept high-confidence taxonomy-backed suggestions", ()
     responseId: "resp-1",
     model: "gpt-test",
     taxonomyVersion: getTaxonomyVersion(categories),
-    transactions: [baseTransaction],
+    // Plaid's structured PFC (FOOD_AND_DRINK, MEDIUM confidence) maps to dining
+    // and agrees with the model, contributing a +0.05 prior boost (0.10 * 0.5).
+    transactions: [
+      {
+        ...baseTransaction,
+        institutionCategory: "FOOD_AND_DRINK",
+        institutionCategoryDetailed: "FOOD_AND_DRINK_RESTAURANT",
+        institutionCategoryConfidence: "MEDIUM",
+      },
+    ],
     categories,
     suggestions: [
       {
@@ -106,10 +115,65 @@ test("AI enrichment rows accept high-confidence taxonomy-backed suggestions", ()
   assert.equal(row.suggested_category_label, "Dining");
   assert.equal(row.model_confidence_score, 0.91);
   assert.equal(row.confidence_score, 0.96);
+  assert.ok(
+    row.confidence_notes.includes(
+      "Suggestion agrees with Plaid's MEDIUM category prior.",
+    ),
+  );
   assert.equal(row.created_at, "2026-04-13T12:00:00.000Z");
   assert.doesNotThrow(() => JSON.parse(row.input_json));
   assert.doesNotThrow(() => JSON.parse(row.model_output_json));
   assert.doesNotThrow(() => JSON.parse(row.secondary_candidates_json));
+});
+
+test("a very-high Plaid prior lifts a sub-threshold suggestion over the bar", () => {
+  const taxonomyVersion = getTaxonomyVersion(categories);
+  const suggestions = [
+    {
+      transactionId: "txn-1",
+      categoryId: "groceries",
+      confidence: 0.84,
+      secondaryCandidates: [],
+      signals: ["merchant phrase"],
+      reason: "Market-like merchant pattern.",
+    },
+  ];
+
+  // Without a structured Plaid prior the 0.84 suggestion needs review.
+  const [withoutPrior] = buildAiEnrichmentInsertRows({
+    runId: "run-1",
+    responseId: "resp-1",
+    model: "gpt-test",
+    taxonomyVersion,
+    transactions: [{ ...baseTransaction, institutionCategory: null }],
+    categories,
+    suggestions,
+  });
+
+  assert.equal(withoutPrior.status, "needs_review");
+  assert.equal(withoutPrior.confidence_score, 0.84);
+
+  // VERY_HIGH PFC groceries agrees with the model, adding +0.10 → 0.94 accepted.
+  const [withPrior] = buildAiEnrichmentInsertRows({
+    runId: "run-1",
+    responseId: "resp-1",
+    model: "gpt-test",
+    taxonomyVersion,
+    transactions: [
+      {
+        ...baseTransaction,
+        institutionCategory: "FOOD_AND_DRINK",
+        institutionCategoryDetailed: "FOOD_AND_DRINK_GROCERIES",
+        institutionCategoryConfidence: "VERY_HIGH",
+      },
+    ],
+    categories,
+    suggestions,
+  });
+
+  assert.equal(withPrior.status, "accepted");
+  assert.equal(withPrior.confidence_score, 0.94);
+  assert.equal(withPrior.review_required, false);
 });
 
 test("AI enrichment rows route low-confidence valid suggestions to review", () => {

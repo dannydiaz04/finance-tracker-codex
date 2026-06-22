@@ -1,6 +1,6 @@
 # Production Milestones
 
-Last updated: 2026-06-21
+Last updated: 2026-06-22
 
 This is the living tracker for getting Finance Tracker production-ready. Keep
 status current as work lands.
@@ -379,7 +379,9 @@ correctness.
 Goal: an LLM model-API categorizer that auto-categorizes transactions with
 confidence gating and a human-review fallback.
 
-Status: **foundation already exists** — extend it; do not rebuild.
+Status: **in progress (2026-06-22)** — the Plaid-prior, idempotency/cost-control,
+provider-seam, and accuracy-harness items below landed this pass; scheduling and a
+taxonomy-gap follow-up remain. The marts loop turned out to be already closed.
 
 Already built:
 
@@ -398,29 +400,71 @@ Already built:
   flags), `GET|POST /api/enrich/low-confidence`, post-ingest hook, Overview
   AI-fallback card.
 
-To build:
+### Landed 2026-06-22
 
-- [ ] **Feed Plaid `personal_finance_category` as a strong prior** — primary +
-  detailed + confidence are 100% populated on Capital One; pass them into the
-  queue/prompt so the model anchors on Plaid's ML categorization and review
-  volume drops.
-- [ ] **Close the loop into the marts** — auto-apply accepted (≥ threshold)
-  suggestions from `ai_enrichment_results` into `core_finance.fact_classification`
-  / the derived category so dashboards reflect AI categories (today results are
-  written but not promoted).
-- [ ] **Idempotency / cost control** — skip re-enriching rows whose `input_hash`
-  is unchanged; add a per-run token/cost budget cap.
-- [ ] **Accuracy evaluation harness** — score AI suggestions against
-  `manual_overrides`; track precision and auto-accept rate per
-  prompt/taxonomy/rules version so model/prompt changes are measurable.
-- [ ] **Provider seam** — keep the classifier behind a small model-API interface
-  (defaults to the configured `OPENAI_CATEGORIZATION_MODEL`) so the model can be
-  swapped without touching the pipeline.
-- [ ] **Schedule** enrichment to run after each warehouse refresh (ties to
-  Milestone 6).
+- [x] **Feed Plaid `personal_finance_category` as a strong prior.** PFC primary +
+  detailed + confidence are 100% populated on the 361 Plaid rows (verified live:
+  205 `VERY_HIGH` + 36 `HIGH` in the queue). New pure module
+  `lib/ai-enrichment/plaid-category-prior.ts` maps PFC → our taxonomy
+  (conservatively: only clean, unambiguous targets map; ambiguous/absent ones
+  yield a null prior). The queue view (`ops_finance.ai_enrichment_queue`) now
+  surfaces `institution_category_detailed` + `institution_category_confidence`
+  (pulled from the nested `$.rawPayloadJson.personal_finance_category.*` — the
+  raw Plaid txn sits under `rawPayloadJson` inside the event payload, **not** at
+  the top level; the first path attempt was wrong and caught by a live check).
+  The classifier feeds `plaidCategory` + `plaidCategorySuggestedTaxonomyId` into
+  the prompt and applies a confidence-weighted score adjustment: agreement boosts
+  up to +0.10 × Plaid-confidence (so a borderline row clears the 0.90 auto-accept
+  bar), disagreement with a high-confidence prior is only a mild −0.06 × weight so
+  strong merchant evidence still wins.
+- [x] **Close the loop into the marts** — *already done*; the earlier "written but
+  not promoted" note was stale. `core_finance.fact_classification` already has an
+  `accepted_ai_suggestions` rung (`status = "accepted"` AND `confidence_score >=
+  0.90`) between merchant rules and the institution/fallback tiers, so accepted
+  AI categories already flow to `fact_transaction_current` → marts/overview after
+  a Dataform refresh. No code change needed; verified by reading the model.
+- [x] **Idempotency / cost control.** `runAiCategoryEnrichment` now skips
+  candidates whose exact `input_hash` already has a result row
+  (`filterUnchangedCandidates`), so a previously-rejected row is not re-paid for
+  on the next run unless its input actually changed (a prompt/rules/taxonomy
+  version bump changes the hash and intentionally re-scores). Added a
+  `--token-budget` cap that stops dispatching batches once the spend is reached,
+  with per-run token accounting (`inputTokens`/`outputTokens`/`tokensUsed`) and a
+  `stoppedForBudget` flag surfaced in the summary.
+- [x] **Provider seam.** Extracted a `CategoryModelClient` interface
+  (`provider` + `model` + `classify`) with `createOpenAiCategoryModelClient()` as
+  the default. `runAiCategoryEnrichment` depends only on the seam (inject via
+  `modelClient`), and `model_provider` is now written from the client rather than
+  hard-coded, so the model/provider can be swapped without touching scoring or
+  persistence.
+- [x] **Accuracy evaluation harness.** `scripts/eval-ai-categories.ts`
+  (`npm run eval:ai-categories`) scores the latest suggestion per transaction
+  against `manual_overrides` (ground truth), grouped by prompt/rules/taxonomy/
+  model version, reporting precision, auto-accept rate, and accept-precision.
+  Read-only; selects no secret columns.
+- [x] **Versioning + tests.** Bumped `CATEGORY_CLASSIFIER_PROMPT_VERSION` →
+  `category-classifier.v2` and `CATEGORY_CLASSIFIER_RULES_VERSION` →
+  `category-guidelines.v2` (so improved rows re-score and stay traceable). Added
+  `tests/ai-enrichment/plaid-category-prior.test.mjs` (`npm run test:ai`, 8 cases)
+  and extended the classifier test with a "very-high prior lifts a sub-threshold
+  suggestion over the bar" case. `typecheck` / `lint` / `npm test` /
+  `dataform:compile` all green; the queue view is materialized in BigQuery.
+
+Still to build:
+
+- [ ] **Taxonomy gap (highest remaining leverage).** Live PFC distribution shows
+  the biggest queue buckets are `LOAN_PAYMENTS` (165 rows, non-credit-card —
+  mortgage/auto/student/personal) and `ENTERTAINMENT` (13), neither of which has a
+  target in the 10-category `dim_category`. They correctly map to a null prior
+  today, but adding debt/loan + entertainment categories would unlock the most
+  review-volume reduction. This is a product/taxonomy decision, so it is parked
+  here rather than guessed.
+- [ ] **Schedule** enrichment to run after each warehouse refresh, then re-run
+  `fact_classification` so accepted categories promote (ties to Milestone 6).
 - [ ] Context/skills note: prompt text lives in
   `buildCategoryClassifierInstructions()` and the `category-guidelines` rules
-  version — iterate there and bump the version string so results stay traceable.
+  version, the Plaid→taxonomy map lives in `plaid-category-prior.ts` — iterate in
+  those and bump the version strings so results stay traceable.
 
 ## Phase D: Surface Plaid's Rich Signal (already captured, not yet exposed)
 
@@ -479,3 +523,13 @@ Status: not started.
 - Storage guardrail confirmed: finance data in BigQuery; Postgres auth-only; no
   AlloyDB/Spanner/Bigtable/CloudSQL.
 - Plaid connectivity fix: `typecheck` / `lint` / `build` / `npm test` pass.
+
+## Verification (2026-06-22 — Phase C)
+
+- `npm run typecheck`, `npm run lint`, `npm run dataform:compile`: pass.
+- `npm test` (imports + alerts + ai): 27 + 12 + 8 cases pass.
+- `ops_finance.ai_enrichment_queue` re-materialized in BigQuery (0 B billed);
+  live check confirms `institution_category_detailed`/`_confidence` populate for
+  352 queue rows (205 `VERY_HIGH`, 36 `HIGH`).
+- No OpenAI enrichment run was triggered here (model runs are operator-driven);
+  the pipeline is verified structurally and is ready to run.

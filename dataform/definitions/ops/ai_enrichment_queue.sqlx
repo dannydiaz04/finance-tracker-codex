@@ -18,6 +18,15 @@ select
   description_raw,
   description_norm,
   institution_category,
+  -- Plaid's machine-learning categorization, surfaced as a strong prior for the
+  -- LLM categorizer. `institution_category` already carries PFC primary; pull the
+  -- finer-grained detailed label and Plaid's own confidence level out of the raw
+  -- Plaid transaction, which is nested under `$.rawPayloadJson` inside the event
+  -- payload (null for CSV-imported rows, which simply yields no prior).
+  json_value(raw_payload_json, "$.rawPayloadJson.personal_finance_category.detailed")
+    as institution_category_detailed,
+  json_value(raw_payload_json, "$.rawPayloadJson.personal_finance_category.confidence_level")
+    as institution_category_confidence,
   derived_category_id,
   category_label,
   transaction_class,

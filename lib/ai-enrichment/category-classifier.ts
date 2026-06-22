@@ -7,9 +7,13 @@ import {
   insertBigQueryRows,
   runBigQueryQuery,
 } from "../bigquery/client.ts";
+import { derivePlaidCategoryPrior } from "./plaid-category-prior.ts";
 
-export const CATEGORY_CLASSIFIER_PROMPT_VERSION = "category-classifier.v1";
-export const CATEGORY_CLASSIFIER_RULES_VERSION = "category-guidelines.v1";
+// v2 adds Plaid's personal_finance_category (primary + detailed + confidence) as
+// a weighted prior in both the prompt and the scorer. Bumping the versions
+// changes every row's input_hash so improved rows are re-scored on the next run.
+export const CATEGORY_CLASSIFIER_PROMPT_VERSION = "category-classifier.v2";
+export const CATEGORY_CLASSIFIER_RULES_VERSION = "category-guidelines.v2";
 export const DEFAULT_CATEGORY_MODEL = "gpt-5.2";
 
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
@@ -28,6 +32,17 @@ type OpenAIResponsePayload = {
   error?: {
     message?: string;
   };
+  usage?: {
+    input_tokens?: number;
+    output_tokens?: number;
+    total_tokens?: number;
+  };
+};
+
+export type CategoryModelUsage = {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
 };
 
 export type CategoryTaxonomyItem = {
@@ -49,6 +64,10 @@ export type AiEnrichmentQueueRow = {
   descriptionRaw: string;
   descriptionNorm: string;
   institutionCategory: string | null;
+  /** Plaid personal_finance_category.detailed (null for non-Plaid rows). */
+  institutionCategoryDetailed: string | null;
+  /** Plaid personal_finance_category.confidence_level (VERY_HIGH..UNKNOWN). */
+  institutionCategoryConfidence: string | null;
   derivedCategoryId: string;
   categoryLabel: string;
   transactionClass: string;
@@ -88,7 +107,26 @@ export type CategoryClassifierSuggestion = {
 export type CategoryClassifierBatchResponse = {
   responseId: string | null;
   results: CategoryClassifierSuggestion[];
+  usage: CategoryModelUsage | null;
 };
+
+export type CategoryModelRequest = {
+  transactions: AiEnrichmentQueueRow[];
+  categories: CategoryTaxonomyItem[];
+  manualExamples: ManualCategoryExample[];
+};
+
+/**
+ * Provider seam: anything that can turn a batch of queued transactions into
+ * category suggestions. `runAiCategoryEnrichment` depends only on this, so the
+ * OpenAI implementation can be swapped (or faked in tests) without touching the
+ * pipeline, scoring, or persistence.
+ */
+export interface CategoryModelClient {
+  readonly provider: string;
+  readonly model: string;
+  classify(request: CategoryModelRequest): Promise<CategoryClassifierBatchResponse>;
+}
 
 export type CategoryClassifierDecision = {
   transaction: AiEnrichmentQueueRow;
@@ -142,20 +180,32 @@ export type RunAiCategoryEnrichmentOptions = {
   autoAcceptThreshold?: number;
   /** When set, only enrich rows belonging to this user. */
   userId?: string | null;
+  /** Inject a different model provider; defaults to the OpenAI client. */
+  modelClient?: CategoryModelClient;
+  /** Stop dispatching further batches once this many model tokens are spent. */
+  tokenBudget?: number;
 };
 
 export type AiCategoryEnrichmentSummary = {
   runId: string;
   model: string;
+  modelProvider: string;
   promptVersion: string;
   rulesVersion: string;
   taxonomyVersion: string;
   candidateCount: number;
+  /** Rows whose input_hash already had a result and were skipped (idempotency). */
+  skippedUnchangedCount: number;
   enrichedCount: number;
   insertedCount: number;
   acceptedCount: number;
   needsReviewCount: number;
   rejectedCount: number;
+  inputTokens: number;
+  outputTokens: number;
+  tokensUsed: number;
+  /** True when the run halted early because the token budget was reached. */
+  stoppedForBudget: boolean;
 };
 
 function normalizeString(value: unknown) {
@@ -256,6 +306,12 @@ function getOpenAiApiKey(optionApiKey?: string) {
 }
 
 function toPromptTransaction(row: AiEnrichmentQueueRow) {
+  const plaidPrior = derivePlaidCategoryPrior({
+    primary: row.institutionCategory,
+    detailed: row.institutionCategoryDetailed,
+    confidenceLevel: row.institutionCategoryConfidence,
+  });
+
   return {
     transactionId: row.transactionId,
     accountName: row.accountName,
@@ -266,6 +322,16 @@ function toPromptTransaction(row: AiEnrichmentQueueRow) {
     descriptionRaw: row.descriptionRaw,
     descriptionNorm: row.descriptionNorm,
     institutionCategory: row.institutionCategory,
+    plaidCategory: plaidPrior
+      ? {
+          primary: plaidPrior.primary,
+          detailed: plaidPrior.detailed,
+          confidence: plaidPrior.confidenceLevel,
+        }
+      : null,
+    // The canonical-taxonomy id Plaid's categorization maps to, or null when no
+    // confident mapping exists. This is the strong prior the model should anchor on.
+    plaidCategorySuggestedTaxonomyId: plaidPrior?.categoryId ?? null,
     currentCategoryId: row.derivedCategoryId,
     currentCategoryLabel: row.categoryLabel,
     transactionClass: row.transactionClass,
@@ -320,7 +386,10 @@ export function buildCategoryClassifierInstructions() {
     "Use only categoryId values from the provided taxonomy. Do not invent categories.",
     "Prefer stable merchant and description evidence over the bank-provided institution category when they disagree.",
     "Use manualExamples as high-signal learning examples when a new transaction has similar merchant or description text.",
-    "Treat institution category as a weak hint, not as ground truth.",
+    "Treat institutionCategory as a weak hint, not as ground truth.",
+    "plaidCategory is Plaid's machine-learning categorization (primary, detailed, confidence). Treat it as a STRONG prior — stronger than institutionCategory.",
+    "When plaidCategorySuggestedTaxonomyId is present and merchant/description evidence is weak or ambiguous, prefer plaidCategorySuggestedTaxonomyId.",
+    "You may override plaidCategorySuggestedTaxonomyId when clear merchant or description evidence points to a different taxonomy category; explain the override in reason.",
     "Do not classify a transaction as salary unless it is clearly payroll, paycheck, direct deposit, or employer income.",
     "Do not classify refunds as income just because the signed amount is positive.",
     "If the category is ambiguous, choose uncategorized with confidence below 0.70.",
@@ -479,6 +548,23 @@ export function parseCategoryClassifierResponse(
   return suggestions;
 }
 
+function extractUsage(payload: OpenAIResponsePayload): CategoryModelUsage | null {
+  const usage = payload.usage;
+
+  if (!usage) {
+    return null;
+  }
+
+  const inputTokens = normalizeNumber(usage.input_tokens);
+  const outputTokens = normalizeNumber(usage.output_tokens);
+  const totalTokens =
+    typeof usage.total_tokens === "number"
+      ? normalizeNumber(usage.total_tokens)
+      : inputTokens + outputTokens;
+
+  return { inputTokens, outputTokens, totalTokens };
+}
+
 export async function callOpenAiCategoryClassifier({
   transactions,
   categories,
@@ -523,29 +609,33 @@ export async function callOpenAiCategoryClassifier({
   return {
     responseId: payload.id ?? null,
     results: parseCategoryClassifierResponse(outputText),
+    usage: extractUsage(payload),
   };
 }
 
-function findInstitutionHintCategoryId(institutionCategory: string | null) {
-  const normalized = institutionCategory?.toLowerCase() ?? "";
-
-  if (!normalized) {
-    return null;
-  }
-
-  if (normalized.includes("travel")) {
-    return "travel";
-  }
-
-  if (normalized.includes("grocery") || normalized.includes("groceries")) {
-    return "groceries";
-  }
-
-  if (normalized.includes("dining") || normalized.includes("restaurant")) {
-    return "dining";
-  }
-
-  return null;
+/**
+ * Default model provider: OpenAI's Responses API. Exposed as a
+ * {@link CategoryModelClient} so the pipeline depends on the seam, not OpenAI.
+ */
+export function createOpenAiCategoryModelClient({
+  apiKey,
+  model,
+}: {
+  apiKey: string;
+  model: string;
+}): CategoryModelClient {
+  return {
+    provider: "openai",
+    model,
+    classify: ({ transactions, categories, manualExamples }) =>
+      callOpenAiCategoryClassifier({
+        transactions,
+        categories,
+        manualExamples,
+        apiKey,
+        model,
+      }),
+  };
 }
 
 function findTransactionClassCategoryId(transactionClass: string) {
@@ -604,9 +694,11 @@ export function scoreCategorySuggestion({
   const classCategoryId = findTransactionClassCategoryId(
     transaction.transactionClass,
   );
-  const institutionCategoryId = findInstitutionHintCategoryId(
-    transaction.institutionCategory,
-  );
+  const plaidPrior = derivePlaidCategoryPrior({
+    primary: transaction.institutionCategory,
+    detailed: transaction.institutionCategoryDetailed,
+    confidenceLevel: transaction.institutionCategoryConfidence,
+  });
   const strongestSecondaryConfidence = Math.max(
     0,
     ...(suggestion.secondaryCandidates ?? [])
@@ -623,12 +715,25 @@ export function scoreCategorySuggestion({
     confidenceNotes.push("Suggestion conflicts with transaction class.");
   }
 
-  if (institutionCategoryId && institutionCategoryId === suggestion.categoryId) {
-    confidenceScore += 0.05;
-    confidenceNotes.push("Suggestion agrees with institution category hint.");
-  } else if (institutionCategoryId && suggestion.categoryId !== "uncategorized") {
-    confidenceScore -= 0.05;
-    confidenceNotes.push("Suggestion differs from institution category hint.");
+  // Plaid's personal_finance_category as a confidence-weighted prior. Agreement
+  // boosts up to +0.10 (scaled by Plaid's own confidence) so a borderline row can
+  // clear the auto-accept bar; disagreement with a high-confidence Plaid prior is
+  // only a mild penalty so strong merchant evidence can still win.
+  if (plaidPrior?.categoryId && plaidPrior.weight > 0) {
+    if (plaidPrior.categoryId === suggestion.categoryId) {
+      confidenceScore += 0.1 * plaidPrior.weight;
+      confidenceNotes.push(
+        `Suggestion agrees with Plaid's ${plaidPrior.confidenceLevel} category prior.`,
+      );
+    } else if (
+      suggestion.categoryId !== "uncategorized" &&
+      plaidPrior.weight >= 0.8
+    ) {
+      confidenceScore -= 0.06 * plaidPrior.weight;
+      confidenceNotes.push(
+        `Suggestion conflicts with a high-confidence Plaid category prior (${plaidPrior.categoryId}).`,
+      );
+    }
   }
 
   if (strongestSecondaryConfidence > 0 && margin < 0.15) {
@@ -688,6 +793,7 @@ export function buildAiEnrichmentInsertRows({
   runId,
   responseId,
   model,
+  modelProvider = "openai",
   taxonomyVersion,
   transactions,
   categories,
@@ -698,6 +804,7 @@ export function buildAiEnrichmentInsertRows({
   runId: string;
   responseId: string | null;
   model: string;
+  modelProvider?: string;
   taxonomyVersion: string;
   transactions: AiEnrichmentQueueRow[];
   categories: CategoryTaxonomyItem[];
@@ -730,7 +837,7 @@ export function buildAiEnrichmentInsertRows({
       prompt_version: CATEGORY_CLASSIFIER_PROMPT_VERSION,
       rules_version: CATEGORY_CLASSIFIER_RULES_VERSION,
       taxonomy_version: taxonomyVersion,
-      model_provider: "openai",
+      model_provider: modelProvider,
       model,
       model_response_id: responseId,
       suggested_category_id: suggestion.categoryId,
@@ -769,6 +876,12 @@ function normalizeQueueRow(row: Record<string, unknown>): AiEnrichmentQueueRow {
     descriptionRaw: normalizeString(row.descriptionRaw),
     descriptionNorm: normalizeString(row.descriptionNorm),
     institutionCategory: normalizeNullableString(row.institutionCategory),
+    institutionCategoryDetailed: normalizeNullableString(
+      row.institutionCategoryDetailed,
+    ),
+    institutionCategoryConfidence: normalizeNullableString(
+      row.institutionCategoryConfidence,
+    ),
     derivedCategoryId: normalizeString(row.derivedCategoryId),
     categoryLabel: normalizeString(row.categoryLabel),
     transactionClass: normalizeString(row.transactionClass),
@@ -835,6 +948,8 @@ async function loadAiEnrichmentQueue({
         q.description_raw AS descriptionRaw,
         q.description_norm AS descriptionNorm,
         q.institution_category AS institutionCategory,
+        q.institution_category_detailed AS institutionCategoryDetailed,
+        q.institution_category_confidence AS institutionCategoryConfidence,
         q.derived_category_id AS derivedCategoryId,
         q.category_label AS categoryLabel,
         q.transaction_class AS transactionClass,
@@ -934,12 +1049,73 @@ function chunkArray<T>(items: T[], chunkSize: number) {
   return chunks;
 }
 
+function requireOpenAiApiKey(optionApiKey?: string) {
+  const apiKey = getOpenAiApiKey(optionApiKey);
+
+  if (!apiKey) {
+    throw new Error("OPENAI_API_KEY is required to run AI categorization.");
+  }
+
+  return apiKey;
+}
+
+// Idempotency: drop candidates whose exact input_hash already has a result row.
+// The queue view already hides rows with an accepted/needs_review result, but a
+// previously rejected row reappears each run — this stops us re-paying for an
+// identical input. A prompt/rules/taxonomy version bump changes the hash, so
+// improved rows are intentionally re-scored rather than skipped.
+async function filterUnchangedCandidates(
+  candidates: AiEnrichmentQueueRow[],
+  taxonomyVersion: string,
+  userId?: string | null,
+): Promise<AiEnrichmentQueueRow[]> {
+  const projectId = getBigQueryProjectId();
+
+  if (!projectId || candidates.length === 0) {
+    return candidates;
+  }
+
+  const transactionIds = candidates.map((candidate) => candidate.transactionId);
+  const rows = await runBigQueryQuery<{ inputHash: unknown }>(
+    `
+      SELECT DISTINCT input_hash AS inputHash
+      FROM \`${projectId}.ops_finance.ai_enrichment_results\`
+      WHERE (@userId = '' OR user_id = @userId)
+        AND transaction_id IN UNNEST(@transactionIds)
+    `,
+    {
+      userId: userId ?? "",
+      transactionIds,
+    },
+  );
+
+  const existingHashes = new Set(
+    (rows ?? []).map((row) => normalizeString(row.inputHash)).filter(Boolean),
+  );
+
+  if (existingHashes.size === 0) {
+    return candidates;
+  }
+
+  return candidates.filter((candidate) => {
+    const inputHash = hashValue(buildInputJson(candidate, taxonomyVersion));
+    return !existingHashes.has(inputHash);
+  });
+}
+
 export async function runAiCategoryEnrichment(
   options: RunAiCategoryEnrichmentOptions = {},
 ): Promise<AiCategoryEnrichmentSummary> {
-  const model = getModelName(options.model);
+  // Display identity is resolvable without a provider so an empty queue never
+  // requires an API key (used by the post-ingest hook and sample mode).
+  const model = options.modelClient?.model ?? getModelName(options.model);
+  const modelProvider = options.modelClient?.provider ?? "openai";
   const limit = options.limit ?? DEFAULT_LIMIT;
   const batchSize = options.batchSize ?? DEFAULT_BATCH_SIZE;
+  const tokenBudget =
+    typeof options.tokenBudget === "number" && options.tokenBudget > 0
+      ? options.tokenBudget
+      : null;
   const runId = `ai-cat-${new Date().toISOString()}-${randomUUID()}`;
   const categories = await loadCategoryTaxonomy();
 
@@ -953,46 +1129,76 @@ export async function runAiCategoryEnrichment(
     includeExisting: Boolean(options.includeExisting),
     userId: options.userId,
   });
-  const manualExamples = await loadManualCategoryExamples(options.userId);
+
   let insertedCount = 0;
   let acceptedCount = 0;
   let needsReviewCount = 0;
   let rejectedCount = 0;
+  let inputTokens = 0;
+  let outputTokens = 0;
+  let tokensUsed = 0;
+  let stoppedForBudget = false;
+
+  const emptySummary = (
+    candidateCount: number,
+    skippedUnchangedCount: number,
+  ): AiCategoryEnrichmentSummary => ({
+    runId,
+    model,
+    modelProvider,
+    promptVersion: CATEGORY_CLASSIFIER_PROMPT_VERSION,
+    rulesVersion: CATEGORY_CLASSIFIER_RULES_VERSION,
+    taxonomyVersion,
+    candidateCount,
+    skippedUnchangedCount,
+    enrichedCount: 0,
+    insertedCount: 0,
+    acceptedCount: 0,
+    needsReviewCount: 0,
+    rejectedCount: 0,
+    inputTokens: 0,
+    outputTokens: 0,
+    tokensUsed: 0,
+    stoppedForBudget: false,
+  });
 
   if (candidates.length === 0) {
-    return {
-      runId,
+    return emptySummary(0, 0);
+  }
+
+  const pending = options.includeExisting
+    ? candidates
+    : await filterUnchangedCandidates(candidates, taxonomyVersion, options.userId);
+  const skippedUnchangedCount = candidates.length - pending.length;
+
+  if (pending.length === 0) {
+    return emptySummary(candidates.length, skippedUnchangedCount);
+  }
+
+  const manualExamples = await loadManualCategoryExamples(options.userId);
+  const modelClient =
+    options.modelClient ??
+    createOpenAiCategoryModelClient({
+      apiKey: requireOpenAiApiKey(options.openAiApiKey),
       model,
-      promptVersion: CATEGORY_CLASSIFIER_PROMPT_VERSION,
-      rulesVersion: CATEGORY_CLASSIFIER_RULES_VERSION,
-      taxonomyVersion,
-      candidateCount: 0,
-      enrichedCount: 0,
-      insertedCount: 0,
-      acceptedCount: 0,
-      needsReviewCount: 0,
-      rejectedCount: 0,
-    };
-  }
+    });
 
-  const apiKey = getOpenAiApiKey(options.openAiApiKey);
+  for (const batch of chunkArray(pending, Math.max(1, batchSize))) {
+    if (tokenBudget !== null && tokensUsed >= tokenBudget) {
+      stoppedForBudget = true;
+      break;
+    }
 
-  if (!apiKey) {
-    throw new Error("OPENAI_API_KEY is required to run AI categorization.");
-  }
-
-  for (const batch of chunkArray(candidates, Math.max(1, batchSize))) {
-    const response = await callOpenAiCategoryClassifier({
+    const response = await modelClient.classify({
       transactions: batch,
       categories,
       manualExamples,
-      apiKey,
-      model,
     });
     const rows = buildAiEnrichmentInsertRows({
       runId,
       responseId: response.responseId,
-      model,
+      model: modelClient.model,
+      modelProvider: modelClient.provider,
       taxonomyVersion,
       transactions: batch,
       categories,
@@ -1006,19 +1212,31 @@ export async function runAiCategoryEnrichment(
     acceptedCount += rows.filter((row) => row.status === "accepted").length;
     needsReviewCount += rows.filter((row) => row.status === "needs_review").length;
     rejectedCount += rows.filter((row) => row.status === "rejected").length;
+
+    if (response.usage) {
+      inputTokens += response.usage.inputTokens;
+      outputTokens += response.usage.outputTokens;
+      tokensUsed += response.usage.totalTokens;
+    }
   }
 
   return {
     runId,
-    model,
+    model: modelClient.model,
+    modelProvider: modelClient.provider,
     promptVersion: CATEGORY_CLASSIFIER_PROMPT_VERSION,
     rulesVersion: CATEGORY_CLASSIFIER_RULES_VERSION,
     taxonomyVersion,
     candidateCount: candidates.length,
-    enrichedCount: candidates.length,
+    skippedUnchangedCount,
+    enrichedCount: insertedCount,
     insertedCount,
     acceptedCount,
     needsReviewCount,
     rejectedCount,
+    inputTokens,
+    outputTokens,
+    tokensUsed,
+    stoppedForBudget,
   };
 }
