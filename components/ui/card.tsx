@@ -109,7 +109,7 @@ export function CardHeader({
   className,
   ...props
 }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("flex flex-col gap-2 p-6", className)} {...props} />;
+  return <div className={cn("flex min-w-0 flex-col gap-2 p-6", className)} {...props} />;
 }
 
 export function CardTitle({
@@ -118,7 +118,7 @@ export function CardTitle({
 }: HTMLAttributes<HTMLHeadingElement>) {
   return (
     <h3
-      className={cn("text-lg font-semibold tracking-tight text-white", className)}
+      className={cn("break-words text-lg font-semibold tracking-tight text-white", className)}
       {...props}
     />
   );
@@ -137,5 +137,5 @@ export function CardContent({
   className,
   ...props
 }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("px-6 pb-6", className)} {...props} />;
+  return <div className={cn("min-w-0 px-6 pb-6", className)} {...props} />;
 }

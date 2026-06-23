@@ -5,6 +5,8 @@ import { type FormEvent, useEffect, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+
+import { cn } from "@/lib/utils";
 import {
   type RuleAction,
   type SaveResultTone,
@@ -110,8 +112,8 @@ export function OverrideForm({
   return (
     <form onSubmit={submit} className={inline ? "grid gap-2" : "grid gap-3"}>
       {suggestedCategoryLabel ? (
-        <p className="text-xs text-slate-400">
-          AI suggested: <span className="text-slate-200">{suggestedCategoryLabel}</span>
+        <p className="break-words text-xs text-slate-400">
+          AI suggested: <span className="break-words text-slate-200">{suggestedCategoryLabel}</span>
         </p>
       ) : null}
 
@@ -136,7 +138,7 @@ export function OverrideForm({
       />
 
       <div className={inline ? "flex items-center gap-2" : "grid gap-2"}>
-        <div className={inline ? "min-w-0 flex-1" : ""}>
+        <div className={inline ? "min-w-0 flex-1" : "min-w-0"}>
           <Select
             value={action}
             onChange={(event) => setAction(event.target.value as RuleAction)}
@@ -159,9 +161,9 @@ export function OverrideForm({
       </div>
 
       {willLearn && preview?.key === `${categoryId}|${action}` && preview.text ? (
-        <p className="text-xs text-slate-400">{preview.text}</p>
+        <p className="break-words text-xs text-slate-400">{preview.text}</p>
       ) : null}
-      {result ? <p className={toneClass[result.tone]}>{result.message}</p> : null}
+      {result ? <p className={cn("break-words", toneClass[result.tone])}>{result.message}</p> : null}
     </form>
   );
 }
