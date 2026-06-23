@@ -1,0 +1,29 @@
+config {
+  type: "operations",
+  schema: "ops_finance",
+  name: "category_definitions",
+  description: "User-maintained, append-only versioned category catalog. The latest row per (user_id, category_id) is the current definition; status='archived' rows are soft-delete tombstones. Full history is retained for audit and restore.",
+  hasOutput: true
+}
+
+create table if not exists ${self()} (
+  user_id string,
+  category_id string,
+  label string,
+  category_l1 string,
+  category_l2 string,
+  color string,
+  sort_order int64,
+  -- 'active' | 'archived' (archived = soft-delete tombstone)
+  status string,
+  -- Seed-derived categories carry warehouse semantics (transfers, fallbacks) and may be
+  -- renamed/recolored but never archived.
+  is_system bool,
+  -- 'user' | 'seed' | 'import'
+  change_source string,
+  updated_at timestamp,
+  created_at timestamp
+)
+options (
+  description = "User-maintained, append-only versioned category catalog (latest-active per (user_id, category_id) wins)."
+)

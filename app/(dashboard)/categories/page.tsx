@@ -1,5 +1,6 @@
 import { CircleCheckBig } from "lucide-react";
 
+import { CategoryManager } from "@/components/categories/category-manager";
 import { CategoryHitRateList } from "@/components/dashboard/category-hit-rate-list";
 import { CategoryTreemap } from "@/components/dashboard/category-treemap";
 import { PageHeader } from "@/components/dashboard/page-header";
@@ -30,6 +31,7 @@ export default async function CategoriesPage({
         eyebrow="Categories"
         title="Deterministic categorization first, review queue second."
         description="Categories are derived from warehouse rules, institution hints, and user overrides, with low-confidence rows isolated for fast correction."
+        action={<CategoryManager categories={categoryOptions} />}
       />
 
       <TimeFilterSummary

@@ -7,7 +7,8 @@ config {
 
 select current_txn.*
 from ${ref("fact_transaction_current")} as current_txn
-left join ${ref("dim_category")} as categories
+left join ${ref("dim_category_effective")} as categories
   on categories.category_id = current_txn.derived_category_id
+ and (categories.user_id = current_txn.user_id or categories.user_id is null)
 where current_txn.derived_category_id is not null
   and categories.category_id is null

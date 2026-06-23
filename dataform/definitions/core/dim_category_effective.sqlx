@@ -1,0 +1,52 @@
+config {
+  type: "view",
+  schema: "core_finance",
+  name: "dim_category_effective",
+  description: "Effective category catalog: the static seed dimension (emitted with user_id = null as the global baseline) overlaid with each user's latest active definitions from ops_finance.category_definitions. Consumers resolve a label by preferring the row matching the user, then falling back to the null-user seed row.",
+  tags: ["core"]
+}
+
+with user_latest as (
+  -- Collapse the append-only definitions log to the current row per (user_id, category_id).
+  select
+    user_id,
+    category_id,
+    label,
+    category_l1,
+    category_l2,
+    color,
+    sort_order,
+    status,
+    coalesce(is_system, false) as is_system
+  from ${ref("category_definitions")}
+  qualify row_number() over (
+    partition by user_id, category_id
+    order by updated_at desc
+  ) = 1
+)
+select
+  cast(null as string) as user_id,
+  category_id,
+  label,
+  category_l1,
+  category_l2,
+  color,
+  cast(null as int64) as sort_order,
+  true as is_system,
+  "seed" as source
+from ${ref("dim_category")}
+
+union all
+
+select
+  user_id,
+  category_id,
+  label,
+  category_l1,
+  category_l2,
+  color,
+  sort_order,
+  is_system,
+  "user" as source
+from user_latest
+where status = "active"

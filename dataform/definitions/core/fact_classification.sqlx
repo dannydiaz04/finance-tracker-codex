@@ -100,56 +100,67 @@ fallbacks as (
       else "uncategorized"
     end as category_id
   from base
+),
+classified as (
+  select
+    base.user_id,
+    base.transaction_id,
+    coalesce(
+      overrides.category_id,
+      matched_rules.category_id,
+      accepted_ai_suggestions.category_id,
+      fallbacks.category_id
+    ) as category_id,
+    case
+      when overrides.category_id is not null then 1.00
+      when matched_rules.rule_id is not null then 0.95
+      when accepted_ai_suggestions.category_id is not null then accepted_ai_suggestions.confidence_score
+      when base.institution_category is not null then 0.70
+      else 0.55
+    end as confidence_score,
+    case
+      when overrides.category_id is not null then "manual_override"
+      when matched_rules.rule_id is not null then "merchant_rule"
+      when accepted_ai_suggestions.category_id is not null then "ai_suggestion"
+      when base.institution_category is not null then "institution_category"
+      else "fallback"
+    end as classification_source,
+    coalesce(
+      matched_rules.rule_id,
+      if(
+        accepted_ai_suggestions.run_id is not null,
+        concat("ai:", accepted_ai_suggestions.run_id),
+        null
+      )
+    ) as rule_id,
+    coalesce(overrides.updated_at, accepted_ai_suggestions.created_at, base.event_timestamp) as classified_at
+  from base
+  left join overrides
+    on overrides.transaction_id = base.transaction_id
+  left join matched_rules
+    on matched_rules.transaction_id = base.transaction_id
+   and matched_rules.rule_rank = 1
+  left join accepted_ai_suggestions
+    on accepted_ai_suggestions.transaction_id = base.transaction_id
+   and accepted_ai_suggestions.suggestion_rank = 1
+  left join fallbacks
+    on fallbacks.transaction_id = base.transaction_id
 )
 select
-  base.user_id,
-  base.transaction_id,
-  coalesce(
-    overrides.category_id,
-    matched_rules.category_id,
-    accepted_ai_suggestions.category_id,
-    fallbacks.category_id
-  ) as category_id,
-  categories.label as category_label,
-  categories.category_l2 as subcategory_id,
-  case
-    when overrides.category_id is not null then 1.00
-    when matched_rules.rule_id is not null then 0.95
-    when accepted_ai_suggestions.category_id is not null then accepted_ai_suggestions.confidence_score
-    when base.institution_category is not null then 0.70
-    else 0.55
-  end as confidence_score,
-  case
-    when overrides.category_id is not null then "manual_override"
-    when matched_rules.rule_id is not null then "merchant_rule"
-    when accepted_ai_suggestions.category_id is not null then "ai_suggestion"
-    when base.institution_category is not null then "institution_category"
-    else "fallback"
-  end as classification_source,
-  coalesce(
-    matched_rules.rule_id,
-    if(
-      accepted_ai_suggestions.run_id is not null,
-      concat("ai:", accepted_ai_suggestions.run_id),
-      null
-    )
-  ) as rule_id,
-  coalesce(overrides.updated_at, accepted_ai_suggestions.created_at, base.event_timestamp) as classified_at
-from base
-left join overrides
-  on overrides.transaction_id = base.transaction_id
-left join matched_rules
-  on matched_rules.transaction_id = base.transaction_id
- and matched_rules.rule_rank = 1
-left join accepted_ai_suggestions
-  on accepted_ai_suggestions.transaction_id = base.transaction_id
- and accepted_ai_suggestions.suggestion_rank = 1
-left join fallbacks
-  on fallbacks.transaction_id = base.transaction_id
-left join ${ref("dim_category")} as categories
-  on categories.category_id = coalesce(
-    overrides.category_id,
-    matched_rules.category_id,
-    accepted_ai_suggestions.category_id,
-    fallbacks.category_id
-  )
+  classified.user_id,
+  classified.transaction_id,
+  classified.category_id,
+  -- Prefer the user's own (possibly renamed) category; fall back to the global seed row.
+  coalesce(user_cat.label, seed_cat.label) as category_label,
+  coalesce(user_cat.category_l2, seed_cat.category_l2) as subcategory_id,
+  classified.confidence_score,
+  classified.classification_source,
+  classified.rule_id,
+  classified.classified_at
+from classified
+left join ${ref("dim_category_effective")} as user_cat
+  on user_cat.category_id = classified.category_id
+ and user_cat.user_id = classified.user_id
+left join ${ref("dim_category_effective")} as seed_cat
+  on seed_cat.category_id = classified.category_id
+ and seed_cat.user_id is null

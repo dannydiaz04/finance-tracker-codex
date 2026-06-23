@@ -23,6 +23,18 @@ export type Category = {
   group: string;
   sublabel: string;
   color: string;
+  /** Seed/system categories carry warehouse semantics and cannot be archived. */
+  isSystem?: boolean;
+  /** User-controlled display ordering; null/undefined sorts after ordered rows. */
+  sortOrder?: number | null;
+};
+
+/** One persisted version of a category in the append-only definitions log. */
+export type CategoryDefinition = Category & {
+  status: "active" | "archived";
+  changeSource: "user" | "seed" | "import";
+  updatedAt: string;
+  createdAt: string;
 };
 
 export type Account = {
