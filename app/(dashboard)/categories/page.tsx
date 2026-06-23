@@ -4,10 +4,11 @@ import { CategoryHitRateList } from "@/components/dashboard/category-hit-rate-li
 import { CategoryTreemap } from "@/components/dashboard/category-treemap";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { TimeFilterSummary } from "@/components/dashboard/time-filter-summary";
+import { ReviewQueueCard } from "@/components/rules/review-queue-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getCategories } from "@/lib/queries/catalog";
 import { getCategoryInsights, getReviewQueue } from "@/lib/queries/categories";
 import { normalizeTimeFilter } from "@/lib/time-filter";
-import { formatCurrency } from "@/lib/utils";
 
 type CategoriesPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -17,9 +18,10 @@ export default async function CategoriesPage({
   searchParams,
 }: CategoriesPageProps) {
   const timeFilter = normalizeTimeFilter(await searchParams);
-  const [categories, reviewQueue] = await Promise.all([
+  const [categories, reviewQueue, categoryOptions] = await Promise.all([
     getCategoryInsights(timeFilter),
     getReviewQueue(timeFilter),
+    getCategories(),
   ]);
 
   return (
@@ -46,24 +48,11 @@ export default async function CategoriesPage({
         </CardHeader>
         <CardContent className="space-y-3">
           {reviewQueue.map((item) => (
-            <div
+            <ReviewQueueCard
               key={item.transactionId}
-              className="grid gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4 md:grid-cols-[1fr_auto_auto]"
-            >
-              <div>
-                <p className="font-medium text-white">{item.merchant}</p>
-                <p className="mt-1 text-sm text-slate-400">{item.reason}</p>
-              </div>
-              <div className="text-sm text-slate-300">
-                {item.suggestedCategory}
-                <p className="mt-1 text-xs uppercase tracking-[0.18em] text-slate-500">
-                  confidence {(item.confidenceScore * 100).toFixed(0)}%
-                </p>
-              </div>
-              <div className="text-right font-medium text-white">
-                {formatCurrency(item.amount)}
-              </div>
-            </div>
+              item={item}
+              categories={categoryOptions}
+            />
           ))}
 
           <div className="rounded-2xl border border-emerald-300/20 bg-emerald-300/10 p-4 text-sm text-emerald-50">

@@ -83,6 +83,8 @@ export async function getLowConfidenceReviewItems(timeFilter?: TimeFilter) {
         amount,
         posted_at AS postedAt,
         suggested_category AS suggestedCategory,
+        current_category_id AS currentCategoryId,
+        merchant_norm AS merchantNorm,
         confidence_score AS confidenceScore,
         reason
       FROM \`${projectId}.ops_finance.review_queue\`
@@ -214,4 +216,94 @@ export async function getInternalMovementReconciliationItems(
         sampleInternalMovementReconciliationItems,
         timeFilter ?? { preset: "all" },
       ).filter((item) => item.matchStatus === "unmatched");
+}
+
+/**
+ * Count how many of THIS user's transactions a candidate rule would match, using the
+ * exact predicate fact_classification.sqlx applies (so the dry-run preview can't promise
+ * matches the warehouse won't produce). Returns null when BigQuery isn't configured.
+ */
+export async function countRuleMatches(input: {
+  userId: string;
+  matchStrategy: Rule["matchStrategy"];
+  matchValue: string;
+}): Promise<number | null> {
+  const projectId = getBigQueryProjectId();
+
+  if (!projectId) {
+    return null;
+  }
+
+  const predicate =
+    input.matchStrategy === "merchant_exact"
+      ? "LOWER(merchant_norm) = LOWER(@matchValue)"
+      : input.matchStrategy === "description_regex"
+        ? "REGEXP_CONTAINS(LOWER(description_norm), LOWER(@matchValue))"
+        : "STRPOS(LOWER(merchant_norm), LOWER(@matchValue)) > 0";
+
+  const rows = await runBigQueryQuery<{ matches: unknown }>(
+    `
+      SELECT COUNT(*) AS matches
+      FROM \`${projectId}.core_finance.fact_transaction_current\`
+      WHERE user_id = @userId
+        AND ${predicate}
+    `,
+    { userId: input.userId, matchValue: input.matchValue },
+  );
+
+  return rows && rows[0] ? coerceNumber(rows[0].matches) : 0;
+}
+
+export type RawPendingSuggestion = {
+  suggestion_id: string;
+  transaction_id: string | null;
+  category_id: string;
+  category_label: string;
+  match_strategy: string;
+  match_value: string;
+  rule_name: string;
+  rule_description: string;
+  source: string;
+  note: string | null;
+  created_at: string;
+};
+
+/** Latest pending suggestions for one transaction — used to supersede stale ones. */
+export async function getPendingSuggestionsForTransaction(input: {
+  userId: string;
+  transactionId: string;
+}): Promise<RawPendingSuggestion[]> {
+  const projectId = getBigQueryProjectId();
+
+  if (!projectId) {
+    return [];
+  }
+
+  const rows = await runBigQueryQuery<RawPendingSuggestion>(
+    `
+      SELECT
+        suggestion_id,
+        transaction_id,
+        category_id,
+        category_label,
+        match_strategy,
+        match_value,
+        rule_name,
+        rule_description,
+        source,
+        note,
+        CAST(created_at AS STRING) AS created_at
+      FROM \`${projectId}.ops_finance.category_rule_suggestions\`
+      WHERE user_id = @userId
+      QUALIFY ROW_NUMBER() OVER (
+        PARTITION BY suggestion_id
+        ORDER BY updated_at DESC
+      ) = 1
+        AND transaction_id = @transactionId
+        AND status = "pending"
+    `,
+    { userId: input.userId, transactionId: input.transactionId },
+  );
+
+  return rows ?? [];
 }

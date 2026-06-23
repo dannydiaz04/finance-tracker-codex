@@ -2,9 +2,11 @@ import { GitPullRequestDraft, Repeat2, ShieldCheck, Sparkles } from "lucide-reac
 
 import { PageHeader } from "@/components/dashboard/page-header";
 import { TimeFilterSummary } from "@/components/dashboard/time-filter-summary";
+import { ReviewQueueCard } from "@/components/rules/review-queue-card";
 import { RuleSuggestionActions } from "@/components/rules/rule-suggestion-actions";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getCategories } from "@/lib/queries/catalog";
 import {
   getInternalMovementReconciliationItems,
   getLowConfidenceReviewItems,
@@ -20,12 +22,14 @@ type RulesPageProps = {
 
 export default async function RulesPage({ searchParams }: RulesPageProps) {
   const timeFilter = normalizeTimeFilter(await searchParams);
-  const [rules, reviewItems, ruleSuggestions, reconciliationItems] = await Promise.all([
-    getRules(),
-    getLowConfidenceReviewItems(timeFilter),
-    getRuleSuggestions(),
-    getInternalMovementReconciliationItems(timeFilter),
-  ]);
+  const [rules, reviewItems, ruleSuggestions, reconciliationItems, categoryOptions] =
+    await Promise.all([
+      getRules(),
+      getLowConfidenceReviewItems(timeFilter),
+      getRuleSuggestions(),
+      getInternalMovementReconciliationItems(timeFilter),
+      getCategories(),
+    ]);
 
   return (
     <div className="space-y-6">
@@ -115,17 +119,11 @@ export default async function RulesPage({ searchParams }: RulesPageProps) {
           </CardHeader>
           <CardContent className="space-y-3">
             {reviewItems.map((item) => (
-              <div
+              <ReviewQueueCard
                 key={item.transactionId}
-                className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4"
-              >
-                <p className="font-medium text-white">{item.merchant}</p>
-                <p className="mt-1 text-sm text-slate-400">{item.description}</p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Badge>{item.suggestedCategory}</Badge>
-                  <Badge>{(item.confidenceScore * 100).toFixed(0)}% confidence</Badge>
-                </div>
-              </div>
+                item={item}
+                categories={categoryOptions}
+              />
             ))}
           </CardContent>
         </Card>

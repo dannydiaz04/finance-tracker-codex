@@ -4,8 +4,8 @@ import type { Route } from "next";
 import { AnimatePresence, motion } from "motion/react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Database, GitCompareArrows, Sparkles, X } from "lucide-react";
-import { type FormEvent, useState, useTransition } from "react";
 
+import { OverrideForm } from "@/components/transactions/override-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,12 +24,6 @@ export function TransactionDrawer({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [saveState, setSaveState] = useState<{
-    transactionId: string | null;
-    status: "idle" | "saved" | "error";
-    message: string | null;
-  }>({ transactionId: null, status: "idle", message: null });
-  const [isSaving, startTransition] = useTransition();
 
   const close = () => {
     const params = new URLSearchParams(searchParams.toString());
@@ -39,48 +33,6 @@ export function TransactionDrawer({
         params.toString() ? `${pathname}?${params.toString()}` : pathname
       ) as Route,
     );
-  };
-
-  const saveOverride = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    setSaveState({
-      transactionId: transaction?.transactionId ?? null,
-      status: "idle",
-      message: null,
-    });
-
-    startTransition(async () => {
-      const response = await fetch("/api/categories/override", {
-        method: "POST",
-        body: formData,
-      });
-      const payload = (await response.json().catch(() => null)) as
-        | {
-            error?: string;
-            ruleSuggestion?: unknown;
-            ruleSuggestionPersisted?: boolean;
-          }
-        | null;
-
-      if (!response.ok) {
-        setSaveState({
-          transactionId: transaction?.transactionId ?? null,
-          status: "error",
-          message: payload?.error ?? "Unable to save override.",
-        });
-        return;
-      }
-
-      setSaveState({
-        transactionId: transaction?.transactionId ?? null,
-        status: "saved",
-        message: payload?.ruleSuggestionPersisted
-          ? "Override saved. A learned rule is waiting for review."
-          : "Override saved.",
-      });
-      router.refresh();
-    });
   };
 
   return (
@@ -146,47 +98,13 @@ export function TransactionDrawer({
                   <CardTitle className="text-base">Manual recategorization</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <form
-                    onSubmit={saveOverride}
-                    className="grid gap-3"
-                  >
-                    <input
-                      type="hidden"
-                      name="transactionId"
-                      value={transaction.transactionId}
-                    />
-                    <input
-                      type="hidden"
-                      name="createRuleSuggestion"
-                      value="true"
-                    />
-                    <select
-                      name="categoryId"
-                      defaultValue={transaction.derivedCategoryId}
-                      className="h-10 rounded-xl border border-white/10 bg-slate-950/60 px-3 text-sm text-slate-100"
-                    >
-                      {categories.map((category) => (
-                        <option key={category.id} value={category.id}>
-                          {category.label}
-                        </option>
-                      ))}
-                    </select>
-                    <Button type="submit" variant="secondary" disabled={isSaving}>
-                      {isSaving ? "Saving..." : "Save override"}
-                    </Button>
-                    {saveState.message &&
-                    saveState.transactionId === transaction.transactionId ? (
-                      <p
-                        className={
-                          saveState.status === "error"
-                            ? "text-sm text-rose-200"
-                            : "text-sm text-emerald-200"
-                        }
-                      >
-                        {saveState.message}
-                      </p>
-                    ) : null}
-                  </form>
+                  <OverrideForm
+                    variant="drawer"
+                    transactionId={transaction.transactionId}
+                    currentCategoryId={transaction.derivedCategoryId}
+                    categories={categories}
+                    onResolved={() => router.refresh()}
+                  />
                 </CardContent>
               </Card>
 

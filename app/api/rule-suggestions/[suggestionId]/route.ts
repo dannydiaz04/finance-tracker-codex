@@ -8,6 +8,15 @@ import {
   isBigQueryConfigured,
   runBigQueryQuery,
 } from "@/lib/bigquery/client";
+import {
+  LEARNED_RULE_CONFIDENCE,
+  LEARNED_RULE_PRIORITY,
+  RuleGuardrailError,
+  applyRuleGuardrails,
+  dedupePlan,
+} from "@/lib/categorization/override-plan";
+import { getRules } from "@/lib/queries/rules";
+import type { Rule } from "@/lib/types/finance";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -134,19 +143,81 @@ export async function POST(
       return NextResponse.json({ status: "dismissed", persisted: true });
     }
 
+    // Guard + dedupe at the REAL category_rules write boundary — the suggestion draft is
+    // advisory; this accept is where an active rule (conf 0.95, above AI) is actually born.
+    let guarded;
+    try {
+      guarded = applyRuleGuardrails({
+        matchStrategy: suggestion.match_strategy as Rule["matchStrategy"],
+        matchValue: suggestion.match_value,
+      });
+    } catch (error) {
+      if (error instanceof RuleGuardrailError) {
+        return NextResponse.json({ error: error.message }, { status: 400 });
+      }
+      throw error;
+    }
+
+    const existingRules = await getRules();
+    const dedupe = dedupePlan({
+      existingRules: existingRules.map((item) => ({
+        ruleId: item.id,
+        matchStrategy: item.matchStrategy,
+        matchValue: item.matchValue,
+        categoryId: item.categoryId,
+        enabled: item.enabled,
+      })),
+      matchStrategy: guarded.matchStrategy,
+      matchValue: guarded.matchValue,
+      categoryId: suggestion.category_id,
+    });
+
+    // An identical active rule already exists — accept the suggestion without writing a
+    // duplicate (idempotent against double-clicks / retries).
+    if (dedupe.status === "exists") {
+      await insertSuggestionStatus({ suggestion, status: "accepted", userId });
+      return NextResponse.json({ status: "accepted", persisted: true, dedupe: "exists", rule: null });
+    }
+
     const now = new Date().toISOString();
+
+    // Contradictory rule for the same merchant → disable it before writing the new one.
+    if (dedupe.status === "conflict" && dedupe.conflictRuleId) {
+      const conflict = existingRules.find((item) => item.id === dedupe.conflictRuleId);
+      if (conflict) {
+        await insertBigQueryRows("ops_finance", "category_rules", [
+          {
+            user_id: userId,
+            rule_id: conflict.id,
+            name: conflict.name,
+            description: conflict.description,
+            priority: conflict.priority,
+            enabled: false,
+            category_id: conflict.categoryId,
+            category_label: conflict.categoryLabel,
+            match_strategy: conflict.matchStrategy,
+            match_value: conflict.matchValue,
+            confidence_boost: conflict.confidenceBoost,
+            hit_rate: conflict.hitRate,
+            last_matched_at: conflict.lastMatchedAt ?? null,
+            created_at: now,
+          },
+        ]);
+      }
+    }
+
     const rule = {
       user_id: userId,
       rule_id: `learned-${suggestion.suggestion_id}`,
       name: suggestion.rule_name,
       description: suggestion.rule_description,
-      priority: 110,
+      priority: LEARNED_RULE_PRIORITY,
       enabled: true,
       category_id: suggestion.category_id,
       category_label: suggestion.category_label,
-      match_strategy: suggestion.match_strategy,
-      match_value: suggestion.match_value,
-      confidence_boost: 0.95,
+      match_strategy: guarded.matchStrategy,
+      match_value: guarded.matchValue,
+      confidence_boost: LEARNED_RULE_CONFIDENCE,
       hit_rate: 0,
       last_matched_at: null,
       created_at: now,
@@ -158,6 +229,7 @@ export async function POST(
     return NextResponse.json({
       status: "accepted",
       persisted: true,
+      dedupe: dedupe.status,
       rule,
     });
   } catch (error) {
