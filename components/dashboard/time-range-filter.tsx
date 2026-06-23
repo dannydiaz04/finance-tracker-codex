@@ -131,11 +131,13 @@ export function TimeRangeFilter() {
     <>
       <Button
         type="button"
-        className="fixed bottom-5 right-5 z-40 gap-2 shadow-[0_18px_70px_rgba(34,211,238,0.28)] md:bottom-auto md:top-5"
+        size="sm"
+        className="fixed bottom-4 right-3 z-40 h-9 w-9 justify-center p-0 shadow-[0_10px_40px_rgba(34,211,238,0.2)] md:bottom-auto md:right-4 md:top-4"
         onClick={() => setOpen(true)}
+        aria-label="Time filters"
+        title="Time filters"
       >
         <SlidersHorizontal className="size-4" />
-        Time filters
       </Button>
 
       <div
