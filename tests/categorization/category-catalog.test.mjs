@@ -63,7 +63,7 @@ test("mergeCategoryDefinitions overlays user rows, archives removed categories, 
       color: "",
       sortOrder: 2,
       status: "active",
-      isSystem: false,
+      isSystem: true,
     },
   ]);
 
