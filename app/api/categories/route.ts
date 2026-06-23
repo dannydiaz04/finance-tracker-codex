@@ -3,6 +3,8 @@ import { z } from "zod";
 
 import { resolveRouteUserId } from "@/lib/auth/session";
 import {
+  buildCategoryDefinitionRow,
+  buildReassignedCategoryRuleRow,
   isSystemCategoryId,
   slugifyCategoryId,
 } from "@/lib/categorization/category-catalog";
@@ -13,7 +15,7 @@ import {
   getTransactionIdsForCategory,
 } from "@/lib/queries/catalog";
 import { getRules } from "@/lib/queries/rules";
-import type { Category, Rule } from "@/lib/types/finance";
+import type { Category } from "@/lib/types/finance";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,50 +39,6 @@ const archiveSchema = z.object({
 });
 
 const DEFAULT_COLOR = "#64748b";
-
-function definitionRow(input: {
-  userId: string;
-  category: Category;
-  status: "active" | "archived";
-  isSystem: boolean;
-  now: string;
-}) {
-  return {
-    user_id: input.userId,
-    category_id: input.category.id,
-    label: input.category.label,
-    category_l1: input.category.group,
-    category_l2: input.category.sublabel,
-    color: input.category.color,
-    sort_order: input.category.sortOrder ?? null,
-    status: input.status,
-    is_system: input.isSystem,
-    change_source: "user",
-    updated_at: input.now,
-    created_at: input.now,
-  };
-}
-
-// Reassign a deterministic rule to a different category by appending a new version that
-// shares rule_id (fact_classification keeps the latest row per rule_id).
-function reassignedRuleRow(rule: Rule, target: Category, userId: string, now: string) {
-  return {
-    user_id: userId,
-    rule_id: rule.id,
-    name: rule.name,
-    description: rule.description,
-    priority: rule.priority,
-    enabled: rule.enabled,
-    category_id: target.id,
-    category_label: target.label,
-    match_strategy: rule.matchStrategy,
-    match_value: rule.matchValue,
-    confidence_boost: rule.confidenceBoost,
-    hit_rate: rule.hitRate,
-    last_matched_at: rule.lastMatchedAt ?? null,
-    created_at: now,
-  };
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -132,7 +90,7 @@ export async function POST(request: NextRequest) {
       sortOrder: payload.sortOrder ?? existing?.sortOrder ?? null,
     };
 
-    const row = definitionRow({
+    const row = buildCategoryDefinitionRow({
       userId,
       category,
       status: "active",
@@ -229,7 +187,12 @@ export async function DELETE(request: NextRequest) {
           "ops_finance",
           "category_rules",
           rulesToMove.map((rule) =>
-            reassignedRuleRow(rule, reassignTarget!, userId, now),
+            buildReassignedCategoryRuleRow({
+              rule,
+              target: reassignTarget!,
+              userId,
+              now,
+            }),
           ),
         );
         reassignedRules = rulesToMove.length;
@@ -255,7 +218,7 @@ export async function DELETE(request: NextRequest) {
       }
     }
 
-    const tombstone = definitionRow({
+    const tombstone = buildCategoryDefinitionRow({
       userId,
       category: target,
       status: "archived",
