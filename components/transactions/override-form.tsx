@@ -136,7 +136,7 @@ export function OverrideForm({
       />
 
       <div className={inline ? "flex items-center gap-2" : "grid gap-2"}>
-        <div className={inline ? "flex-1" : ""}>
+        <div className={inline ? "min-w-0 flex-1" : ""}>
           <Select
             value={action}
             onChange={(event) => setAction(event.target.value as RuleAction)}
