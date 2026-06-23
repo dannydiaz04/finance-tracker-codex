@@ -115,7 +115,11 @@ export default async function TransactionsPage({
         selectedId={filters.selectedId}
       />
 
-      <TransactionDrawer transaction={selectedTransaction} categories={categories} />
+      <TransactionDrawer
+        detail={selectedTransaction}
+        transactions={transactions}
+        categories={categories}
+      />
     </div>
   );
 }

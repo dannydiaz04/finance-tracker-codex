@@ -9,21 +9,51 @@ import { OverrideForm } from "@/components/transactions/override-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { Category, TransactionDetail } from "@/lib/types/finance";
+import type {
+  Category,
+  Transaction,
+  TransactionDetail,
+} from "@/lib/types/finance";
 import { formatCurrency } from "@/lib/utils";
 
 type TransactionDrawerProps = {
-  transaction: TransactionDetail | null;
+  /**
+   * Server-fetched rich detail (transfer links + raw events) for the selected row.
+   * Arrives a round-trip after the click, so it can briefly lag `selectedId`.
+   */
+  detail: TransactionDetail | null;
+  /**
+   * The rows already in client memory. Lets the drawer open *instantly* from base data
+   * on click instead of waiting for the server to refetch the detail.
+   */
+  transactions: Transaction[];
   categories: Category[];
 };
 
 export function TransactionDrawer({
-  transaction,
+  detail,
+  transactions,
   categories,
 }: TransactionDrawerProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+
+  // `useSearchParams` resolves synchronously on a client navigation (the router already
+  // holds the new params), so this reflects the click before the server re-render lands.
+  const selectedId = searchParams.get("selectedId");
+
+  // Open immediately from the base row we already have, then upgrade to the rich detail
+  // once it streams in. This removes the click → slide-in lag (no server wait to appear).
+  const base = selectedId
+    ? transactions.find((item) => item.transactionId === selectedId) ?? null
+    : null;
+  const active: TransactionDetail | Transaction | null =
+    detail && detail.transactionId === selectedId ? detail : base;
+
+  // Transfer links only exist on the rich detail; show none until it arrives for this row.
+  const relatedTransfers =
+    detail && detail.transactionId === selectedId ? detail.relatedTransfers : [];
 
   const close = () => {
     const params = new URLSearchParams(searchParams.toString());
@@ -37,7 +67,7 @@ export function TransactionDrawer({
 
   return (
     <AnimatePresence>
-      {transaction ? (
+      {active ? (
         <>
           <motion.button
             type="button"
@@ -51,7 +81,7 @@ export function TransactionDrawer({
             initial={{ x: 480, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: 480, opacity: 0 }}
-            transition={{ type: "spring", stiffness: 220, damping: 25 }}
+            transition={{ type: "spring", stiffness: 260, damping: 28 }}
             className="fixed right-0 top-0 z-40 h-screen w-full max-w-xl overflow-y-auto border-l border-white/10 bg-slate-950/96 p-4 shadow-[0_0_120px_rgba(8,15,30,0.65)] sm:p-6"
           >
             <div className="mb-6 flex items-start justify-between gap-4">
@@ -60,10 +90,10 @@ export function TransactionDrawer({
                   Transaction detail
                 </p>
                 <h2 className="mt-2 text-2xl font-semibold text-white">
-                  {transaction.merchantRaw}
+                  {active.merchantRaw}
                 </h2>
                 <p className="mt-2 text-sm text-slate-400">
-                  {transaction.descriptionRaw}
+                  {active.descriptionRaw}
                 </p>
               </div>
               <Button variant="ghost" size="sm" onClick={close}>
@@ -74,20 +104,20 @@ export function TransactionDrawer({
             <div className="grid gap-4">
               <Card>
                 <CardHeader>
-                  <CardTitle>{formatCurrency(transaction.signedAmount)}</CardTitle>
+                  <CardTitle>{formatCurrency(active.signedAmount)}</CardTitle>
                 </CardHeader>
                 <CardContent className="grid gap-3 text-sm text-slate-300">
                   <div className="flex flex-wrap gap-2">
-                    <Badge>{transaction.categoryLabel}</Badge>
-                    <Badge>{transaction.transactionClass.replace("_", " ")}</Badge>
-                    <Badge>{transaction.accountName}</Badge>
-                    <Badge>{transaction.pending ? "Pending" : "Posted"}</Badge>
+                    <Badge>{active.categoryLabel}</Badge>
+                    <Badge>{active.transactionClass.replace("_", " ")}</Badge>
+                    <Badge>{active.accountName}</Badge>
+                    <Badge>{active.pending ? "Pending" : "Posted"}</Badge>
                   </div>
                   <div className="grid gap-2 text-sm text-slate-400">
-                    <p>Posted: {transaction.postedAt}</p>
-                    <p>Authorized: {transaction.authorizedAt ?? "N/A"}</p>
-                    <p>Confidence: {(transaction.confidenceScore * 100).toFixed(0)}%</p>
-                    <p>Rule: {transaction.ruleId ?? "No explicit rule"}</p>
+                    <p>Posted: {active.postedAt}</p>
+                    <p>Authorized: {active.authorizedAt ?? "N/A"}</p>
+                    <p>Confidence: {(active.confidenceScore * 100).toFixed(0)}%</p>
+                    <p>Rule: {active.ruleId ?? "No explicit rule"}</p>
                   </div>
                 </CardContent>
               </Card>
@@ -100,8 +130,8 @@ export function TransactionDrawer({
                 <CardContent>
                   <OverrideForm
                     variant="drawer"
-                    transactionId={transaction.transactionId}
-                    currentCategoryId={transaction.derivedCategoryId}
+                    transactionId={active.transactionId}
+                    currentCategoryId={active.derivedCategoryId}
                     categories={categories}
                     onResolved={() => router.refresh()}
                   />
@@ -114,7 +144,7 @@ export function TransactionDrawer({
                   <CardTitle className="text-base">Classification history</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {transaction.classificationHistory.map((entry) => (
+                  {active.classificationHistory.map((entry) => (
                     <div
                       key={`${entry.timestamp}-${entry.source}`}
                       className="rounded-2xl border border-white/10 bg-white/[0.03] p-4"
@@ -138,9 +168,9 @@ export function TransactionDrawer({
                   <CardTitle className="text-base">Raw payload and transfer links</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {transaction.relatedTransfers.length > 0 ? (
+                  {relatedTransfers.length > 0 ? (
                     <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm text-slate-300">
-                      {transaction.relatedTransfers.map((related) => (
+                      {relatedTransfers.map((related) => (
                         <p key={related.transactionId}>
                           {related.accountName}: {formatCurrency(related.signedAmount)} on{" "}
                           {related.postedAt}
@@ -149,7 +179,7 @@ export function TransactionDrawer({
                     </div>
                   ) : null}
                   <pre className="overflow-x-auto rounded-2xl border border-white/10 bg-slate-950/80 p-4 text-xs text-slate-300">
-                    {JSON.stringify(transaction.rawPayloadJson, null, 2)}
+                    {JSON.stringify(active.rawPayloadJson, null, 2)}
                   </pre>
                 </CardContent>
               </Card>
