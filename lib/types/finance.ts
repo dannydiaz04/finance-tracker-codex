@@ -234,6 +234,10 @@ export type ReviewQueueItem = {
   amount: number;
   postedAt: string;
   suggestedCategory: string;
+  /** Current derived category id (from fact_transaction_current) — for the inline edit form. */
+  currentCategoryId: string | null;
+  /** Normalized merchant — lets the card preview a rule without re-normalizing client-side. */
+  merchantNorm: string;
   confidenceScore: number;
   reason: string;
 };

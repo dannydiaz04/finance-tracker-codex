@@ -24,11 +24,27 @@ overrides as (
       updated_at,
       row_number() over (
         partition by transaction_id
-        order by updated_at desc
+        order by updated_at desc, category_id desc
       ) as override_rank
     from ${ref("manual_overrides")}
   )
   where override_rank = 1
+),
+active_rules as (
+  -- Collapse category_rules to the latest row per (user_id, rule_id) so a disabled
+  -- tombstone (enabled=false) actually turns a rule off, then keep only enabled rules.
+  select * except (rule_recency)
+  from (
+    select
+      *,
+      row_number() over (
+        partition by user_id, rule_id
+        order by created_at desc
+      ) as rule_recency
+    from ${ref("category_rules")}
+  )
+  where rule_recency = 1
+    and coalesce(enabled, true)
 ),
 matched_rules as (
   select
@@ -36,17 +52,21 @@ matched_rules as (
     rules.rule_id,
     rules.category_id,
     rules.priority,
+    -- Deterministic tiebreaker: equal-priority rules must resolve identically on every
+    -- run. priority alone is not unique (every learned rule is priority 110), so an
+    -- unbroken tie let BigQuery pick the winning category non-deterministically.
     row_number() over (
       partition by base.transaction_id
-      order by rules.priority desc
+      order by rules.priority desc, rules.created_at desc, rules.rule_id
     ) as rule_rank
   from base
-  join ${ref("category_rules")} as rules
-    on coalesce(rules.enabled, true)
-   and rules.user_id = base.user_id
+  join active_rules as rules
+    on rules.user_id = base.user_id
    and (
      (rules.match_strategy = "merchant_exact" and lower(base.merchant_norm) = lower(rules.match_value))
-     or (rules.match_strategy = "merchant_contains" and lower(base.merchant_norm) like concat("%", lower(rules.match_value), "%"))
+     -- Literal substring (no LIKE metacharacters): '%'/'_' in match_value cannot widen
+     -- the match, and this mirrors the JS classifier's .includes() semantics.
+     or (rules.match_strategy = "merchant_contains" and strpos(lower(base.merchant_norm), lower(rules.match_value)) > 0)
      or (rules.match_strategy = "description_regex" and regexp_contains(lower(base.description_norm), lower(rules.match_value)))
    )
 ),

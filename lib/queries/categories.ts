@@ -46,6 +46,8 @@ export async function getReviewQueue(timeFilter?: TimeFilter) {
         amount,
         posted_at AS postedAt,
         suggested_category AS suggestedCategory,
+        current_category_id AS currentCategoryId,
+        merchant_norm AS merchantNorm,
         confidence_score AS confidenceScore,
         reason
       FROM \`${projectId}.ops_finance.review_queue\`

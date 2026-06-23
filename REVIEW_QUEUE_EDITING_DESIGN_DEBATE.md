@@ -11,7 +11,8 @@
 > is promoted into `PLAN.md` for buildout. The canonical detailed plan still lives in
 > `PLAN.md`; this doc is where it earns its keep.
 >
-> _Status: Round 2 complete. Converging. 3 open decisions for the human._
+> _Status: Round 3 complete. Agent C (verification pass) + human rulings on O1–O4.
+> Promoted to `PLAN.md` for buildout. See "Round 3" below._
 
 ---
 
@@ -194,6 +195,40 @@ rule**, improving the agent. Verified mechanics:
 - **Agent B:** "No remaining strong objections given D1–D9 and O1–O3 resolved. Approve for
   buildout once the human rules O1–O3."
 - **Agent A:** "Agreed. Ready to promote to `PLAN.md` and build on your go."
+
+---
+
+## Round 3 — Agent C (verification pass) + human rulings
+
+**C opened the layer A and B never did** (`fact_classification.sqlx`, the refresh
+model) and ground-truthed every claim. Five strong objections, all **missed by both
+A and B**, three of them blockers — each verified against source:
+
+- **C3.1 (blocker).** Rule ladder is non-deterministic: `fact_classification.sqlx:39-42`
+  ranks `matched_rules` by `priority desc` with **no tiebreaker**, and every learned
+  rule is `priority 110`. Two rules on one txn → arbitrary, run-to-run-unstable
+  category. A/B blessed the conflict case (B2.1) reasoning only override-vs-rule,
+  never rule-vs-rule — which the proposed dedupe key (incl. `category_id`) actively
+  permits.
+- **C3.2 (blocker).** Dedupe key must **drop `category_id`** (else contradictory
+  `peets→A` / `peets→B` both survive → feeds C3.1) and supersede on conflict.
+- **C3.3 (blocker).** "Resolved after refresh" is dishonest: `persisted` only means
+  the override INSERT landed; `review_queue` is a batch view and **nothing schedules
+  `dataform run`** (only `scripts/process-dropbox.sh:115`). B2.3 had it backwards.
+- **C3.4.** Write-boundary unsafe once `create` ships: unescaped LIKE (`:49`),
+  unvalidated regex into a shared `type:"table"` (`:50`), unvalidated `category_id`
+  pinned at 1.00 (`override/route.ts:69`), and no rule-disable path.
+- **C3.5.** Rubber-stamp loop: pre-selecting the AI guess self-trains the model.
+- **C3.6.** The route isn't unit-testable as A1.3/D5 assumed; test a **pure helper**.
+
+**Human rulings (2026-06-22):** O1 → **include `create`-now**; O2/O3 → **fix the full
+safety package now** (tiebreaker, category validation, regex/LIKE validation,
+rule-disable/rollback); O4 → **view-level resolution** (anti-join `manual_overrides`
+in `review_queue`); modality → **shared `OverrideForm` + `variant`**.
+
+**Resolution:** Promoted to `PLAN.md` (Phases 0–5). Phase 0 fixes the warehouse
+invariants C3.1–C3.4 first; Phase 1 puts every rule write through a unit-tested pure
+chokepoint (`override-plan.ts`) that resolves C3.2/C3.5/C3.6.
 
 ---
 

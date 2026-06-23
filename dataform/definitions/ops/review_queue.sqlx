@@ -18,6 +18,14 @@ with ai_review_suggestions as (
     ) as suggestion_rank
   from ${ref("ai_enrichment_results")}
   where status = "needs_review"
+),
+
+resolved_overrides as (
+  -- Any transaction the user has already overridden is resolved and must leave the
+  -- queue immediately. This view reads the operational manual_overrides table live,
+  -- so resolution survives reload without waiting on a fact_transaction_current rebuild.
+  select distinct user_id, transaction_id
+  from ${ref("manual_overrides")}
 )
 
 select
@@ -28,6 +36,8 @@ select
   abs(current_txn.signed_amount) as amount,
   current_txn.posted_at,
   coalesce(ai_review_suggestions.suggested_category_label, current_txn.category_label) as suggested_category,
+  current_txn.derived_category_id as current_category_id,
+  current_txn.merchant_norm,
   coalesce(ai_review_suggestions.confidence_score, current_txn.confidence_score) as confidence_score,
   case
     when current_txn.pending then "Pending merchant with non-final bank metadata."
@@ -40,7 +50,13 @@ from ${ref("fact_transaction_current")} as current_txn
 left join ai_review_suggestions
   on ai_review_suggestions.transaction_id = current_txn.transaction_id
  and ai_review_suggestions.suggestion_rank = 1
-where current_txn.pending
-   or current_txn.confidence_score < 0.7
-   or current_txn.derived_category_id = "uncategorized"
-   or ai_review_suggestions.transaction_id is not null
+left join resolved_overrides
+  on resolved_overrides.transaction_id = current_txn.transaction_id
+ and resolved_overrides.user_id = current_txn.user_id
+where resolved_overrides.transaction_id is null
+  and (
+    current_txn.pending
+    or current_txn.confidence_score < 0.7
+    or current_txn.derived_category_id = "uncategorized"
+    or ai_review_suggestions.transaction_id is not null
+  )
