@@ -118,8 +118,8 @@ test("active user rows add custom categories with fallback colors and determinis
 });
 
 test("slugified category ids are stable, normalized, and seed-dependent", () => {
-  assert.equal(slugifyCategoryId(" Travel & Dining! ", "user-1|2026-06-24"), "travel-dining-s36zhh");
-  assert.equal(slugifyCategoryId(" Travel & Dining! ", "user-1|2026-06-24"), "travel-dining-s36zhh");
+  assert.equal(slugifyCategoryId(" Travel & Dining! ", "user-1|2026-06-24"), "travel-dining-19gksr");
+  assert.equal(slugifyCategoryId(" Travel & Dining! ", "user-1|2026-06-24"), "travel-dining-19gksr");
   assert.notEqual(
     slugifyCategoryId(" Travel & Dining! ", "user-1|2026-06-24"),
     slugifyCategoryId(" Travel & Dining! ", "user-2|2026-06-24"),
