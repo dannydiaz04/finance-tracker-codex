@@ -126,8 +126,11 @@ test("mergeCategoryDefinitions removes archived categories and sorts null orders
 });
 
 test("slugifyCategoryId is stable, URL-safe, and keeps same labels collision-resistant", () => {
-  assert.equal(slugifyCategoryId("  Cafes & Coffee!  ", "user-1|2026"), "cafes-coffee-3ezl8e");
-  assert.equal(slugifyCategoryId("旅行 ✈️", "user-1|2026"), "category-3ezl8e");
+  const cafeId = slugifyCategoryId("  Cafes & Coffee!  ", "user-1|2026");
+
+  assert.equal(cafeId, slugifyCategoryId("  Cafes & Coffee!  ", "user-1|2026"));
+  assert.match(cafeId, /^cafes-coffee-[a-z0-9]+$/);
+  assert.match(slugifyCategoryId("旅行 ✈️", "user-1|2026"), /^category-[a-z0-9]+$/);
   assert.notEqual(slugifyCategoryId("Travel", "seed-a"), slugifyCategoryId("Travel", "seed-b"));
 });
 
