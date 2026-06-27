@@ -1,12 +1,19 @@
 "use client";
 
 import type { Route } from "next";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { CalendarRange, RotateCcw, SlidersHorizontal, X } from "lucide-react";
+import {
+  CalendarRange,
+  Loader2,
+  RotateCcw,
+  SlidersHorizontal,
+  X,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
 import {
   TIME_FILTER_CHANGE_EVENT,
   TIME_FILTER_QUERY_KEYS,
@@ -74,6 +81,7 @@ export function TimeRangeFilter() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [open, setOpen] = useState(false);
+  const [isPending, startTransition] = useTransition();
   const currentFilter = useMemo(
     () => normalizeTimeFilter(Object.fromEntries(searchParams.entries())),
     [searchParams],
@@ -93,6 +101,13 @@ export function TimeRangeFilter() {
           source: currentRangeKey,
         };
 
+  const navigate = (queryString: string) => {
+    startTransition(() => {
+      router.push(`${pathname}${queryString ? `?${queryString}` : ""}` as Route);
+      announceFilterChange(queryString);
+    });
+  };
+
   const pushFilter = (filter: TimeFilter) => {
     const params = new URLSearchParams(searchParams.toString());
 
@@ -110,21 +125,15 @@ export function TimeRangeFilter() {
       params.set("timePreset", filter.preset);
     }
 
-    const queryString = params.toString();
-    router.push(`${pathname}${queryString ? `?${queryString}` : ""}` as Route);
-    announceFilterChange(queryString);
-    setOpen(false);
+    navigate(params.toString());
   };
 
   const resetFilter = () => {
     const params = new URLSearchParams(searchParams.toString());
     TIME_FILTER_QUERY_KEYS.forEach((key) => params.delete(key));
-    const queryString = params.toString();
 
     setDraftRange({ from: "", to: "", source: "" });
-    router.push(`${pathname}${queryString ? `?${queryString}` : ""}` as Route);
-    announceFilterChange(queryString);
-    setOpen(false);
+    navigate(params.toString());
   };
 
   return (
@@ -134,10 +143,15 @@ export function TimeRangeFilter() {
         size="sm"
         className="fixed bottom-4 right-3 z-40 h-9 w-9 justify-center p-0 shadow-[0_10px_40px_rgba(34,211,238,0.2)] md:bottom-auto md:right-4 md:top-4"
         onClick={() => setOpen(true)}
-        aria-label="Time filters"
+        aria-label={isPending ? "Loading new time range" : "Time filters"}
+        aria-busy={isPending}
         title="Time filters"
       >
-        <SlidersHorizontal className="size-4" />
+        {isPending ? (
+          <Loader2 className="size-4 animate-spin" />
+        ) : (
+          <SlidersHorizontal className="size-4" />
+        )}
       </Button>
 
       <div
@@ -171,9 +185,15 @@ export function TimeRangeFilter() {
               </div>
               <div>
                 <p className="text-sm font-medium text-white">Time parameters</p>
-                <p className="mt-1 text-sm text-slate-400">
-                  {formatTimeFilterLabel(currentFilter)}
-                </p>
+                {isPending ? (
+                  <span className="mt-1 inline-flex">
+                    <Spinner label="Updating visuals…" />
+                  </span>
+                ) : (
+                  <p className="mt-1 text-sm text-slate-400">
+                    {formatTimeFilterLabel(currentFilter)}
+                  </p>
+                )}
               </div>
             </div>
             <Button
@@ -210,8 +230,9 @@ export function TimeRangeFilter() {
                     <button
                       key={option.value}
                       type="button"
+                      disabled={isPending}
                       className={cn(
-                        "h-10 rounded-xl border border-white/10 px-3 text-xs font-medium text-slate-400 transition-colors",
+                        "h-10 rounded-xl border border-white/10 px-3 text-xs font-medium text-slate-400 transition-colors disabled:cursor-not-allowed disabled:opacity-50",
                         currentFilter.preset === option.value
                           ? "border-cyan-300/30 bg-cyan-400/15 text-cyan-100"
                           : "bg-white/[0.03] hover:bg-white/[0.06] hover:text-white",
@@ -268,6 +289,8 @@ export function TimeRangeFilter() {
           <div className="grid grid-cols-[1fr_auto] gap-3 border-t border-white/10 px-5 py-4">
             <Button
               type="button"
+              disabled={isPending}
+              aria-busy={isPending}
               onClick={() =>
                 pushFilter({
                   preset: "custom",
@@ -276,12 +299,20 @@ export function TimeRangeFilter() {
                 })
               }
             >
-              Apply parameters
+              {isPending ? (
+                <>
+                  <Loader2 className="mr-2 size-4 animate-spin" />
+                  Applying…
+                </>
+              ) : (
+                "Apply parameters"
+              )}
             </Button>
             <Button
               type="button"
               variant="secondary"
               aria-label="Reset time filter"
+              disabled={isPending}
               onClick={resetFilter}
             >
               <RotateCcw className="size-4" />
