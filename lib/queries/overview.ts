@@ -2,6 +2,8 @@ import "server-only";
 
 import { getCurrentUserId } from "@/lib/auth/session";
 import { getBigQueryProjectId, runBigQueryQuery } from "@/lib/bigquery/client";
+import { deriveBalanceTotalsFromAccounts, resolvePrimaryCheckingBalance } from "@/lib/queries/account-balances";
+import { getAccounts } from "@/lib/queries/catalog";
 import { getCashflowSeries } from "@/lib/queries/cashflow";
 import { coerceDateString, coerceNumber } from "@/lib/queries/coerce";
 import { deriveOverviewFromTransactions } from "@/lib/queries/finance-aggregates";
@@ -100,6 +102,7 @@ function mapOverviewSnapshot(row: RawOverviewSnapshot): OverviewSnapshot {
       changeVsPrior: coerceNumber(merchant.change_vs_prior),
     })),
     reviewQueueCount: coerceNumber(row.review_queue_count),
+    primaryCheckingBalance: null,
   };
 }
 
@@ -118,16 +121,24 @@ export async function getOverviewSnapshot(timeFilter?: TimeFilter) {
       )
     : null;
   const base = rows?.[0] ? mapOverviewSnapshot(rows[0]) : sampleOverview;
-  const [transactions, cashflow] = await Promise.all([
+  const [transactions, cashflow, accounts] = await Promise.all([
     getTransactions({
       from: timeFilter?.from,
       to: timeFilter?.to,
     }),
     getCashflowSeries(timeFilter),
+    getAccounts(),
   ]);
 
+  const derived = deriveOverviewFromTransactions(transactions, base);
+  const balanceTotals = deriveBalanceTotalsFromAccounts(accounts);
+  const primaryCheckingBalance = resolvePrimaryCheckingBalance(accounts);
+
   return {
-    ...deriveOverviewFromTransactions(transactions, base),
+    ...derived,
+    ...balanceTotals,
+    primaryCheckingBalance,
+    accounts,
     cashflow,
   };
 }

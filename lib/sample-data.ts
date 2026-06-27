@@ -75,6 +75,17 @@ export const sampleCategories: Category[] = [
 
 export const sampleAccounts: Account[] = [
   {
+    id: "capital_one_360_checking_5980",
+    name: "Capital One 360 Checking",
+    institution: "Capital One",
+    type: "checking",
+    subtype: "checking",
+    currency: "USD",
+    mask: "5980",
+    currentBalance: 8240.18,
+    availableBalance: 8240.18,
+  },
+  {
     id: "acct-checking",
     name: "Main Checking",
     institution: "Schwab",
@@ -876,4 +887,12 @@ export const sampleOverview: OverviewSnapshot = {
     changeVsPrior: item.trend,
   })),
   reviewQueueCount: sampleReviewQueue.length,
+  primaryCheckingBalance: {
+    accountId: "capital_one_360_checking_5980",
+    accountName: "Capital One 360 Checking",
+    institution: "Capital One",
+    mask: "5980",
+    currentBalance: 8240.18,
+    availableBalance: 8240.18,
+  },
 };

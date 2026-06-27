@@ -10,12 +10,23 @@ with base as (
   select *
   from ${ref("fact_transaction_current")}
 ),
+account_balance_scalars as (
+  select
+    user_id,
+    sum(coalesce(current_balance, 0)) as total_balance,
+    sum(
+      case
+        when type != "credit"
+          then coalesce(available_balance, current_balance, 0)
+        else 0
+      end
+    ) as available_cash
+  from ${ref("dim_account")}
+  group by user_id
+),
 scalars as (
   select
     user_id,
-    sum(case when direction = "inflow" then signed_amount else 0 end)
-      - abs(sum(case when direction = "outflow" then signed_amount else 0 end)) as total_balance,
-    sum(case when direction = "inflow" then signed_amount else 0 end) as available_cash,
     abs(
       sum(
         case
@@ -150,8 +161,8 @@ review_counts as (
 )
 select
   scalars.user_id,
-  scalars.total_balance,
-  scalars.available_cash,
+  coalesce(account_balance_scalars.total_balance, 0) as total_balance,
+  coalesce(account_balance_scalars.available_cash, 0) as available_cash,
   scalars.month_to_date_spend,
   scalars.month_to_date_income,
   scalars.savings_rate,
@@ -166,6 +177,7 @@ select
   merchant_arr.top_merchants as top_merchants,
   coalesce(review_counts.review_queue_count, 0) as review_queue_count
 from scalars
+left join account_balance_scalars on account_balance_scalars.user_id = scalars.user_id
 left join largest on largest.user_id = scalars.user_id
 left join accounts_arr on accounts_arr.user_id = scalars.user_id
 left join cashflow_arr on cashflow_arr.user_id = scalars.user_id

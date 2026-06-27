@@ -1,12 +1,15 @@
 import { DatabaseZap, Filter, SearchCheck } from "lucide-react";
 
+import { AccountBalanceSummary } from "@/components/dashboard/account-balance-summary";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { PrimaryCheckingBalanceCard } from "@/components/dashboard/primary-checking-balance-card";
 import { TimeFilterSummary } from "@/components/dashboard/time-filter-summary";
 import { TransactionDrawer } from "@/components/transactions/transaction-drawer";
 import { TransactionFilters } from "@/components/transactions/transaction-filters";
 import { TransactionTable } from "@/components/transactions/transaction-table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { normalizeTransactionFilters } from "@/lib/bigquery/params";
+import { resolvePrimaryCheckingBalance } from "@/lib/queries/account-balances";
 import { getAccounts, getCategories } from "@/lib/queries/catalog";
 import {
   getTransactionById,
@@ -50,6 +53,7 @@ export default async function TransactionsPage({
   const lowConfidence = transactions.filter(
     (transaction) => transaction.confidenceScore < 0.75,
   ).length;
+  const primaryCheckingBalance = resolvePrimaryCheckingBalance(accounts);
 
   return (
     <div className="space-y-6">
@@ -62,6 +66,13 @@ export default async function TransactionsPage({
       <TimeFilterSummary
         filter={timeFilter}
         fields="Transactions filter `from` and `to` against `postedAt` / warehouse `posted_at`."
+      />
+
+      <PrimaryCheckingBalanceCard balance={primaryCheckingBalance} />
+
+      <AccountBalanceSummary
+        accounts={accounts}
+        accountIds={filters.accountIds}
       />
 
       <div className="grid gap-4 md:grid-cols-4">

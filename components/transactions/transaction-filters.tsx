@@ -14,6 +14,7 @@ import type {
   TransactionFilters,
   TransactionSearchSuggestion,
 } from "@/lib/types/finance";
+import { formatCompactCurrency } from "@/lib/utils";
 
 type TransactionFiltersProps = {
   accounts: Account[];
@@ -136,7 +137,7 @@ export function TransactionFilters({
             <option value="">All accounts</option>
             {accounts.map((account) => (
               <option key={account.id} value={account.id}>
-                {account.name}
+                {account.name} · {formatCompactCurrency(account.currentBalance)}
               </option>
             ))}
           </Select>

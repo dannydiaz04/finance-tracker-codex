@@ -9,6 +9,7 @@ import { KpiCards } from "@/components/dashboard/kpi-cards";
 import { MonthSelector } from "@/components/dashboard/month-selector";
 import { MonthlyMoneyChart } from "@/components/dashboard/monthly-money-chart";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { PrimaryCheckingBalanceCard } from "@/components/dashboard/primary-checking-balance-card";
 import { WeekdaySpendChart } from "@/components/dashboard/weekday-spend-chart";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -111,6 +112,8 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
       <Suspense fallback={null}>
         <MonthSelector months={monthlySummaries} selectedMonth={selectedMonth} />
       </Suspense>
+
+      <PrimaryCheckingBalanceCard balance={overview.primaryCheckingBalance} />
 
       <KpiCards overview={overview} timeFilter={timeFilter} />
 
@@ -244,7 +247,7 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
             <div>
               <CardTitle className="text-base">Available cash</CardTitle>
               <CardDescription>
-                Liquid balances across non-credit accounts.
+                Liquid balances on non-credit linked accounts (from Plaid sync).
               </CardDescription>
             </div>
           </CardHeader>

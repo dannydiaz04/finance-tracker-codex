@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
-import { ArrowDownRight, ArrowUpRight, Wallet } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight } from "lucide-react";
 
 import {
   Card,
@@ -14,7 +14,6 @@ import { formatTimeFilterLabel, type TimeFilter } from "@/lib/time-filter";
 import type { OverviewSnapshot } from "@/lib/types/finance";
 import {
   cn,
-  formatCompactCurrency,
   formatCurrency,
   formatPercent,
 } from "@/lib/utils";
@@ -47,7 +46,7 @@ type KpiDefinition = {
   tone: CardTone;
   iconAccent: string;
   label: (scope: string) => string;
-  icon: typeof Wallet;
+  icon: typeof ArrowUpRight;
   accessor: (overview: OverviewSnapshot) => string;
   helper: (
     overview: OverviewSnapshot,
@@ -56,17 +55,6 @@ type KpiDefinition = {
 };
 
 const kpis: KpiDefinition[] = [
-  {
-    key: "totalBalance",
-    tone: "balance",
-    iconAccent: "border-cyan-400/30 bg-cyan-400/10 text-cyan-200",
-    label: (scope: string) => `Net worth (${scope})`,
-    icon: Wallet,
-    accessor: (overview: OverviewSnapshot) =>
-      formatCompactCurrency(overview.totalBalance),
-    helper: (_overview: OverviewSnapshot, scope: ReturnType<typeof getDateScopeCopy>) =>
-      `Current linked account balances, shown with ${scope.contextPhrase} context.`,
-  },
   {
     key: "monthToDateIncome",
     tone: "income",
@@ -95,7 +83,7 @@ export function KpiCards({ overview, timeFilter }: KpiCardsProps) {
   const scope = getDateScopeCopy(timeFilter);
 
   return (
-    <div className="grid gap-4 lg:grid-cols-3">
+    <div className="grid gap-4 lg:grid-cols-2">
       {kpis.map((item, index) => {
         const Icon = item.icon;
 

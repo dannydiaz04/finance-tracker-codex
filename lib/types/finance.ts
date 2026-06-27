@@ -183,9 +183,20 @@ export type MerchantSpendPoint = {
   changeVsPrior: number;
 };
 
+/** Live Capital One checking balance — invariant to transaction date filters. */
+export type PrimaryCheckingBalance = {
+  accountId: string;
+  accountName: string;
+  institution: string;
+  mask: string;
+  currentBalance: number;
+  availableBalance: number;
+};
+
 export type OverviewSnapshot = {
   totalBalance: number;
   availableCash: number;
+  primaryCheckingBalance: PrimaryCheckingBalance | null;
   monthToDateSpend: number;
   monthToDateIncome: number;
   savingsRate: number;
