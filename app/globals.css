@@ -53,6 +53,19 @@ pre {
   font-family: var(--font-geist-mono), monospace;
 }
 
+/* Theme the native <select> popup so its options match the dark UI instead of
+   falling back to the browser's default light list. */
+select option,
+select optgroup {
+  background-color: #0b1424;
+  color: var(--card-foreground);
+}
+
+select option:checked {
+  background-color: rgb(34 211 238 / 0.18);
+  color: #ecfeff;
+}
+
 .metric-grid {
   background-image:
     linear-gradient(to right, rgb(255 255 255 / 0.04) 1px, transparent 1px),
