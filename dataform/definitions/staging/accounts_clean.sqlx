@@ -54,10 +54,10 @@ metadata as (
   where metadata_rank = 1
 )
 select
-  observed.user_id,
-  observed.account_id,
-  coalesce(metadata.account_name, observed.name) as name,
-  coalesce(metadata.institution, observed.source_name) as source_name,
+  coalesce(observed.user_id, metadata.user_id) as user_id,
+  coalesce(observed.account_id, metadata.account_id) as account_id,
+  coalesce(metadata.account_name, observed.name, metadata.account_id) as name,
+  coalesce(metadata.institution, observed.source_name, "Plaid") as source_name,
   coalesce(
     metadata.account_type,
     case
@@ -85,7 +85,9 @@ select
   metadata.current_balance as current_balance,
   metadata.available_balance as available_balance
 from observed
-left join metadata
+full outer join metadata
   on metadata.account_id = observed.account_id
  and metadata.user_id = observed.user_id
  and coalesce(metadata.is_active, true)
+where observed.account_id is not null
+   or coalesce(metadata.is_active, true)

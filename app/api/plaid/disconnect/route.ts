@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { resolveRouteUserId } from "@/lib/auth/session";
 import { deletePlaidItem, getPlaidItem } from "@/lib/plaid/items";
+import { revalidatePlaidDependentViews } from "@/lib/plaid/revalidate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,6 +35,8 @@ export async function POST(request: NextRequest) {
   if (!deleted) {
     return NextResponse.json({ error: "Failed to disconnect." }, { status: 500 });
   }
+
+  revalidatePlaidDependentViews();
 
   return NextResponse.json({ ok: true, itemId, institutionName: item.institutionName });
 }

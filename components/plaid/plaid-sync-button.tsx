@@ -41,6 +41,11 @@ export function PlaidSyncButton({ itemId, label, floatingMessage }: PlaidSyncBut
           removed: number;
           reason?: string;
         }>;
+        warehouseRefresh?: {
+          status: "ran" | "skipped" | "error";
+          reason?: string;
+          durationMs?: number;
+        };
       };
 
       if (!response.ok) {
@@ -61,11 +66,19 @@ export function PlaidSyncButton({ itemId, label, floatingMessage }: PlaidSyncBut
         (result) => result.status === "error" || result.status === "skipped",
       );
 
-      setMessage(
-        firstError?.reason
-          ? firstError.reason
-          : `Synced ${totals.added} new, ${totals.modified} updated, ${totals.removed} removed.`,
-      );
+      const syncMessage = firstError?.reason
+        ? firstError.reason
+        : `Synced ${totals.added} new, ${totals.modified} updated, ${totals.removed} removed.`;
+      const refreshMessage =
+        data.warehouseRefresh?.status === "ran"
+          ? "Warehouse refreshed."
+          : data.warehouseRefresh?.status === "error"
+            ? `Warehouse refresh failed: ${data.warehouseRefresh.reason ?? "unknown error"}`
+            : data.warehouseRefresh?.status === "skipped"
+              ? `Warehouse refresh skipped: ${data.warehouseRefresh.reason ?? "not requested"}`
+              : null;
+
+      setMessage([syncMessage, refreshMessage].filter(Boolean).join(" "));
       router.refresh();
     } catch {
       setMessage("Network error while syncing.");

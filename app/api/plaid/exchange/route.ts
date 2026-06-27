@@ -8,10 +8,16 @@ import {
   resolveInstitutionName,
 } from "@/lib/plaid/client";
 import { upsertPlaidItem } from "@/lib/plaid/items";
+import { revalidatePlaidDependentViews } from "@/lib/plaid/revalidate";
 import { syncPlaidItemById } from "@/lib/plaid/sync";
+import {
+  refreshWarehouseMarts,
+  summarizeWarehouseRefresh,
+} from "@/lib/warehouse/dataform-refresh";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 
 export async function POST(request: NextRequest) {
   const { userId, response: authResponse } = await resolveRouteUserId();
@@ -90,6 +96,13 @@ export async function POST(request: NextRequest) {
     });
 
     const syncResult = await syncPlaidItemById(itemId);
+    const warehouseRefresh = syncResult?.persisted
+      ? await refreshWarehouseMarts()
+      : {
+          status: "skipped" as const,
+          reason: "Plaid sync did not persist warehouse rows.",
+        };
+    revalidatePlaidDependentViews();
 
     console.info("[plaid:exchange] stored and synced item", {
       userId,
@@ -106,12 +119,14 @@ export async function POST(request: NextRequest) {
             reason: syncResult.reason,
           }
         : null,
+      warehouseRefresh: summarizeWarehouseRefresh(warehouseRefresh),
     });
 
     return NextResponse.json({
       itemId,
       institutionName,
       syncResult,
+      warehouseRefresh: summarizeWarehouseRefresh(warehouseRefresh),
     });
   } catch (error) {
     // Log only the extracted, safe message — never the raw axios/Plaid error,

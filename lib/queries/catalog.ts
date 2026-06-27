@@ -15,12 +15,74 @@ type RawAccount = Omit<Account, "currentBalance" | "availableBalance"> & {
   availableBalance: unknown;
 };
 
+const accountTypes = new Set<Account["type"]>([
+  "checking",
+  "savings",
+  "credit",
+  "brokerage",
+]);
+
+function normalizeAccountType(value: string | null | undefined): Account["type"] {
+  const normalized = value?.trim().toLowerCase();
+
+  if (normalized && accountTypes.has(normalized as Account["type"])) {
+    return normalized as Account["type"];
+  }
+
+  if (normalized?.includes("credit")) {
+    return "credit";
+  }
+
+  if (normalized?.includes("saving")) {
+    return "savings";
+  }
+
+  if (normalized?.includes("brokerage") || normalized?.includes("investment")) {
+    return "brokerage";
+  }
+
+  return "checking";
+}
+
+function mapAccountRow(row: RawAccount): Account {
+  return {
+    id: row.id,
+    name: row.name || row.id,
+    institution: row.institution || "Unknown",
+    type: normalizeAccountType(row.type),
+    subtype: row.subtype || "",
+    currency: row.currency || "USD",
+    mask: row.mask || "unknown",
+    currentBalance: coerceNumber(row.currentBalance),
+    availableBalance: coerceNumber(row.availableBalance),
+  };
+}
+
+function mergeAccountRows(coreRows: RawAccount[], liveRows: RawAccount[]) {
+  const byId = new Map<string, Account>();
+
+  for (const row of coreRows) {
+    const account = mapAccountRow(row);
+    byId.set(account.id, account);
+  }
+
+  for (const row of liveRows) {
+    const account = mapAccountRow(row);
+    byId.set(account.id, account);
+  }
+
+  return [...byId.values()].sort((left, right) =>
+    left.name.localeCompare(right.name),
+  );
+}
+
 export async function getAccounts() {
   const userId = await getCurrentUserId();
   const projectId = getBigQueryProjectId() ?? "project";
-  const rows = userId
-    ? await runBigQueryQuery<RawAccount>(
-        `
+  const [coreRows, liveRows] = userId
+    ? await Promise.all([
+        runBigQueryQuery<RawAccount>(
+          `
       SELECT
         account_id AS id,
         name,
@@ -35,17 +97,54 @@ export async function getAccounts() {
       WHERE user_id = @userId
       ORDER BY name
     `,
-        { userId },
+          { userId },
+        ).catch(() => null),
+        runBigQueryQuery<RawAccount>(
+          `
+      SELECT
+        account_id AS id,
+        COALESCE(NULLIF(account_name, ''), account_id) AS name,
+        COALESCE(NULLIF(institution, ''), 'Plaid') AS institution,
+        COALESCE(NULLIF(account_type, ''), 'checking') AS type,
+        COALESCE(NULLIF(account_subtype, ''), '') AS subtype,
+        COALESCE(NULLIF(currency, ''), 'USD') AS currency,
+        COALESCE(NULLIF(mask, ''), 'unknown') AS mask,
+        current_balance AS currentBalance,
+        available_balance AS availableBalance
+      FROM (
+        SELECT
+          user_id,
+          account_id,
+          account_name,
+          institution,
+          account_type,
+          account_subtype,
+          currency,
+          mask,
+          current_balance,
+          available_balance,
+          is_active,
+          ROW_NUMBER() OVER (
+            PARTITION BY user_id, account_id
+            ORDER BY updated_at DESC
+          ) AS metadata_rank
+        FROM \`${projectId}.ops_finance.account_metadata\`
+        WHERE user_id = @userId
       )
-    : null;
+      WHERE metadata_rank = 1
+        AND COALESCE(is_active, TRUE)
+      ORDER BY name
+    `,
+          { userId },
+        ).catch(() => null),
+      ])
+    : [null, null];
 
-  return rows
-    ? rows.map((row) => ({
-        ...row,
-        currentBalance: coerceNumber(row.currentBalance),
-        availableBalance: coerceNumber(row.availableBalance),
-      }))
-    : sampleAccounts;
+  if (!coreRows && !liveRows) {
+    return sampleAccounts;
+  }
+
+  return mergeAccountRows(coreRows ?? [], liveRows ?? []);
 }
 
 type RawCategoryDefinition = {

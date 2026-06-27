@@ -171,8 +171,9 @@ PLAID_WEBHOOK_URL=https://your-tunnel/api/plaid/webhook`}
             <p className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-6 text-sm text-slate-400">
               No Plaid-sourced accounts have been synced into the warehouse yet for
               your connections. Use “Sync now” on a connection above (or wait for the
-              webhook), then run <code>npx dataform run dataform</code> to refresh the
-              marts so masks, balances, and accounts appear here and on the Overview.
+              webhook), then refresh this page. Accounts and balances appear from
+              live Plaid metadata; transaction marts refresh automatically after
+              Plaid sync.
             </p>
           ) : (
             <div className="grid gap-3 md:grid-cols-2">
@@ -233,8 +234,9 @@ PLAID_WEBHOOK_URL=https://your-tunnel/api/plaid/webhook`}
           <p className="text-xs text-slate-500">
             These accounts (and their masks / account identifiers) come from Plaid’s
             AccountBase responses during <code>/transactions/sync</code>, stored in
-            <code className="mx-1">ops_finance.account_metadata</code>, and projected
-            through <code>stg_finance.accounts_clean</code> → <code>core_finance.dim_account</code>.
+            <code className="mx-1">ops_finance.account_metadata</code>. The app reads
+            that live metadata immediately and the warehouse also projects it through
+            <code className="mx-1">stg_finance.accounts_clean</code> → <code>core_finance.dim_account</code>.
           </p>
         </CardContent>
       </Card>
@@ -261,8 +263,8 @@ PLAID_WEBHOOK_URL=https://your-tunnel/api/plaid/webhook`}
             reusing the exact normalization the CSV path uses.
           </p>
           <p>
-            4. Account balances from Plaid are stored on each account and shown on
-            the Overview.
+            4. Account balances from Plaid are stored on each account and shown
+            immediately on Connections, Overview, and Transactions.
           </p>
           <p>
             5. With <code className="text-cyan-200">PLAID_WEBHOOK_URL</code> set,
@@ -270,8 +272,9 @@ PLAID_WEBHOOK_URL=https://your-tunnel/api/plaid/webhook`}
             and the app auto-syncs; otherwise use “Sync now”.
           </p>
           <p>
-            6. Run <code className="text-cyan-200">npx dataform run dataform</code>{" "}
-            to refresh the marts so the dashboards reflect the new transactions.
+            6. Plaid sync automatically runs the Dataform warehouse refresh so
+            transaction marts, category/merchant aggregates, and other derived
+            dashboard data catch up without a manual command.
           </p>
         </CardContent>
       </Card>

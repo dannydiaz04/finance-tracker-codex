@@ -1,11 +1,17 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 
 import { updatePlaidItemStatus } from "@/lib/plaid/items";
+import { revalidatePlaidDependentViews } from "@/lib/plaid/revalidate";
 import { syncPlaidItemById } from "@/lib/plaid/sync";
 import type { PlaidWebhookPayload } from "@/lib/plaid/types";
+import {
+  refreshWarehouseMarts,
+  summarizeWarehouseRefresh,
+} from "@/lib/warehouse/dataform-refresh";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 
 const TRANSACTION_SYNC_CODES = new Set([
   "SYNC_UPDATES_AVAILABLE",
@@ -35,8 +41,8 @@ export async function POST(request: NextRequest) {
     itemId,
   });
 
-  // Plaid expects a 2xx quickly; do the work inline since volume is low for a
-  // single-user app, but never fail the webhook because of downstream errors.
+  // Plaid expects a 2xx quickly. Keep Plaid sync inline, then schedule slower
+  // warehouse refresh work after the response.
   try {
     if (
       webhookType === "TRANSACTIONS" &&
@@ -45,6 +51,18 @@ export async function POST(request: NextRequest) {
       itemId
     ) {
       const result = await syncPlaidItemById(itemId);
+      if (result?.persisted) {
+        after(async () => {
+          const warehouseRefresh = await refreshWarehouseMarts();
+          console.info("[plaid:webhook] warehouse refresh complete", {
+            itemId,
+            warehouseRefresh: summarizeWarehouseRefresh(warehouseRefresh),
+          });
+          revalidatePlaidDependentViews();
+        });
+      } else {
+        revalidatePlaidDependentViews();
+      }
       return NextResponse.json({ received: true, action: "synced", result });
     }
 
@@ -54,6 +72,7 @@ export async function POST(request: NextRequest) {
           ? payload.error.error_message
           : "Plaid reported an item error.";
       await updatePlaidItemStatus(itemId, "error", errorMessage);
+      revalidatePlaidDependentViews();
       return NextResponse.json({ received: true, action: "item_error" });
     }
   } catch (error) {
