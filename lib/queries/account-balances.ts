@@ -1,8 +1,16 @@
 import type { Account, PrimaryCheckingBalance } from "@/lib/types/finance";
 
 export type AccountBalanceTotals = {
+  /** Net worth: liquid cash minus credit-card debt. */
   totalBalance: number;
+  /** Liquid current balances on non-credit accounts. */
   availableCash: number;
+  /** Unused credit limit across credit-card accounts. */
+  availableCredit: number;
+  /** Outstanding balance owed across credit-card accounts. */
+  debtTotal: number;
+  /** Money available to spend: available cash plus available credit. */
+  spendingPower: number;
 };
 
 function normalizeInstitution(value: string) {
@@ -64,13 +72,32 @@ export function deriveBalanceTotalsFromAccounts(
       ? accounts.filter((account) => accountIds.includes(account.id))
       : accounts;
 
+  const cashAccounts = scoped.filter((account) => account.type !== "credit");
+  const creditAccounts = scoped.filter((account) => account.type === "credit");
+
+  // Credit-card current balance is money owed, not money available.
+  const availableCash = cashAccounts.reduce(
+    (sum, account) => sum + (account.availableBalance ?? account.currentBalance),
+    0,
+  );
+  const cashCurrent = cashAccounts.reduce(
+    (sum, account) => sum + account.currentBalance,
+    0,
+  );
+  const availableCredit = creditAccounts.reduce(
+    (sum, account) => sum + (account.availableBalance ?? 0),
+    0,
+  );
+  const debtTotal = creditAccounts.reduce(
+    (sum, account) => sum + account.currentBalance,
+    0,
+  );
+
   return {
-    totalBalance: scoped.reduce((sum, account) => sum + account.currentBalance, 0),
-    availableCash: scoped
-      .filter((account) => account.type !== "credit")
-      .reduce(
-        (sum, account) => sum + (account.availableBalance ?? account.currentBalance),
-        0,
-      ),
+    totalBalance: cashCurrent - debtTotal,
+    availableCash,
+    availableCredit,
+    debtTotal,
+    spendingPower: availableCash + availableCredit,
   };
 }

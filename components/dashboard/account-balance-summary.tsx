@@ -1,4 +1,4 @@
-import { Landmark, Wallet2 } from "lucide-react";
+import { CreditCard, Wallet2 } from "lucide-react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { deriveBalanceTotalsFromAccounts } from "@/lib/queries/account-balances";
@@ -23,10 +23,8 @@ export function AccountBalanceSummary({
       ? accounts.filter((account) => accountIds.includes(account.id))
       : accounts;
 
-  const { totalBalance, availableCash } = deriveBalanceTotalsFromAccounts(
-    accounts,
-    accountIds,
-  );
+  const { availableCash, availableCredit, debtTotal, spendingPower } =
+    deriveBalanceTotalsFromAccounts(accounts, accountIds);
 
   const context =
     scopeLabel ??
@@ -40,62 +38,77 @@ export function AccountBalanceSummary({
     <div className="grid gap-4 md:grid-cols-2">
       <Card tone="balance">
         <CardHeader className="flex-row items-center gap-3">
-          <Wallet2 className="size-5 text-cyan-300" />
+          <Wallet2 className="size-5 text-emerald-300" />
           <div>
-            <CardTitle className="text-base">Total balance</CardTitle>
+            <CardTitle className="text-base">Available to spend</CardTitle>
             <CardDescription>
-              Sum of current balances from linked accounts ({context}).
+              Liquid cash plus unused credit ({context}).
             </CardDescription>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-1">
           <p className="text-3xl font-semibold text-white">
-            {formatCurrency(totalBalance)}
+            {formatCurrency(spendingPower)}
+          </p>
+          <p className="text-sm text-slate-400">
+            {formatCompactCurrency(availableCash)} cash +{" "}
+            {formatCompactCurrency(availableCredit)} available credit
           </p>
         </CardContent>
       </Card>
 
       <Card tone="balance">
         <CardHeader className="flex-row items-center gap-3">
-          <Landmark className="size-5 text-emerald-300" />
+          <CreditCard className="size-5 text-rose-300" />
           <div>
-            <CardTitle className="text-base">Available cash</CardTitle>
+            <CardTitle className="text-base">Credit card debt</CardTitle>
             <CardDescription>
-              Liquid balances on non-credit accounts ({context}).
+              Outstanding balance owed on credit cards ({context}).
             </CardDescription>
           </div>
         </CardHeader>
         <CardContent>
           <p className="text-3xl font-semibold text-white">
-            {formatCurrency(availableCash)}
+            {formatCurrency(debtTotal)}
           </p>
         </CardContent>
       </Card>
 
       {scoped.length > 0 ? (
         <div className="md:col-span-2 space-y-2">
-          {scoped.map((account) => (
-            <div
-              key={account.id}
-              className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3"
-            >
-              <div className="min-w-0">
-                <p className="truncate font-medium text-white">{account.name}</p>
-                <p className="truncate text-sm text-slate-400">
-                  {account.institution}
-                  {account.mask && account.mask !== "unknown" ? ` · •••• ${account.mask}` : ""}
-                </p>
+          {scoped.map((account) => {
+            const isCredit = account.type === "credit";
+
+            return (
+              <div
+                key={account.id}
+                className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3"
+              >
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-white">{account.name}</p>
+                  <p className="truncate text-sm text-slate-400">
+                    {account.institution}
+                    {account.mask && account.mask !== "unknown" ? ` · •••• ${account.mask}` : ""}
+                  </p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p
+                    className={
+                      isCredit ? "font-medium text-rose-300" : "font-medium text-white"
+                    }
+                  >
+                    {isCredit
+                      ? `${formatCompactCurrency(account.currentBalance)} owed`
+                      : formatCompactCurrency(account.currentBalance)}
+                  </p>
+                  <p className="text-sm text-slate-400">
+                    {isCredit ? "avail credit " : "avail "}
+                    {formatCompactCurrency(account.availableBalance)}
+                  </p>
+                </div>
               </div>
-              <div className="shrink-0 text-right">
-                <p className="font-medium text-white">
-                  {formatCompactCurrency(account.currentBalance)}
-                </p>
-                <p className="text-sm text-slate-400">
-                  avail {formatCompactCurrency(account.availableBalance)}
-                </p>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : null}
     </div>

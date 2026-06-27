@@ -851,7 +851,10 @@ export const sampleMerchantInsights: MerchantInsight[] = [
 
 export const sampleOverview: OverviewSnapshot = {
   totalBalance: sampleAccounts.reduce(
-    (total, account) => total + account.currentBalance,
+    (total, account) =>
+      account.type === "credit"
+        ? total - account.currentBalance
+        : total + account.currentBalance,
     0,
   ),
   availableCash: sampleAccounts
