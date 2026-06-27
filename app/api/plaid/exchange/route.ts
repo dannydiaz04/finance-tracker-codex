@@ -7,7 +7,8 @@ import {
   getPlaidClient,
   resolveInstitutionName,
 } from "@/lib/plaid/client";
-import { upsertPlaidItem } from "@/lib/plaid/items";
+import { getPlaidItem, upsertPlaidItem } from "@/lib/plaid/items";
+import { removePlaidItemCompletely } from "@/lib/plaid/remove";
 import { revalidatePlaidDependentViews } from "@/lib/plaid/revalidate";
 import { syncPlaidItemById } from "@/lib/plaid/sync";
 import {
@@ -49,6 +50,10 @@ export async function POST(request: NextRequest) {
     publicToken?: string;
     institutionId?: string | null;
     institutionName?: string | null;
+    // Set by the "Re-link for full history" (backfill) flow. The Item it names
+    // is removed *after* this new Item is created, so a cancelled re-link never
+    // destroys the existing connection.
+    replacesItemId?: string | null;
   };
 
   try {
@@ -95,6 +100,30 @@ export async function POST(request: NextRequest) {
       institutionName,
     });
 
+    // Backfill flow: now that the replacement Item exists, decommission the old
+    // one and purge its raw events so the warehouse rebuild below contains a
+    // single, full-history copy (no duplicates across the overlapping window).
+    const replacesItemId = body.replacesItemId?.trim() || null;
+    let replacedItemId: string | null = null;
+    if (replacesItemId && replacesItemId !== itemId) {
+      const previousItem = await getPlaidItem(replacesItemId);
+
+      if (previousItem && previousItem.userId === userId) {
+        try {
+          await removePlaidItemCompletely({ client, item: previousItem });
+          replacedItemId = replacesItemId;
+        } catch (error) {
+          // Don't fail the whole re-link if cleanup of the old Item hiccups; the
+          // new connection is already live. Surface a safe message for logs.
+          console.error("[plaid:exchange] failed to remove replaced item", {
+            userId,
+            replacesItemId,
+            message: extractPlaidErrorMessage(error),
+          });
+        }
+      }
+    }
+
     const syncResult = await syncPlaidItemById(itemId);
     const warehouseRefresh = syncResult?.persisted
       ? await refreshWarehouseMarts()
@@ -108,6 +137,7 @@ export async function POST(request: NextRequest) {
       userId,
       itemId,
       institutionName,
+      replacedItemId,
       sync: syncResult
         ? {
             status: syncResult.status,
@@ -125,6 +155,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       itemId,
       institutionName,
+      replacedItemId,
       syncResult,
       warehouseRefresh: summarizeWarehouseRefresh(warehouseRefresh),
     });

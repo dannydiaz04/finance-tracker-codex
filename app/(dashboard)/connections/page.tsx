@@ -1,4 +1,4 @@
-import { Landmark, ShieldAlert, Workflow } from "lucide-react";
+import { History, Landmark, ShieldAlert, Workflow } from "lucide-react";
 
 import { PageHeader } from "@/components/dashboard/page-header";
 import { PlaidDisconnectButton } from "@/components/plaid/plaid-disconnect-button";
@@ -149,6 +149,18 @@ PLAID_WEBHOOK_URL=https://your-tunnel/api/plaid/webhook`}
                   </div>
                   <div className="flex flex-col items-end gap-2">
                     <PlaidSyncButton itemId={item.itemId} />
+                    <PlaidLinkButton
+                      replacesItemId={item.itemId}
+                      handleOAuthReturn={false}
+                      label="Re-link for full history"
+                      pendingLabel="Opening Plaid…"
+                      variant="ghost"
+                      size="sm"
+                      icon={<History className="mr-2 size-4" />}
+                      confirmMessage={`Re-link ${
+                        item.institutionName ?? "this institution"
+                      } to pull the full transaction history (up to 730 days)?\n\nPlaid can't extend history on an existing connection, so this reconnects the bank and replaces the current connection once you finish. Select the SAME institution and accounts. Your existing transactions are de-duplicated automatically; nothing is removed until the new connection succeeds.`}
+                    />
                     <PlaidDisconnectButton
                       itemId={item.itemId}
                       institutionName={item.institutionName}

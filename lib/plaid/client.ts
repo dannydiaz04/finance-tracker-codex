@@ -96,6 +96,13 @@ export function isPlaidConfigured() {
 export const PLAID_PRODUCTS: Products[] = [Products.Transactions];
 export const PLAID_COUNTRY_CODES: CountryCode[] = [CountryCode.Us];
 
+// Plaid only honors `transactions.days_requested` when Transactions is first
+// added to an Item (i.e. at `/link/token/create`); it cannot be changed later.
+// Request the maximum (730 days) so new connections backfill as much history as
+// the institution will provide. Existing Items must be removed and re-linked to
+// pick up a larger window — see lib/plaid/remove.ts and the exchange route.
+export const PLAID_TRANSACTIONS_DAYS_REQUESTED = 730;
+
 export function extractPlaidErrorMessage(error: unknown) {
   if (error && typeof error === "object" && "response" in error) {
     const data = (

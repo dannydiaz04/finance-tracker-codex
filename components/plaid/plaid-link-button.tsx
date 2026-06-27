@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Landmark, Loader2 } from "lucide-react";
 import {
   usePlaidLink,
@@ -9,12 +9,16 @@ import {
   type PlaidLinkOnSuccessMetadata,
 } from "react-plaid-link";
 
-import { Button } from "@/components/ui/button";
+import { Button, type ButtonProps } from "@/components/ui/button";
 
 // Persist the original link_token so we can resume Link after an OAuth bank
 // redirects the browser away and back. sessionStorage (not localStorage) is
 // tab-scoped, survives the same-tab OAuth bounce, and auto-clears on tab close.
 const LINK_TOKEN_STORAGE_KEY = "plaid:link-token";
+// When a re-link (backfill) flow starts, we also persist the Item it replaces so
+// the OAuth-return path can still tell the exchange endpoint to retire the old
+// Item once the new one is created.
+const REPLACES_ITEM_STORAGE_KEY = "plaid:replaces-item-id";
 
 // Plaid appends `?oauth_state_id=<uuid>` to the configured redirect_uri when it
 // sends the browser back after an OAuth flow. Its presence is how we detect that
@@ -37,6 +41,9 @@ type PlaidLinkInnerProps = {
   // receivedRedirectUri from usePlaidLink's effect deps, this component must be
   // mounted with both `token` and `receivedRedirectUri` already present.
   receivedRedirectUri?: string;
+  // When present, the exchange retires this (old) Item after the new one is
+  // created — the backfill / re-link-for-full-history flow.
+  replacesItemId?: string;
   onFinished: () => void;
   onError: (message: string) => void;
 };
@@ -44,6 +51,7 @@ type PlaidLinkInnerProps = {
 function PlaidLinkInner({
   token,
   receivedRedirectUri,
+  replacesItemId,
   onFinished,
   onError,
 }: PlaidLinkInnerProps) {
@@ -53,6 +61,7 @@ function PlaidLinkInner({
   const clearStoredToken = useCallback(() => {
     if (typeof window !== "undefined") {
       window.sessionStorage.removeItem(LINK_TOKEN_STORAGE_KEY);
+      window.sessionStorage.removeItem(REPLACES_ITEM_STORAGE_KEY);
     }
   }, []);
 
@@ -68,6 +77,7 @@ function PlaidLinkInner({
             publicToken,
             institutionId: metadata.institution?.institution_id ?? null,
             institutionName: metadata.institution?.name ?? null,
+            ...(replacesItemId ? { replacesItemId } : {}),
           }),
         });
         const data = (await response.json()) as { error?: string };
@@ -83,7 +93,7 @@ function PlaidLinkInner({
 
       onFinished();
     },
-    [clearStoredToken, onError, onFinished],
+    [clearStoredToken, onError, onFinished, replacesItemId],
   );
 
   const onExit = useCallback(
@@ -141,7 +151,38 @@ function PlaidLinkInner({
   return null;
 }
 
-export function PlaidLinkButton() {
+type PlaidLinkButtonProps = {
+  // When set, this button runs the re-link / backfill flow: it links a fresh
+  // Item (with the full history window) and the exchange retires this Item once
+  // the new one exists.
+  replacesItemId?: string;
+  label?: string;
+  pendingLabel?: string;
+  icon?: ReactNode;
+  variant?: ButtonProps["variant"];
+  size?: ButtonProps["size"];
+  className?: string;
+  // Optional confirmation shown before Link opens (used by the backfill flow).
+  confirmMessage?: string;
+  // Only one button on a page should own the global OAuth-return resume, or
+  // every instance would try to resume the same stored token at once. The main
+  // "Connect a bank" button keeps this on; per-item re-link buttons turn it off
+  // and rely on the main button to finish an OAuth bounce using the persisted
+  // replaces-item id.
+  handleOAuthReturn?: boolean;
+};
+
+export function PlaidLinkButton({
+  replacesItemId,
+  label = "Connect a bank",
+  pendingLabel = "Opening Plaid…",
+  icon,
+  variant,
+  size,
+  className,
+  confirmMessage,
+  handleOAuthReturn = true,
+}: PlaidLinkButtonProps = {}) {
   const router = useRouter();
   // Capture the OAuth return state once, synchronously, before any URL cleanup.
   const oauthReturnRef = useRef<{ isOAuth: boolean; href: string } | null>(null);
@@ -153,6 +194,9 @@ export function PlaidLinkButton() {
   const [receivedRedirectUri, setReceivedRedirectUri] = useState<
     string | undefined
   >(undefined);
+  const [replaceTarget, setReplaceTarget] = useState<string | undefined>(
+    undefined,
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -163,6 +207,10 @@ export function PlaidLinkButton() {
   // the cascading-render pattern the rule guards against.
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
+    if (!handleOAuthReturn) {
+      return;
+    }
+
     const oauthReturn = oauthReturnRef.current;
     if (!oauthReturn?.isOAuth) {
       return;
@@ -179,18 +227,26 @@ export function PlaidLinkButton() {
       return;
     }
 
-    // Set both in one batched update so PlaidLinkInner mounts already in resume
+    // Set all in one batched update so PlaidLinkInner mounts already in resume
     // mode (receivedRedirectUri is not a usePlaidLink dependency).
     setToken(storedToken);
+    setReplaceTarget(
+      window.sessionStorage.getItem(REPLACES_ITEM_STORAGE_KEY) ?? undefined,
+    );
     setReceivedRedirectUri(oauthReturn.href);
     setLoading(true);
-  }, []);
+  }, [handleOAuthReturn]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const startLink = useCallback(async () => {
+    if (confirmMessage && !confirm(confirmMessage)) {
+      return;
+    }
+
     setLoading(true);
     setError(null);
     setReceivedRedirectUri(undefined);
+    setReplaceTarget(replacesItemId);
 
     try {
       const response = await fetch("/api/plaid/link-token", { method: "POST" });
@@ -208,19 +264,26 @@ export function PlaidLinkButton() {
       // Persist before opening Link, because an OAuth bank may redirect the page
       // away (clearing React state) before onSuccess can run.
       window.sessionStorage.setItem(LINK_TOKEN_STORAGE_KEY, data.linkToken);
+      if (replacesItemId) {
+        window.sessionStorage.setItem(REPLACES_ITEM_STORAGE_KEY, replacesItemId);
+      } else {
+        window.sessionStorage.removeItem(REPLACES_ITEM_STORAGE_KEY);
+      }
       setToken(data.linkToken);
     } catch {
       setError("Network error while creating a Plaid Link token.");
       setLoading(false);
     }
-  }, []);
+  }, [confirmMessage, replacesItemId]);
 
   const reset = useCallback(() => {
     setToken(null);
     setReceivedRedirectUri(undefined);
+    setReplaceTarget(undefined);
     setLoading(false);
     if (typeof window !== "undefined") {
       window.sessionStorage.removeItem(LINK_TOKEN_STORAGE_KEY);
+      window.sessionStorage.removeItem(REPLACES_ITEM_STORAGE_KEY);
     }
   }, []);
 
@@ -246,19 +309,26 @@ export function PlaidLinkButton() {
 
   return (
     <div className="flex flex-col items-start gap-2">
-      <Button onClick={startLink} disabled={loading}>
+      <Button
+        onClick={startLink}
+        disabled={loading}
+        variant={variant}
+        size={size}
+        className={className}
+      >
         {loading ? (
           <Loader2 className="mr-2 size-4 animate-spin" />
         ) : (
-          <Landmark className="mr-2 size-4" />
+          icon ?? <Landmark className="mr-2 size-4" />
         )}
-        {loading ? "Opening Plaid…" : "Connect a bank"}
+        {loading ? pendingLabel : label}
       </Button>
 
       {token ? (
         <PlaidLinkInner
           token={token}
           receivedRedirectUri={receivedRedirectUri}
+          replacesItemId={replaceTarget}
           onFinished={finish}
           onError={handleInnerError}
         />

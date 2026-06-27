@@ -4,6 +4,7 @@ import { resolveRouteUserId } from "@/lib/auth/session";
 import {
   PLAID_COUNTRY_CODES,
   PLAID_PRODUCTS,
+  PLAID_TRANSACTIONS_DAYS_REQUESTED,
   extractPlaidErrorMessage,
   getPlaidClient,
   getPlaidConfig,
@@ -46,6 +47,10 @@ export async function POST() {
       language: "en",
       country_codes: PLAID_COUNTRY_CODES,
       products: PLAID_PRODUCTS,
+      // Request the full history window up front. This only takes effect when
+      // Transactions is first added to the Item, so it must be set here rather
+      // than on /transactions/sync.
+      transactions: { days_requested: PLAID_TRANSACTIONS_DAYS_REQUESTED },
       ...(webhookUrl ? { webhook: webhookUrl } : {}),
       ...(redirectUri ? { redirect_uri: redirectUri } : {}),
     });
