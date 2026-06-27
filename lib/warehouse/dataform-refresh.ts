@@ -5,7 +5,7 @@ import { createRequire } from "node:module";
 import { performance } from "node:perf_hooks";
 import { promisify } from "node:util";
 
-import { isBigQueryConfigured } from "@/lib/bigquery/client";
+import { isBigQueryConfigured } from "../bigquery/client.ts";
 
 const execFileAsync = promisify(execFile);
 const requireFromHere = createRequire(import.meta.url);
