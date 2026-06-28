@@ -14,6 +14,7 @@ import {
   sampleTransactions,
 } from "@/lib/sample-data";
 import type { TimeFilter } from "@/lib/time-filter";
+import { transactionUserScopePredicate } from "@/lib/queries/user-scope";
 import type {
   Transaction,
   TransactionDetail,
@@ -171,7 +172,7 @@ const transactionBaseQuery = `
   SELECT
     ${transactionSelectFields}
   FROM \`${projectId}.core_finance.fact_transaction_current\`
-  WHERE user_id = @userId
+  WHERE ${transactionUserScopePredicate()}
     AND (
       @query = ''
       OR description_norm LIKE CONCAT('%', @query, '%')
@@ -270,7 +271,7 @@ export async function getTransactionById(transactionId: string) {
         ${transactionSelectFields}
       FROM \`${projectId}.core_finance.fact_transaction_current\`
       WHERE transaction_id = @transactionId
-        AND user_id = @userId
+        AND ${transactionUserScopePredicate()}
       LIMIT 1
     `,
         { transactionId, userId },

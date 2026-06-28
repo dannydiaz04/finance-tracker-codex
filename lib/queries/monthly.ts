@@ -4,6 +4,7 @@ import { getCurrentUserId } from "@/lib/auth/session";
 import { getBigQueryProjectId, runBigQueryQuery } from "@/lib/bigquery/client";
 import { coerceNumber } from "@/lib/queries/coerce";
 import { deriveMonthlySummariesFromTransactions } from "@/lib/queries/finance-aggregates";
+import { transactionUserScopePredicate } from "@/lib/queries/user-scope";
 import { sampleTransactions } from "@/lib/sample-data";
 import {
   buildTimeFilterQueryParams,
@@ -61,7 +62,7 @@ export async function getMonthlyFinanceSummaries(timeFilter?: TimeFilter) {
         COUNT(*) AS transaction_count
       FROM \`${projectId}.core_finance.fact_transaction_current\`
       WHERE NOT pending
-        AND user_id = @userId
+        AND ${transactionUserScopePredicate()}
         AND (NOT @excludePlaid OR source_name != 'plaid')
       GROUP BY month
       ORDER BY month DESC

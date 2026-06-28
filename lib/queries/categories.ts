@@ -6,6 +6,7 @@ import { getBigQueryProjectId, runBigQueryQuery } from "@/lib/bigquery/client";
 import { coerceDateString, coerceNumber } from "@/lib/queries/coerce";
 import { deriveCategoryInsightsFromTransactions } from "@/lib/queries/finance-aggregates";
 import { getTransactions } from "@/lib/queries/transactions";
+import { transactionUserScopePredicate } from "@/lib/queries/user-scope";
 import { sampleReviewQueue } from "@/lib/sample-data";
 import {
   buildTimeFilterQueryParams,
@@ -51,8 +52,8 @@ export async function getReviewQueue(timeFilter?: TimeFilter) {
       FROM \`${projectId}.ops_finance.review_queue\` AS review_queue
       INNER JOIN \`${projectId}.core_finance.fact_transaction_current\` AS current_txn
         ON current_txn.transaction_id = review_queue.transaction_id
-       AND current_txn.user_id = review_queue.user_id
-      WHERE review_queue.user_id = @userId
+       AND COALESCE(current_txn.user_id, '') = COALESCE(review_queue.user_id, '')
+      WHERE ${transactionUserScopePredicate("current_txn")}
         AND (@from = '' OR review_queue.posted_at >= DATE(@from))
         AND (@to = '' OR review_queue.posted_at <= DATE(@to))
         AND (NOT @excludePlaid OR current_txn.source_name != 'plaid')

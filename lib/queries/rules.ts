@@ -3,6 +3,7 @@ import "server-only";
 import { getCurrentUserId } from "@/lib/auth/session";
 import { getBigQueryProjectId, runBigQueryQuery } from "@/lib/bigquery/client";
 import { coerceDateString, coerceNullableNumber, coerceNumber } from "@/lib/queries/coerce";
+import { transactionUserScopePredicate } from "@/lib/queries/user-scope";
 import {
   sampleInternalMovementReconciliationItems,
   sampleReviewQueue,
@@ -90,8 +91,8 @@ export async function getLowConfidenceReviewItems(timeFilter?: TimeFilter) {
       FROM \`${projectId}.ops_finance.review_queue\` AS review_queue
       INNER JOIN \`${projectId}.core_finance.fact_transaction_current\` AS current_txn
         ON current_txn.transaction_id = review_queue.transaction_id
-       AND current_txn.user_id = review_queue.user_id
-      WHERE review_queue.user_id = @userId
+       AND COALESCE(current_txn.user_id, '') = COALESCE(review_queue.user_id, '')
+      WHERE ${transactionUserScopePredicate("current_txn")}
         AND (@from = '' OR review_queue.posted_at >= DATE(@from))
         AND (@to = '' OR review_queue.posted_at <= DATE(@to))
         AND (NOT @excludePlaid OR current_txn.source_name != 'plaid')
@@ -192,9 +193,9 @@ export async function getInternalMovementReconciliationItems(
         FROM \`${projectId}.ops_finance.internal_movement_reconciliation\` AS reconciliation
         INNER JOIN \`${projectId}.core_finance.fact_transaction_current\` AS current_txn
           ON current_txn.transaction_id = reconciliation.transaction_id
-         AND current_txn.user_id = reconciliation.user_id
+         AND COALESCE(current_txn.user_id, '') = COALESCE(reconciliation.user_id, '')
         WHERE reconciliation.match_status = "unmatched"
-          AND reconciliation.user_id = @userId
+          AND ${transactionUserScopePredicate("current_txn")}
           AND (@from = '' OR reconciliation.posted_at >= DATE(@from))
           AND (@to = '' OR reconciliation.posted_at <= DATE(@to))
           AND (NOT @excludePlaid OR current_txn.source_name != 'plaid')
