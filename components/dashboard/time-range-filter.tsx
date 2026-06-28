@@ -221,6 +221,35 @@ export function TimeRangeFilter() {
                 </p>
               </div>
 
+              <label className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+                <input
+                  type="checkbox"
+                  className="mt-1 size-4 rounded border-white/20 bg-slate-950"
+                  checked={currentFilter.excludePlaid ?? false}
+                  disabled={isPending}
+                  onChange={(event) => {
+                    const params = new URLSearchParams(searchParams.toString());
+
+                    if (event.target.checked) {
+                      params.set("excludePlaid", "true");
+                    } else {
+                      params.delete("excludePlaid");
+                    }
+
+                    navigate(params.toString());
+                  }}
+                />
+                <span className="text-sm leading-6 text-slate-300">
+                  <span className="font-medium text-white">
+                    Hide Plaid-synced transactions
+                  </span>
+                  <span className="mt-1 block text-slate-400">
+                    Applies across overview, cash flow, categories, merchants,
+                    rules, and the transaction explorer via `excludePlaid=true`.
+                  </span>
+                </span>
+              </label>
+
               <div>
                 <p className="mb-2 text-xs uppercase tracking-[0.22em] text-slate-500">
                   Presets

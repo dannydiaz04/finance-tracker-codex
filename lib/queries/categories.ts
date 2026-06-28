@@ -1,5 +1,6 @@
 import "server-only";
 
+import { scopeToTransactionFilters } from "@/lib/bigquery/params";
 import { getCurrentUserId } from "@/lib/auth/session";
 import { getBigQueryProjectId, runBigQueryQuery } from "@/lib/bigquery/client";
 import { coerceDateString, coerceNumber } from "@/lib/queries/coerce";
@@ -23,10 +24,7 @@ type RawReviewQueueItem = Omit<
 };
 
 export async function getCategoryInsights(timeFilter?: TimeFilter) {
-  const transactions = await getTransactions({
-    from: timeFilter?.from,
-    to: timeFilter?.to,
-  });
+  const transactions = await getTransactions(scopeToTransactionFilters(timeFilter));
   return deriveCategoryInsightsFromTransactions(transactions).slice(
     0,
     20,
@@ -40,21 +38,25 @@ export async function getReviewQueue(timeFilter?: TimeFilter) {
     ? await runBigQueryQuery<RawReviewQueueItem>(
         `
       SELECT
-        transaction_id AS transactionId,
-        merchant,
-        description,
-        amount,
-        posted_at AS postedAt,
-        suggested_category AS suggestedCategory,
-        current_category_id AS currentCategoryId,
-        merchant_norm AS merchantNorm,
-        confidence_score AS confidenceScore,
-        reason
-      FROM \`${projectId}.ops_finance.review_queue\`
-      WHERE user_id = @userId
-        AND (@from = '' OR posted_at >= DATE(@from))
-        AND (@to = '' OR posted_at <= DATE(@to))
-      ORDER BY confidence_score ASC, posted_at DESC
+        review_queue.transaction_id AS transactionId,
+        review_queue.merchant,
+        review_queue.description,
+        review_queue.amount,
+        review_queue.posted_at AS postedAt,
+        review_queue.suggested_category AS suggestedCategory,
+        review_queue.current_category_id AS currentCategoryId,
+        review_queue.merchant_norm AS merchantNorm,
+        review_queue.confidence_score AS confidenceScore,
+        review_queue.reason
+      FROM \`${projectId}.ops_finance.review_queue\` AS review_queue
+      INNER JOIN \`${projectId}.core_finance.fact_transaction_current\` AS current_txn
+        ON current_txn.transaction_id = review_queue.transaction_id
+       AND current_txn.user_id = review_queue.user_id
+      WHERE review_queue.user_id = @userId
+        AND (@from = '' OR review_queue.posted_at >= DATE(@from))
+        AND (@to = '' OR review_queue.posted_at <= DATE(@to))
+        AND (NOT @excludePlaid OR current_txn.source_name != 'plaid')
+      ORDER BY review_queue.confidence_score ASC, review_queue.posted_at DESC
       LIMIT 50
     `,
         { ...buildTimeFilterQueryParams(timeFilter ?? { preset: "all" }), userId },

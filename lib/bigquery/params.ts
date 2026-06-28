@@ -1,3 +1,4 @@
+import type { TimeFilter } from "@/lib/time-filter";
 import type { TransactionFilters, TransactionSearchSuggestion } from "@/lib/types/finance";
 
 type SearchValue = string | string[] | undefined;
@@ -56,6 +57,16 @@ export function normalizeTransactionFilters(
     excludePlaid:
       getSingleValue(searchParams.excludePlaid) === "true" ||
       getSingleValue(searchParams.excludePlaid) === "1",
+  };
+}
+
+export function scopeToTransactionFilters(
+  timeFilter?: TimeFilter,
+): Pick<TransactionFilters, "from" | "to" | "excludePlaid"> {
+  return {
+    from: timeFilter?.from,
+    to: timeFilter?.to,
+    excludePlaid: timeFilter?.excludePlaid,
   };
 }
 

@@ -4,6 +4,7 @@ import { normalizeDescription } from "@/lib/categorization/normalize";
 import { getCurrentUserId } from "@/lib/auth/session";
 import {
   buildTransactionQueryParams,
+  scopeToTransactionFilters,
   uniqueSearchSuggestions,
 } from "@/lib/bigquery/params";
 import { getBigQueryProjectId, runBigQueryQuery } from "@/lib/bigquery/client";
@@ -235,8 +236,7 @@ export async function getRecentTransactions(limit = 8, timeFilter?: TimeFilter) 
         `${transactionBaseQuery}\nLIMIT ${boundedLimit}`,
         {
           ...buildTransactionQueryParams({
-            from: timeFilter?.from,
-            to: timeFilter?.to,
+            ...scopeToTransactionFilters(timeFilter),
           }),
           userId,
         },
@@ -249,10 +249,7 @@ export async function getRecentTransactions(limit = 8, timeFilter?: TimeFilter) 
 
   return [...sampleTransactions]
     .filter((transaction) =>
-      matchesFilters(transaction, {
-        from: timeFilter?.from,
-        to: timeFilter?.to,
-      }),
+      matchesFilters(transaction, scopeToTransactionFilters(timeFilter)),
     )
     .sort((left, right) => {
       if (left.postedAt === right.postedAt) {

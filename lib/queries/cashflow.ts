@@ -3,12 +3,15 @@ import "server-only";
 import { getCurrentUserId } from "@/lib/auth/session";
 import { getBigQueryProjectId, runBigQueryQuery } from "@/lib/bigquery/client";
 import { coerceDateString, coerceNumber } from "@/lib/queries/coerce";
-import { sampleCashflow } from "@/lib/sample-data";
+import { sampleCashflow, sampleTransactions } from "@/lib/sample-data";
 import {
   buildTimeFilterQueryParams,
   filterByDate,
   type TimeFilter,
 } from "@/lib/time-filter";
+import { deriveCashflowFromTransactions } from "@/lib/queries/finance-aggregates";
+import { getTransactions } from "@/lib/queries/transactions";
+import { scopeToTransactionFilters } from "@/lib/bigquery/params";
 
 type RawCashflowPoint = {
   date: unknown;
@@ -20,6 +23,25 @@ type RawCashflowPoint = {
 export async function getCashflowSeries(timeFilter?: TimeFilter) {
   const userId = await getCurrentUserId();
   const projectId = getBigQueryProjectId() ?? "project";
+  const scope = timeFilter ?? { preset: "all" as const };
+  const queryParams = { ...buildTimeFilterQueryParams(scope), userId };
+
+  if (scope.excludePlaid) {
+    if (userId) {
+      const transactions = await getTransactions(scopeToTransactionFilters(scope));
+      return deriveCashflowFromTransactions(transactions).slice(0, 90);
+    }
+
+    return filterByDate(
+      deriveCashflowFromTransactions(
+        sampleTransactions.filter(
+          (transaction) => transaction.sourceName !== "plaid",
+        ),
+      ),
+      scope,
+    ).slice(0, 90);
+  }
+
   const rows = userId
     ? await runBigQueryQuery<RawCashflowPoint>(
         `
@@ -35,7 +57,7 @@ export async function getCashflowSeries(timeFilter?: TimeFilter) {
       ORDER BY date DESC
       LIMIT 90
     `,
-        { ...buildTimeFilterQueryParams(timeFilter ?? { preset: "all" }), userId },
+        queryParams,
       )
     : null;
 
@@ -46,5 +68,5 @@ export async function getCashflowSeries(timeFilter?: TimeFilter) {
         outflow: coerceNumber(row.outflow),
         net: coerceNumber(row.net),
       }))
-    : filterByDate(sampleCashflow, timeFilter ?? { preset: "all" });
+    : filterByDate(sampleCashflow, scope);
 }

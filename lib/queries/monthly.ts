@@ -5,7 +5,12 @@ import { getBigQueryProjectId, runBigQueryQuery } from "@/lib/bigquery/client";
 import { coerceNumber } from "@/lib/queries/coerce";
 import { deriveMonthlySummariesFromTransactions } from "@/lib/queries/finance-aggregates";
 import { sampleTransactions } from "@/lib/sample-data";
-import { formatMonthLabel, getMonthRange } from "@/lib/time-filter";
+import {
+  buildTimeFilterQueryParams,
+  formatMonthLabel,
+  getMonthRange,
+  type TimeFilter,
+} from "@/lib/time-filter";
 import type { MonthlyFinanceSummary } from "@/lib/types/finance";
 
 type RawMonthlyFinanceSummary = {
@@ -32,9 +37,13 @@ function mapMonthlySummary(row: RawMonthlyFinanceSummary): MonthlyFinanceSummary
   };
 }
 
-export async function getMonthlyFinanceSummaries() {
+export async function getMonthlyFinanceSummaries(timeFilter?: TimeFilter) {
   const userId = await getCurrentUserId();
   const projectId = getBigQueryProjectId() ?? "project";
+  const queryParams = {
+    ...buildTimeFilterQueryParams(timeFilter ?? { preset: "all" }),
+    userId,
+  };
   const rows = userId
     ? await runBigQueryQuery<RawMonthlyFinanceSummary>(
         `
@@ -53,14 +62,23 @@ export async function getMonthlyFinanceSummaries() {
       FROM \`${projectId}.core_finance.fact_transaction_current\`
       WHERE NOT pending
         AND user_id = @userId
+        AND (NOT @excludePlaid OR source_name != 'plaid')
       GROUP BY month
       ORDER BY month DESC
     `,
-        { userId },
+        queryParams,
       )
     : null;
 
-  return rows
+  const summaries = rows
     ? rows.map(mapMonthlySummary)
-    : deriveMonthlySummariesFromTransactions(sampleTransactions);
+    : deriveMonthlySummariesFromTransactions(
+        timeFilter?.excludePlaid
+          ? sampleTransactions.filter(
+              (transaction) => transaction.sourceName !== "plaid",
+            )
+          : sampleTransactions,
+      );
+
+  return summaries;
 }

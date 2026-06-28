@@ -77,21 +77,25 @@ export async function getLowConfidenceReviewItems(timeFilter?: TimeFilter) {
     ? await runBigQueryQuery<ReviewQueueItem>(
         `
       SELECT
-        transaction_id AS transactionId,
-        merchant,
-        description,
-        amount,
-        posted_at AS postedAt,
-        suggested_category AS suggestedCategory,
-        current_category_id AS currentCategoryId,
-        merchant_norm AS merchantNorm,
-        confidence_score AS confidenceScore,
-        reason
-      FROM \`${projectId}.ops_finance.review_queue\`
-      WHERE user_id = @userId
-        AND (@from = '' OR posted_at >= DATE(@from))
-        AND (@to = '' OR posted_at <= DATE(@to))
-      ORDER BY confidence_score ASC
+        review_queue.transaction_id AS transactionId,
+        review_queue.merchant,
+        review_queue.description,
+        review_queue.amount,
+        review_queue.posted_at AS postedAt,
+        review_queue.suggested_category AS suggestedCategory,
+        review_queue.current_category_id AS currentCategoryId,
+        review_queue.merchant_norm AS merchantNorm,
+        review_queue.confidence_score AS confidenceScore,
+        review_queue.reason
+      FROM \`${projectId}.ops_finance.review_queue\` AS review_queue
+      INNER JOIN \`${projectId}.core_finance.fact_transaction_current\` AS current_txn
+        ON current_txn.transaction_id = review_queue.transaction_id
+       AND current_txn.user_id = review_queue.user_id
+      WHERE review_queue.user_id = @userId
+        AND (@from = '' OR review_queue.posted_at >= DATE(@from))
+        AND (@to = '' OR review_queue.posted_at <= DATE(@to))
+        AND (NOT @excludePlaid OR current_txn.source_name != 'plaid')
+      ORDER BY review_queue.confidence_score ASC
       LIMIT 25
     `,
         { ...buildTimeFilterQueryParams(timeFilter ?? { preset: "all" }), userId },
@@ -185,12 +189,16 @@ export async function getInternalMovementReconciliationItems(
           day_delta AS dayDelta,
           amount_delta AS amountDelta,
           reconciliation_group_id AS reconciliationGroupId
-        FROM \`${projectId}.ops_finance.internal_movement_reconciliation\`
-        WHERE match_status = "unmatched"
-          AND user_id = @userId
-          AND (@from = '' OR posted_at >= DATE(@from))
-          AND (@to = '' OR posted_at <= DATE(@to))
-        ORDER BY posted_at DESC, ABS(signed_amount) DESC
+        FROM \`${projectId}.ops_finance.internal_movement_reconciliation\` AS reconciliation
+        INNER JOIN \`${projectId}.core_finance.fact_transaction_current\` AS current_txn
+          ON current_txn.transaction_id = reconciliation.transaction_id
+         AND current_txn.user_id = reconciliation.user_id
+        WHERE reconciliation.match_status = "unmatched"
+          AND reconciliation.user_id = @userId
+          AND (@from = '' OR reconciliation.posted_at >= DATE(@from))
+          AND (@to = '' OR reconciliation.posted_at <= DATE(@to))
+          AND (NOT @excludePlaid OR current_txn.source_name != 'plaid')
+        ORDER BY reconciliation.posted_at DESC, ABS(reconciliation.signed_amount) DESC
         LIMIT 25
       `,
         { ...buildTimeFilterQueryParams(timeFilter ?? { preset: "all" }), userId },

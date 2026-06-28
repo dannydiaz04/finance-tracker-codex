@@ -1,5 +1,6 @@
 import "server-only";
 
+import { scopeToTransactionFilters } from "@/lib/bigquery/params";
 import {
   detectCashflowAnomalies,
   type CashflowAlertThresholds,
@@ -17,7 +18,7 @@ export async function getCashflowAlerts(
 ): Promise<CashflowAlertsResult> {
   const [cashflow, transactions] = await Promise.all([
     getCashflowSeries(timeFilter),
-    getTransactions({ from: timeFilter?.from, to: timeFilter?.to }),
+    getTransactions(scopeToTransactionFilters(timeFilter)),
   ]);
 
   return detectCashflowAnomalies({ cashflow, transactions, thresholds });

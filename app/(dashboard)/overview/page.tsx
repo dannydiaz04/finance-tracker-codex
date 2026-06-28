@@ -75,17 +75,18 @@ function getSelectedMonth(
 
 export default async function OverviewPage({ searchParams }: OverviewPageProps) {
   const resolvedSearchParams = await searchParams;
-  const monthlySummaries = await getMonthlyFinanceSummaries();
+  const timeFilter = normalizeTimeFilter(resolvedSearchParams);
+  const monthlySummaries = await getMonthlyFinanceSummaries(timeFilter);
   const selectedMonth = getSelectedMonth(resolvedSearchParams, monthlySummaries);
-  const timeFilter = selectedMonth
-    ? { ...getMonthRange(selectedMonth), preset: "custom" as const }
-    : normalizeTimeFilter(resolvedSearchParams);
+  const scopedTimeFilter = selectedMonth
+    ? { ...getMonthRange(selectedMonth), preset: "custom" as const, excludePlaid: timeFilter.excludePlaid }
+    : timeFilter;
   const [overview, categories, merchants, alerts, lowConfidence] =
     await Promise.all([
-      getOverviewSnapshot(timeFilter),
-      getCategoryInsights(timeFilter),
-      getMerchantInsights(timeFilter),
-      getCashflowAlerts(timeFilter),
+      getOverviewSnapshot(scopedTimeFilter),
+      getCategoryInsights(scopedTimeFilter),
+      getMerchantInsights(scopedTimeFilter),
+      getCashflowAlerts(scopedTimeFilter),
       getLowConfidenceSummary(),
     ]);
   const openAiConfigured = Boolean(process.env.OPENAI_API_KEY?.trim());
@@ -115,7 +116,7 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
 
       <PrimaryCheckingBalanceCard balance={overview.primaryCheckingBalance} />
 
-      <KpiCards overview={overview} timeFilter={timeFilter} />
+      <KpiCards overview={overview} timeFilter={scopedTimeFilter} />
 
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <MonthlyMoneyChart
