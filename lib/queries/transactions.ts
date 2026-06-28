@@ -14,7 +14,10 @@ import {
   sampleTransactions,
 } from "@/lib/sample-data";
 import type { TimeFilter } from "@/lib/time-filter";
-import { transactionUserScopePredicate } from "@/lib/queries/user-scope";
+import {
+  anonymousCsvDedupePredicate,
+  transactionUserScopePredicate,
+} from "@/lib/queries/user-scope";
 import type {
   Transaction,
   TransactionDetail,
@@ -171,8 +174,13 @@ const transactionSelectFields = `
 const transactionBaseQuery = `
   SELECT
     ${transactionSelectFields}
-  FROM \`${projectId}.core_finance.fact_transaction_current\`
-  WHERE ${transactionUserScopePredicate()}
+  FROM (
+    SELECT *
+    FROM \`${projectId}.core_finance.fact_transaction_current\`
+    WHERE ${transactionUserScopePredicate()}
+    QUALIFY ${anonymousCsvDedupePredicate()}
+  )
+  WHERE TRUE
     AND (
       @query = ''
       OR description_norm LIKE CONCAT('%', @query, '%')
@@ -269,12 +277,16 @@ export async function getTransactionById(transactionId: string) {
         `
       SELECT
         ${transactionSelectFields}
-      FROM \`${projectId}.core_finance.fact_transaction_current\`
+      FROM (
+        SELECT *
+        FROM \`${projectId}.core_finance.fact_transaction_current\`
+        WHERE ${transactionUserScopePredicate()}
+        QUALIFY ${anonymousCsvDedupePredicate()}
+      )
       WHERE transaction_id = @transactionId
-        AND ${transactionUserScopePredicate()}
       LIMIT 1
     `,
-        { transactionId, userId },
+        { transactionId, userId, excludePlaid: true },
       )
     : null;
 
