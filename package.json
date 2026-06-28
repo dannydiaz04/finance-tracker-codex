@@ -11,6 +11,8 @@
     "start": "next start",
     "lint": "eslint .",
     "etl:dropbox": "bash scripts/process-dropbox.sh",
+    "backfill:export": "node --experimental-strip-types scripts/backfill/run-portal-export.ts",
+    "backfill:install-browser": "playwright install chromium",
     "etl:runner": "node --conditions=react-server --experimental-strip-types scripts/run-landed-imports.ts",
     "etl:ai-enrich": "node --conditions=react-server --experimental-strip-types scripts/run-ai-enrichment.ts",
     "eval:ai-categories": "node --conditions=react-server --experimental-strip-types scripts/eval-ai-categories.ts",
@@ -62,6 +64,7 @@
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
+    "playwright": "^1.55.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   },

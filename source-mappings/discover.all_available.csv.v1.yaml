@@ -4,9 +4,6 @@ feed: all_available
 format: csv
 
 file_match:
-  filename_contains:
-    - "Discover"
-    - "AllAvailable"
   required_headers:
     - "Trans. Date"
     - "Post Date"

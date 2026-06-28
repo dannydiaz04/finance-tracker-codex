@@ -4,8 +4,12 @@ feed: transactions
 format: csv
 
 file_match:
-  filename_contains:
-    - "Apple Card Transactions"
+  required_headers:
+    - "Transaction Date"
+    - "Clearing Date"
+    - "Description"
+    - "Amount (USD)"
+    - "Purchased By"
 
 field_map:
   sourceAccountId:

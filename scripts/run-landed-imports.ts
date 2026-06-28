@@ -1,6 +1,11 @@
 import { parseArgs } from "node:util";
 
+import nextEnv from "@next/env";
+
 import { runLandingImports } from "../lib/import/runner.ts";
+
+const { loadEnvConfig } = nextEnv;
+loadEnvConfig(process.cwd());
 
 function printHelp() {
   console.log(`Usage: npm run etl:runner -- [options]
