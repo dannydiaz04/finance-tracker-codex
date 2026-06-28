@@ -110,6 +110,10 @@ function matchesFilters(transaction: Transaction, filters: TransactionFilters) {
     return false;
   }
 
+  if (filters.excludePlaid && transaction.sourceName === "plaid") {
+    return false;
+  }
+
   if (
     typeof filters.minAmount === "number" &&
     Math.abs(transaction.signedAmount) < filters.minAmount
@@ -135,6 +139,7 @@ const transactionSelectFields = `
   canonical_group_id AS canonicalGroupId,
   account_id AS accountId,
   account_name AS accountName,
+  source_name AS sourceName,
   account_type AS accountType,
   authorized_at AS authorizedAt,
   posted_at AS postedAt,
@@ -181,6 +186,7 @@ const transactionBaseQuery = `
     AND (@to = '' OR posted_at <= DATE(@to))
     AND (@minAmount < 0 OR ABS(signed_amount) >= @minAmount)
     AND (@maxAmount < 0 OR ABS(signed_amount) <= @maxAmount)
+    AND (NOT @excludePlaid OR source_name != 'plaid')
   ORDER BY posted_at DESC, ABS(signed_amount) DESC
 `;
 

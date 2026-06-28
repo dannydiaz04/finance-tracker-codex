@@ -43,6 +43,7 @@ export function TransactionFilters({
     to: string;
     minAmount: string;
     maxAmount: string;
+    excludePlaid: boolean;
   };
 
   const [formState, setFormState] = useState<FormState>({
@@ -62,9 +63,10 @@ export function TransactionFilters({
       typeof initialFilters.maxAmount === "number"
         ? String(initialFilters.maxAmount)
         : "",
+    excludePlaid: initialFilters.excludePlaid ?? false,
   });
 
-  const updateField = (field: keyof FormState, value: string) => {
+  const updateField = (field: keyof FormState, value: string | boolean) => {
     setFormState((current) => ({
       ...current,
       [field]: value as FormState[keyof FormState],
@@ -80,6 +82,13 @@ export function TransactionFilters({
       nextState.to === (searchParams.get("to") ?? "");
 
     Object.entries(nextState).forEach(([key, value]) => {
+      if (typeof value === "boolean") {
+        if (value) {
+          params.set(key, "true");
+        }
+        return;
+      }
+
       if (value && value !== "all") {
         if (key === "accountId") {
           params.set("accountIds", value);
@@ -258,6 +267,24 @@ export function TransactionFilters({
         </div>
       </div>
 
+      <div className="mt-3 flex items-center gap-3">
+        <input
+          id="exclude-plaid"
+          type="checkbox"
+          checked={formState.excludePlaid}
+          onChange={(event) =>
+            updateField("excludePlaid", event.target.checked)
+          }
+          className="size-4 rounded border-white/20 bg-white/5 text-cyan-400 focus:ring-cyan-400/40"
+        />
+        <label
+          htmlFor="exclude-plaid"
+          className="text-sm text-slate-300"
+        >
+          Hide Plaid-synced transactions (show CSV / manual imports only)
+        </label>
+      </div>
+
       {suggestions.length > 0 ? (
         <div className="mt-4 flex flex-wrap gap-2">
           {suggestions.map((suggestion) => (
@@ -299,6 +326,7 @@ export function TransactionFilters({
               to: "",
               minAmount: "",
               maxAmount: "",
+              excludePlaid: false,
             };
 
             setFormState(resetState);

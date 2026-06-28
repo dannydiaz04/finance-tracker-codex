@@ -53,6 +53,9 @@ export function normalizeTransactionFilters(
     minAmount: getNumberValue(searchParams.minAmount),
     maxAmount: getNumberValue(searchParams.maxAmount),
     selectedId: getSingleValue(searchParams.selectedId) || undefined,
+    excludePlaid:
+      getSingleValue(searchParams.excludePlaid) === "true" ||
+      getSingleValue(searchParams.excludePlaid) === "1",
   };
 }
 
@@ -78,6 +81,7 @@ export function buildTransactionQueryParams(filters: TransactionFilters) {
     to: filters.to ?? "",
     minAmount: filters.minAmount ?? -1,
     maxAmount: filters.maxAmount ?? -1,
+    excludePlaid: Boolean(filters.excludePlaid),
   };
 }
 

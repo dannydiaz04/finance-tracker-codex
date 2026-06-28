@@ -76,6 +76,7 @@ export type Transaction = {
   canonicalGroupId: string;
   accountId: string;
   accountName: string;
+  sourceName?: "csv" | "plaid";
   accountType: Account["type"];
   authorizedAt: string | null;
   postedAt: string;
@@ -125,6 +126,8 @@ export type TransactionFilters = {
   minAmount?: number;
   maxAmount?: number;
   selectedId?: string;
+  /** When true, hide rows ingested via Plaid sync (source_name = plaid). */
+  excludePlaid?: boolean;
 };
 
 export type TransactionSearchSuggestion = {
