@@ -17,6 +17,7 @@ select
   staged.canonical_group_id,
   staged.account_id,
   staged.account_name,
+  staged.source_name,
   accounts.type as account_type,
   staged.authorized_at,
   staged.posted_at,
