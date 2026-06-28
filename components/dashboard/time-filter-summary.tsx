@@ -20,7 +20,14 @@ export function TimeFilterSummary({ filter, fields }: TimeFilterSummaryProps) {
           <p className="mt-1 text-slate-400">{fields}</p>
         </div>
       </div>
-      <Badge className="w-fit">URL params: from / to</Badge>
+      <div className="flex flex-wrap gap-2">
+        <Badge className="w-fit">URL params: from / to</Badge>
+        {filter.excludePlaid ? (
+          <Badge className="w-fit border-amber-400/20 bg-amber-400/10 text-amber-100">
+            CSV only (Plaid hidden)
+          </Badge>
+        ) : null}
+      </div>
     </div>
   );
 }

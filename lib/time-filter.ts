@@ -1,4 +1,8 @@
 export const TIME_FILTER_QUERY_KEYS = ["from", "to", "timePreset", "month"] as const;
+export const DASHBOARD_SCOPE_QUERY_KEYS = [
+  ...TIME_FILTER_QUERY_KEYS,
+  "excludePlaid",
+] as const;
 export const TIME_FILTER_CHANGE_EVENT = "finance-time-filter-change";
 
 export type TimeFilterPreset = "all" | "last30" | "last90" | "ytd" | "custom";
@@ -8,6 +12,8 @@ export type TimeFilter = {
   to?: string;
   month?: string;
   preset: TimeFilterPreset;
+  /** When true, hide rows ingested via Plaid sync across dashboard views. */
+  excludePlaid?: boolean;
 };
 
 type SearchValue = string | string[] | undefined;
@@ -87,6 +93,9 @@ export function normalizeTimeFilter(
     to: monthRange?.to ?? (isValidDateInput(to) ? to : undefined),
     month: hasMonth ? month : undefined,
     preset,
+    excludePlaid:
+      getSingleValue(searchParams.excludePlaid) === "true" ||
+      getSingleValue(searchParams.excludePlaid) === "1",
   };
 }
 
@@ -94,6 +103,7 @@ export function buildTimeFilterQueryParams(filter: TimeFilter) {
   return {
     from: filter.from ?? "",
     to: filter.to ?? "",
+    excludePlaid: Boolean(filter.excludePlaid),
   };
 }
 
@@ -120,6 +130,10 @@ export function timeFilterToSearchString(filter: TimeFilter) {
     params.set("timePreset", filter.preset);
   }
 
+  if (filter.excludePlaid) {
+    params.set("excludePlaid", "true");
+  }
+
   return params.toString();
 }
 
@@ -127,7 +141,7 @@ export function copyTimeFilterParams(
   source: Pick<URLSearchParams, "get">,
   target = new URLSearchParams(),
 ) {
-  TIME_FILTER_QUERY_KEYS.forEach((key) => {
+  DASHBOARD_SCOPE_QUERY_KEYS.forEach((key) => {
     const value = source.get(key);
 
     if (value) {

@@ -2,6 +2,7 @@ import "server-only";
 
 import { getCurrentUserId } from "@/lib/auth/session";
 import { getBigQueryProjectId, runBigQueryQuery } from "@/lib/bigquery/client";
+import { scopeToTransactionFilters } from "@/lib/bigquery/params";
 import { deriveBalanceTotalsFromAccounts, resolvePrimaryCheckingBalance } from "@/lib/queries/account-balances";
 import { getAccounts } from "@/lib/queries/catalog";
 import { getCashflowSeries } from "@/lib/queries/cashflow";
@@ -122,10 +123,7 @@ export async function getOverviewSnapshot(timeFilter?: TimeFilter) {
     : null;
   const base = rows?.[0] ? mapOverviewSnapshot(rows[0]) : sampleOverview;
   const [transactions, cashflow, accounts] = await Promise.all([
-    getTransactions({
-      from: timeFilter?.from,
-      to: timeFilter?.to,
-    }),
+    getTransactions(scopeToTransactionFilters(timeFilter)),
     getCashflowSeries(timeFilter),
     getAccounts(),
   ]);
