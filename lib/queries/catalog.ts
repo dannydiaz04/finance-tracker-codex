@@ -7,6 +7,7 @@ import {
   type CategoryDefinitionRow,
 } from "@/lib/categorization/category-catalog";
 import { coerceNullableNumber, coerceNumber } from "@/lib/queries/coerce";
+import { accountUserScopePredicate } from "@/lib/queries/user-scope";
 import { sampleAccounts, sampleCategories } from "@/lib/sample-data";
 import type { Account, Category } from "@/lib/types/finance";
 
@@ -94,7 +95,7 @@ export async function getAccounts() {
         current_balance AS currentBalance,
         available_balance AS availableBalance
       FROM \`${projectId}.core_finance.dim_account\`
-      WHERE user_id = @userId
+      WHERE ${accountUserScopePredicate()}
       ORDER BY name
     `,
           { userId },
