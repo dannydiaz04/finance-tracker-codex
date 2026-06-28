@@ -4,9 +4,12 @@ feed: 360_checking_5980
 format: csv
 
 file_match:
-  filename_contains:
-    - "360Checking"
-    - "5980"
+  required_headers:
+    - "Account Number"
+    - "Transaction Description"
+    - "Transaction Date"
+    - "Transaction Amount"
+    - "Balance"
 
 field_map:
   sourceAccountId:
