@@ -6,6 +6,7 @@ import { coerceNumber } from "@/lib/queries/coerce";
 import { deriveMonthlySummariesFromTransactions } from "@/lib/queries/finance-aggregates";
 import {
   anonymousCsvDedupePredicate,
+  plaidCanonicalDedupePredicate,
   transactionUserScopePredicate,
 } from "@/lib/queries/user-scope";
 import { sampleTransactions } from "@/lib/sample-data";
@@ -68,6 +69,7 @@ export async function getMonthlyFinanceSummaries(timeFilter?: TimeFilter) {
         FROM \`${projectId}.core_finance.fact_transaction_current\`
         WHERE ${transactionUserScopePredicate()}
         QUALIFY ${anonymousCsvDedupePredicate()}
+          AND ${plaidCanonicalDedupePredicate()}
       )
       WHERE NOT pending
         AND (NOT @excludePlaid OR source_name != 'plaid')

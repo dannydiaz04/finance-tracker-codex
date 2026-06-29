@@ -17,11 +17,63 @@ function normalizeInstitution(value: string) {
   return value.trim().toLowerCase();
 }
 
+function normalizeLogicalAccountPart(value: string) {
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function getLogicalAccountKey(account: Account) {
+  return [
+    normalizeLogicalAccountPart(account.institution),
+    normalizeLogicalAccountPart(account.name),
+    account.type,
+    normalizeLogicalAccountPart(account.mask || "unknown"),
+  ].join("::");
+}
+
+function getAccountCompletenessScore(account: Account) {
+  return [
+    account.institution && account.institution !== "Unknown",
+    account.name && account.name !== account.id,
+    account.mask && account.mask !== "unknown",
+    account.availableBalance !== 0,
+    account.currentBalance !== 0,
+  ].filter(Boolean).length;
+}
+
+function preferAccount(left: Account, right: Account) {
+  const leftScore = getAccountCompletenessScore(left);
+  const rightScore = getAccountCompletenessScore(right);
+
+  if (leftScore !== rightScore) {
+    return rightScore > leftScore ? right : left;
+  }
+
+  return right.name.localeCompare(left.name) < 0 ? right : left;
+}
+
+export function dedupeAccountsByLogicalIdentity(accounts: Account[]) {
+  const byLogicalAccount = new Map<string, Account>();
+
+  for (const account of accounts) {
+    const key = getLogicalAccountKey(account);
+    const existing = byLogicalAccount.get(key);
+
+    byLogicalAccount.set(
+      key,
+      existing ? preferAccount(existing, account) : account,
+    );
+  }
+
+  return [...byLogicalAccount.values()].sort((left, right) =>
+    left.name.localeCompare(right.name),
+  );
+}
+
 /** Capital One checking — the live balance shown in the bank app, not transaction net flow. */
 export function resolveCapitalOneCheckingAccount(
   accounts: Account[],
 ): Account | null {
-  const matches = accounts.filter((account) => {
+  const matches = dedupeAccountsByLogicalIdentity(accounts).filter((account) => {
     const institution = normalizeInstitution(account.institution);
     const isCapitalOne =
       institution.includes("capital one") || institution === "capitalone";
@@ -67,10 +119,11 @@ export function deriveBalanceTotalsFromAccounts(
   accounts: Account[],
   accountIds?: string[],
 ): AccountBalanceTotals {
-  const scoped =
+  const scoped = dedupeAccountsByLogicalIdentity(
     accountIds && accountIds.length > 0
       ? accounts.filter((account) => accountIds.includes(account.id))
-      : accounts;
+      : accounts,
+  );
 
   const cashAccounts = scoped.filter((account) => account.type !== "credit");
   const creditAccounts = scoped.filter((account) => account.type === "credit");

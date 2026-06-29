@@ -16,6 +16,7 @@ import {
 import type { TimeFilter } from "@/lib/time-filter";
 import {
   anonymousCsvDedupePredicate,
+  plaidCanonicalDedupePredicate,
   transactionUserScopePredicate,
 } from "@/lib/queries/user-scope";
 import type {
@@ -179,6 +180,7 @@ const transactionBaseQuery = `
     FROM \`${projectId}.core_finance.fact_transaction_current\`
     WHERE ${transactionUserScopePredicate()}
     QUALIFY ${anonymousCsvDedupePredicate()}
+      AND ${plaidCanonicalDedupePredicate()}
   )
   WHERE TRUE
     AND (
@@ -282,6 +284,7 @@ export async function getTransactionById(transactionId: string) {
         FROM \`${projectId}.core_finance.fact_transaction_current\`
         WHERE ${transactionUserScopePredicate()}
         QUALIFY ${anonymousCsvDedupePredicate()}
+          AND ${plaidCanonicalDedupePredicate()}
       )
       WHERE transaction_id = @transactionId
       LIMIT 1

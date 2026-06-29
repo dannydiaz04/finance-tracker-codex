@@ -1,7 +1,10 @@
 import { CreditCard, Wallet2 } from "lucide-react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { deriveBalanceTotalsFromAccounts } from "@/lib/queries/account-balances";
+import {
+  dedupeAccountsByLogicalIdentity,
+  deriveBalanceTotalsFromAccounts,
+} from "@/lib/queries/account-balances";
 import type { Account } from "@/lib/types/finance";
 import { formatCompactCurrency, formatCurrency } from "@/lib/utils";
 
@@ -18,10 +21,11 @@ export function AccountBalanceSummary({
   accountIds,
   scopeLabel,
 }: AccountBalanceSummaryProps) {
-  const scoped =
+  const rawScoped =
     accountIds && accountIds.length > 0
       ? accounts.filter((account) => accountIds.includes(account.id))
       : accounts;
+  const scoped = dedupeAccountsByLogicalIdentity(rawScoped);
 
   const { availableCash, availableCredit, debtTotal, spendingPower } =
     deriveBalanceTotalsFromAccounts(accounts, accountIds);
