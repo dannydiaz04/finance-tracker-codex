@@ -42,7 +42,7 @@ test("dedupeAccountsByLogicalIdentity collapses normalized duplicates and keeps 
     account({
       id: "live-capital-one-360",
       name: "  CAPITAL   ONE 360 CHECKING  ",
-      institution: "capitalone",
+      institution: " capital one ",
       mask: "5980",
       currentBalance: 1425.2,
       availableBalance: 1390.17,
