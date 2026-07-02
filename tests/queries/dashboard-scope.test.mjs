@@ -23,7 +23,7 @@ test("normalizeTransactionFilters parses list, amount, and Plaid exclusion searc
   const filters = normalizeTransactionFilters({
     query: "  grocery  ",
     accountIds: "checking, savings,",
-    categoryIds: ["food,utilities"],
+    categoryIds: "food,utilities",
     direction: "outflow",
     minAmount: "25.50",
     maxAmount: "not-a-number",
