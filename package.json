@@ -20,6 +20,7 @@
     "test:alerts": "node --conditions=react-server --experimental-strip-types --test tests/alerts/*.test.mjs",
     "test:ai": "node --conditions=react-server --experimental-strip-types --test tests/ai-enrichment/*.test.mjs",
     "test:categorization": "node --conditions=react-server --experimental-strip-types --test tests/categorization/*.test.mjs",
+    "test:queries": "node --conditions=react-server --experimental-strip-types --test tests/queries/*.test.mjs",
     "test": "node --conditions=react-server --experimental-strip-types --test tests/*/*.test.mjs",
     "typecheck": "tsc --noEmit",
     "dataform:compile": "dataform compile dataform",
