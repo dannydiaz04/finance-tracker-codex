@@ -37,6 +37,7 @@ test("normalizeTransactionFilters parses list, amount, and exclude-Plaid filters
     query: "groceries",
     accountIds: ["checking", "savings"],
     categoryIds: ["food", "dining"],
+    merchant: undefined,
     direction: "outflow",
     transactionClass: "expense",
     pending: "posted",

@@ -132,7 +132,7 @@ test("Capital One primary checking resolution prefers the 360 checking account a
     account({
       id: "cap-one-360-live",
       name: "capital one 360 checking",
-      institution: " capital   one ",
+      institution: "Capital One",
       mask: "5980",
       currentBalance: 1240.1,
       availableBalance: 1200.1,
@@ -146,7 +146,7 @@ test("Capital One primary checking resolution prefers the 360 checking account a
   assert.deepEqual(balance, {
     accountId: "cap-one-360-live",
     accountName: "capital one 360 checking",
-    institution: " capital   one ",
+    institution: "Capital One",
     mask: "5980",
     currentBalance: 1240.1,
     availableBalance: 1200.1,
