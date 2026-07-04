@@ -1,4 +1,4 @@
-import type { Category } from "@/lib/types/finance";
+import type { Category, Rule } from "@/lib/types/finance";
 
 /**
  * Pure helpers for the user-maintained category catalog. Kept free of server/db imports
@@ -16,6 +16,38 @@ export type CategoryDefinitionRow = {
   isSystem: boolean;
 };
 
+export type PersistedCategoryDefinitionRow = {
+  user_id: string;
+  category_id: string;
+  label: string;
+  category_l1: string;
+  category_l2: string;
+  color: string;
+  sort_order: number | null;
+  status: "active" | "archived";
+  is_system: boolean;
+  change_source: "user";
+  updated_at: string;
+  created_at: string;
+};
+
+export type ReassignedCategoryRuleRow = {
+  user_id: string;
+  rule_id: string;
+  name: string;
+  description: string;
+  priority: number;
+  enabled: boolean;
+  category_id: string;
+  category_label: string;
+  match_strategy: Rule["matchStrategy"];
+  match_value: string;
+  confidence_boost: number;
+  hit_rate: number;
+  last_matched_at: string | null;
+  created_at: string;
+};
+
 /** Seed category ids whose warehouse semantics must never be archived (only renamed). */
 export const SYSTEM_CATEGORY_IDS = new Set<string>([
   "uncategorized",
@@ -29,6 +61,55 @@ const FALLBACK_COLOR = "#64748b";
 
 export function isSystemCategoryId(categoryId: string): boolean {
   return SYSTEM_CATEGORY_IDS.has(categoryId);
+}
+
+export function buildCategoryDefinitionRow(input: {
+  userId: string;
+  category: Category;
+  status: "active" | "archived";
+  isSystem: boolean;
+  now: string;
+}): PersistedCategoryDefinitionRow {
+  return {
+    user_id: input.userId,
+    category_id: input.category.id,
+    label: input.category.label,
+    category_l1: input.category.group,
+    category_l2: input.category.sublabel,
+    color: input.category.color,
+    sort_order: input.category.sortOrder ?? null,
+    status: input.status,
+    is_system: input.isSystem,
+    change_source: "user",
+    updated_at: input.now,
+    created_at: input.now,
+  };
+}
+
+// Reassign a deterministic rule to a different category by appending a new version that
+// shares rule_id (fact_classification keeps the latest row per rule_id).
+export function buildReassignedCategoryRuleRow(input: {
+  rule: Rule;
+  target: Category;
+  userId: string;
+  now: string;
+}): ReassignedCategoryRuleRow {
+  return {
+    user_id: input.userId,
+    rule_id: input.rule.id,
+    name: input.rule.name,
+    description: input.rule.description,
+    priority: input.rule.priority,
+    enabled: input.rule.enabled,
+    category_id: input.target.id,
+    category_label: input.target.label,
+    match_strategy: input.rule.matchStrategy,
+    match_value: input.rule.matchValue,
+    confidence_boost: input.rule.confidenceBoost,
+    hit_rate: input.rule.hitRate,
+    last_matched_at: input.rule.lastMatchedAt ?? null,
+    created_at: input.now,
+  };
 }
 
 /**
