@@ -62,8 +62,8 @@ test("deriveBalanceTotalsFromAccounts dedupes before calculating cash, credit, d
   const totals = deriveBalanceTotalsFromAccounts([
     account({
       id: "checking-stale",
-      currentBalance: 100,
-      availableBalance: 100,
+      currentBalance: 0,
+      availableBalance: 0,
     }),
     account({
       id: "checking-current",
@@ -101,8 +101,8 @@ test("deriveBalanceTotalsFromAccounts scopes by selected account ids before dedu
   const accounts = [
     account({
       id: "checking-stale",
-      currentBalance: 100,
-      availableBalance: 100,
+      currentBalance: 0,
+      availableBalance: 0,
     }),
     account({
       id: "checking-current",
