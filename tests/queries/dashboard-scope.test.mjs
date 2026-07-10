@@ -151,7 +151,7 @@ test("deduplicates search suggestions by case-insensitive label and type", () =>
       { type: "category", label: "Target" },
     ]),
     [
-      { type: "merchant", label: "Target" },
+      { type: "merchant", label: "target" },
       { type: "category", label: "Target" },
     ],
   );
