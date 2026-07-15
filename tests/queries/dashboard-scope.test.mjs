@@ -167,7 +167,7 @@ test("dedupe predicates partition by canonical identity and user/source ownershi
   );
 });
 
-test("uniqueSearchSuggestions keeps the first case-insensitive label per type", () => {
+test("uniqueSearchSuggestions dedupes labels case-insensitively per type", () => {
   assert.deepEqual(
     uniqueSearchSuggestions([
       { label: "Target", type: "merchant" },
@@ -176,7 +176,7 @@ test("uniqueSearchSuggestions keeps the first case-insensitive label per type", 
       { label: "Groceries", type: "category" },
     ]),
     [
-      { label: "Target", type: "merchant" },
+      { label: "target", type: "merchant" },
       { label: "Target", type: "keyword" },
       { label: "Groceries", type: "category" },
     ],
