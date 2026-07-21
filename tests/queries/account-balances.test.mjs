@@ -59,7 +59,7 @@ test("dedupes logical account rows and keeps the richest balance record", () => 
   );
   assert.equal(deduped[0].currentBalance, 1250);
   assert.equal(deduped[0].availableBalance, 1200);
-}
+});
 
 test("balance totals do not double count duplicate cash or credit accounts", () => {
   const accounts = [
@@ -100,7 +100,7 @@ test("balance totals do not double count duplicate cash or credit accounts", () 
     debtTotal: 50,
     spendingPower: 570,
   });
-}
+});
 
 test("selected account totals are scoped before logical dedupe", () => {
   const accounts = [
@@ -125,7 +125,7 @@ test("selected account totals are scoped before logical dedupe", () => {
     debtTotal: 0,
     spendingPower: 90,
   });
-}
+});
 
 test("Capital One primary checking ignores duplicates and prefers 360 checking", () => {
   const duplicateChecking = account({
@@ -173,4 +173,4 @@ test("Capital One primary checking ignores duplicates and prefers 360 checking",
     currentBalance: 700,
     availableBalance: 650,
   });
-}
+});
