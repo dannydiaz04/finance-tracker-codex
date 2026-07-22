@@ -6,8 +6,8 @@ import type {
   OverviewSnapshot,
   Transaction,
   WeekdaySpendInsight,
-} from "@/lib/types/finance";
-import { formatMonthLabel, getMonthRange } from "@/lib/time-filter";
+} from "../types/finance";
+import { formatMonthLabel, getMonthRange } from "../time-filter";
 
 function isInternalMovement(transaction: Transaction) {
   return (
