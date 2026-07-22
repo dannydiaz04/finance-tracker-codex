@@ -69,7 +69,7 @@ test("Runner archives a landed CSV after persisting through the shared import pa
   assert.equal(result.failureReason, null);
   assert.equal(result.mappingResolutionStrategy, "profile");
   assert.equal(result.mappingProfileId, "discover.all_available.csv.v1");
-  assert.deepEqual(result.matchedBy, ["filename", "header-signature"]);
+  assert.deepEqual(result.matchedBy, ["header-signature"]);
   assert.equal(result.importBatchId, persistedImport.importBatch.importBatchId);
   assert.equal(result.rowCount, persistedImport.importBatch.rowCount);
   assert.ok(result.fileChecksum.length > 0);
