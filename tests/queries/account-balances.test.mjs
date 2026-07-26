@@ -61,8 +61,8 @@ test("deriveBalanceTotalsFromAccounts does not double-count logical duplicates a
   const duplicateChecking = account({
     id: "csv-checking",
     name: "Everyday Checking",
-    currentBalance: 25,
-    availableBalance: 25,
+    currentBalance: 0,
+    availableBalance: 0,
   });
   const checking = account({
     id: "plaid-checking",
