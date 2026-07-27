@@ -71,6 +71,13 @@ function matchesFilters(transaction: Transaction, filters: TransactionFilters) {
   }
 
   if (
+    filters.categoryGroups?.length &&
+    !filters.categoryGroups.includes(transaction.categoryGroup)
+  ) {
+    return false;
+  }
+
+  if (
     filters.categoryIds?.length &&
     !filters.categoryIds.includes(transaction.derivedCategoryId)
   ) {
@@ -159,6 +166,7 @@ const transactionSelectFields = `
   description_norm AS descriptionNorm,
   institution_category AS institutionCategory,
   derived_category_id AS derivedCategoryId,
+  category_group AS categoryGroup,
   category_label AS categoryLabel,
   subcategory_id AS subcategoryId,
   confidence_score AS confidenceScore,
@@ -193,43 +201,58 @@ const transactionCurrentReadQuery = `
       PARTITION BY transaction_id
       ORDER BY updated_at DESC, category_id DESC
     ) = 1
-  )
-  SELECT
-    scoped_transactions.* REPLACE (
+  ),
+  resolved_transactions AS (
+    SELECT
+      scoped_transactions.*,
+      latest_overrides.category_id AS override_category_id,
       COALESCE(
         latest_overrides.category_id,
         scoped_transactions.derived_category_id
-      ) AS derived_category_id,
+      ) AS resolved_category_id
+    FROM scoped_transactions
+    LEFT JOIN latest_overrides
+      ON latest_overrides.transaction_id = scoped_transactions.transaction_id
+  )
+  SELECT
+    resolved_transactions.* EXCEPT (
+      override_category_id,
+      resolved_category_id
+    ) REPLACE (
+      resolved_transactions.resolved_category_id AS derived_category_id,
       COALESCE(
-        override_user_category.label,
-        override_seed_category.label,
-        scoped_transactions.category_label
+        effective_user_category.label,
+        effective_seed_category.label,
+        resolved_transactions.category_label
       ) AS category_label,
       COALESCE(
-        override_user_category.category_l2,
-        override_seed_category.category_l2,
-        scoped_transactions.subcategory_id
+        effective_user_category.category_l2,
+        effective_seed_category.category_l2,
+        resolved_transactions.subcategory_id
       ) AS subcategory_id,
       IF(
-        latest_overrides.category_id IS NOT NULL,
+        resolved_transactions.override_category_id IS NOT NULL,
         CAST(1 AS FLOAT64),
-        scoped_transactions.confidence_score
+        resolved_transactions.confidence_score
       ) AS confidence_score,
       IF(
-        latest_overrides.category_id IS NOT NULL,
+        resolved_transactions.override_category_id IS NOT NULL,
         "manual_override",
-        scoped_transactions.classification_source
+        resolved_transactions.classification_source
       ) AS classification_source
-    )
-  FROM scoped_transactions
-  LEFT JOIN latest_overrides
-    ON latest_overrides.transaction_id = scoped_transactions.transaction_id
-  LEFT JOIN \`${projectId}.core_finance.dim_category_effective\` AS override_user_category
-    ON override_user_category.user_id = @userId
-   AND override_user_category.category_id = latest_overrides.category_id
-  LEFT JOIN \`${projectId}.core_finance.dim_category_effective\` AS override_seed_category
-    ON override_seed_category.user_id IS NULL
-   AND override_seed_category.category_id = latest_overrides.category_id
+    ),
+    COALESCE(
+      effective_user_category.category_l1,
+      effective_seed_category.category_l1,
+      ""
+    ) AS category_group
+  FROM resolved_transactions
+  LEFT JOIN \`${projectId}.core_finance.dim_category_effective\` AS effective_user_category
+    ON effective_user_category.user_id = @userId
+   AND effective_user_category.category_id = resolved_transactions.resolved_category_id
+  LEFT JOIN \`${projectId}.core_finance.dim_category_effective\` AS effective_seed_category
+    ON effective_seed_category.user_id IS NULL
+   AND effective_seed_category.category_id = resolved_transactions.resolved_category_id
 `;
 
 const transactionBaseQuery = `
@@ -245,6 +268,7 @@ const transactionBaseQuery = `
       OR merchant_norm LIKE CONCAT('%', @query, '%')
     )
     AND (NOT @hasAccountIds OR account_id IN UNNEST(@accountIds))
+    AND (NOT @hasCategoryGroups OR category_group IN UNNEST(@categoryGroups))
     AND (NOT @hasCategoryIds OR derived_category_id IN UNNEST(@categoryIds))
     AND (@merchant = '' OR merchant_norm LIKE CONCAT('%', @merchant, '%'))
     AND (@direction = '' OR direction = @direction)
@@ -264,6 +288,7 @@ function mapTransaction(row: RawTransaction): Transaction {
     authorizedAt: row.authorizedAt ? coerceDateString(row.authorizedAt) : null,
     postedAt: coerceDateString(row.postedAt),
     signedAmount: coerceNumber(row.signedAmount),
+    categoryGroup: row.categoryGroup || "Uncategorized",
     confidenceScore: coerceNumber(row.confidenceScore),
     classificationHistory: (row.classificationHistory ?? []).map((entry) => ({
       timestamp: coerceDateString(entry.timestamp),

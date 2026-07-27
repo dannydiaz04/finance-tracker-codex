@@ -1,13 +1,17 @@
 "use client";
 
 import type { Route } from "next";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Search, SlidersHorizontal } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import {
+  getCategoryGroups,
+  resolveCategoryGroup,
+} from "@/lib/categorization/category-catalog";
 import type {
   Account,
   Category,
@@ -32,9 +36,11 @@ export function TransactionFilters({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const initialCategoryId = initialFilters.categoryIds?.[0] ?? "";
   type FormState = {
     query: string;
     accountId: string;
+    categoryGroup: string;
     categoryId: string;
     direction: NonNullable<TransactionFilters["direction"]>;
     transactionClass: NonNullable<TransactionFilters["transactionClass"]>;
@@ -49,7 +55,10 @@ export function TransactionFilters({
   const [formState, setFormState] = useState<FormState>({
     query: initialFilters.query ?? "",
     accountId: initialFilters.accountIds?.[0] ?? "",
-    categoryId: initialFilters.categoryIds?.[0] ?? "",
+    categoryGroup:
+      initialFilters.categoryGroups?.[0] ??
+      resolveCategoryGroup(initialCategoryId, categories),
+    categoryId: initialCategoryId,
     direction: initialFilters.direction ?? "all",
     transactionClass: initialFilters.transactionClass ?? "all",
     pending: initialFilters.pending ?? "all",
@@ -66,10 +75,33 @@ export function TransactionFilters({
     excludePlaid: initialFilters.excludePlaid ?? false,
   });
 
+  const categoryGroups = useMemo(() => getCategoryGroups(categories), [categories]);
+  const subcategoryOptions = useMemo(
+    () =>
+      categories.filter(
+        (category) => category.group.trim() === formState.categoryGroup,
+      ),
+    [categories, formState.categoryGroup],
+  );
+
   const updateField = (field: keyof FormState, value: string | boolean) => {
     setFormState((current) => ({
       ...current,
       [field]: value as FormState[keyof FormState],
+    }));
+  };
+
+  const updateCategoryGroup = (categoryGroup: string) => {
+    setFormState((current) => ({
+      ...current,
+      categoryGroup,
+      categoryId: categories.some(
+        (category) =>
+          category.id === current.categoryId &&
+          category.group.trim() === categoryGroup,
+      )
+        ? current.categoryId
+        : "",
     }));
   };
 
@@ -100,6 +132,11 @@ export function TransactionFilters({
           return;
         }
 
+        if (key === "categoryGroup") {
+          params.set("categoryGroups", value);
+          return;
+        }
+
         params.set(key, value);
       }
     });
@@ -119,7 +156,7 @@ export function TransactionFilters({
         warehouse `posted_at`.
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
         <div className="sm:col-span-2 lg:col-span-2">
           <label className="mb-2 block text-xs uppercase tracking-[0.24em] text-slate-500">
             Search
@@ -157,13 +194,38 @@ export function TransactionFilters({
             Category
           </label>
           <Select
-            value={formState.categoryId}
-            onChange={(event) => updateField("categoryId", event.target.value)}
+            value={formState.categoryGroup}
+            onChange={(event) => updateCategoryGroup(event.target.value)}
+            aria-label="Category"
           >
             <option value="">All categories</option>
-            {categories.map((category) => (
+            {categoryGroups.map((group) => (
+              <option key={group} value={group}>
+                {group}
+              </option>
+            ))}
+          </Select>
+        </div>
+
+        <div>
+          <label className="mb-2 block text-xs uppercase tracking-[0.24em] text-slate-500">
+            Subcategory
+          </label>
+          <Select
+            value={formState.categoryId}
+            onChange={(event) => updateField("categoryId", event.target.value)}
+            aria-label="Subcategory"
+            disabled={!formState.categoryGroup}
+          >
+            <option value="">
+              {formState.categoryGroup
+                ? "All subcategories"
+                : "Choose category first"}
+            </option>
+            {subcategoryOptions.map((category) => (
               <option key={category.id} value={category.id}>
                 {category.label}
+                {category.sublabel ? ` — ${category.sublabel}` : ""}
               </option>
             ))}
           </Select>
@@ -318,6 +380,7 @@ export function TransactionFilters({
             const resetState: FormState = {
               query: "",
               accountId: "",
+              categoryGroup: "",
               categoryId: "",
               direction: "all",
               transactionClass: "all",

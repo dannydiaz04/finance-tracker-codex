@@ -35,6 +35,7 @@ type ColumnId =
   | "merchant"
   | "date"
   | "category"
+  | "subcategory"
   | "account"
   | "status"
   | "amount";
@@ -57,6 +58,7 @@ type ColumnFilters = {
   merchant: TextFilterState;
   date: TextFilterState;
   category: TextFilterState;
+  subcategory: TextFilterState;
   account: TextFilterState;
   status: TextFilterState;
   amount: NumberFilterState;
@@ -69,6 +71,7 @@ const INITIAL_FILTERS: ColumnFilters = {
   merchant: EMPTY_TEXT,
   date: EMPTY_TEXT,
   category: EMPTY_TEXT,
+  subcategory: EMPTY_TEXT,
   account: EMPTY_TEXT,
   status: EMPTY_TEXT,
   amount: EMPTY_NUMBER,
@@ -101,6 +104,8 @@ function getColumnText(column: TextColumnId, transaction: Transaction): string {
     case "date":
       return transaction.postedAt;
     case "category":
+      return transaction.categoryGroup;
+    case "subcategory":
       return transaction.categoryLabel;
     case "account":
       return transaction.accountName;
@@ -135,6 +140,10 @@ export function TransactionTable({
     [transactions],
   );
   const distinctCategories = useMemo(
+    () => unique(transactions.map((t) => t.categoryGroup)),
+    [transactions],
+  );
+  const distinctSubcategories = useMemo(
     () => unique(transactions.map((t) => t.categoryLabel)),
     [transactions],
   );
@@ -165,6 +174,7 @@ export function TransactionTable({
       if (!passText("merchant", transaction)) return false;
       if (!passText("date", transaction)) return false;
       if (!passText("category", transaction)) return false;
+      if (!passText("subcategory", transaction)) return false;
       if (!passText("account", transaction)) return false;
       if (!passText("status", transaction)) return false;
       if (minActive && transaction.signedAmount < (minValue as number)) return false;
@@ -217,6 +227,7 @@ export function TransactionTable({
     (filters.merchant.selectedValues !== null ? 1 : 0) +
     (filters.date.selectedValues !== null ? 1 : 0) +
     (filters.category.selectedValues !== null ? 1 : 0) +
+    (filters.subcategory.selectedValues !== null ? 1 : 0) +
     (filters.account.selectedValues !== null ? 1 : 0) +
     (filters.status.selectedValues !== null ? 1 : 0) +
     (filters.amount.min !== "" || filters.amount.max !== "" ? 1 : 0);
@@ -225,7 +236,7 @@ export function TransactionTable({
 
   return (
     <div className="rounded-sm border border-border bg-card">
-      <div className="hidden items-center gap-4 border-b border-border px-5 py-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-500 lg:grid lg:grid-cols-[1.2fr_0.72fr_1fr_0.8fr_0.8fr_0.8fr]">
+      <div className="hidden items-center gap-3 border-b border-border px-5 py-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-500 lg:grid lg:grid-cols-[1.1fr_0.68fr_0.78fr_0.9fr_0.75fr_0.85fr_0.75fr]">
         <ColumnHeader
           id="merchant"
           label="Merchant"
@@ -252,6 +263,16 @@ export function TransactionTable({
           type="text"
           distinctValues={distinctCategories}
           filter={filters.category}
+          sort={sort}
+          onSort={handleSort}
+          onTextFilter={handleTextFilter}
+        />
+        <ColumnHeader
+          id="subcategory"
+          label="Subcategory"
+          type="text"
+          distinctValues={distinctSubcategories}
+          filter={filters.subcategory}
           sort={sort}
           onSort={handleSort}
           onTextFilter={handleTextFilter}
@@ -366,7 +387,7 @@ export function TransactionTable({
               onClick={() => openTransaction(transaction.transactionId)}
             >
               {/* Desktop table row (lg+) */}
-              <div className="hidden lg:grid lg:w-full lg:grid-cols-[1.2fr_0.72fr_1fr_0.8fr_0.8fr_0.8fr] lg:gap-4">
+              <div className="hidden lg:grid lg:w-full lg:grid-cols-[1.1fr_0.68fr_0.78fr_0.9fr_0.75fr_0.85fr_0.75fr] lg:gap-3">
                 <div>
                   <p className="text-sm font-medium text-white">
                     {transaction.merchantRaw}
@@ -377,6 +398,9 @@ export function TransactionTable({
                 </div>
                 <div className="flex items-center font-mono text-xs text-slate-400">
                   {formatTransactionDate(transaction.postedAt)}
+                </div>
+                <div className="flex items-center">
+                  <Badge>{transaction.categoryGroup}</Badge>
                 </div>
                 <div className="flex items-center">
                   <Badge>{transaction.categoryLabel}</Badge>
@@ -433,6 +457,7 @@ export function TransactionTable({
                   </p>
                 ) : null}
                 <div className="flex flex-wrap items-center gap-2">
+                  <Badge>{transaction.categoryGroup}</Badge>
                   <Badge>{transaction.categoryLabel}</Badge>
                   <Badge
                     className={cn(

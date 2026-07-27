@@ -90,6 +90,7 @@ export type Transaction = {
   descriptionNorm: string;
   institutionCategory: string | null;
   derivedCategoryId: string;
+  categoryGroup: string;
   categoryLabel: string;
   subcategoryId: string | null;
   confidenceScore: number;
@@ -116,6 +117,7 @@ export type TransactionDetail = Transaction & {
 export type TransactionFilters = {
   query?: string;
   accountIds?: string[];
+  categoryGroups?: string[];
   categoryIds?: string[];
   merchant?: string;
   direction?: TransactionDirection | "all";
