@@ -69,7 +69,8 @@ export function describeSaveResult(input: {
     if (payload.ruleSuggestionError) {
       return {
         tone: "partial",
-        message: "Category saved, but the rule suggestion couldn’t be saved. Try again.",
+        message:
+          "Subcategory saved, but the rule suggestion couldn’t be saved. Try again.",
       };
     }
     if (payload.ruleSuggestionPersisted) {
@@ -82,7 +83,7 @@ export function describeSaveResult(input: {
     if (payload.ruleError) {
       return {
         tone: "partial",
-        message: "Category saved, but the rule couldn’t be saved. Try again.",
+        message: "Subcategory saved, but the rule couldn’t be saved. Try again.",
       };
     }
     if (payload.dedupe === "exists") {

@@ -116,7 +116,7 @@ export default async function AssistantPage({ searchParams }: AssistantPageProps
               {topCategory ? (
                 <div className="rounded-sm border border-border bg-background p-4">
                   <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
-                    Top category
+                    Top subcategory
                   </p>
                   <div className="mt-2 flex items-center justify-between gap-4">
                     <p className="font-medium text-white">{topCategory.label}</p>

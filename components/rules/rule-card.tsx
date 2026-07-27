@@ -51,6 +51,9 @@ export function RuleCard({ rule, categories }: RuleCardProps) {
     null,
   );
   const [isPending, startTransition] = useTransition();
+  const currentSubcategory = categories.find(
+    (category) => category.id === currentRule.categoryId,
+  );
 
   const openEditor = () => {
     setDraft(toDraft(currentRule));
@@ -172,7 +175,7 @@ export function RuleCard({ rule, categories }: RuleCardProps) {
 
           <div className="grid gap-3 md:grid-cols-2">
             <label className="grid gap-1 text-xs text-slate-400">
-              Category
+              Subcategory
               <Select
                 value={draft.categoryId}
                 onChange={(event) =>
@@ -182,7 +185,7 @@ export function RuleCard({ rule, categories }: RuleCardProps) {
               >
                 {categories.map((category) => (
                   <option key={category.id} value={category.id}>
-                    {category.label}
+                    {category.group} — {category.label}
                   </option>
                 ))}
               </Select>
@@ -237,7 +240,12 @@ export function RuleCard({ rule, categories }: RuleCardProps) {
         </form>
       ) : (
         <div className="mt-4 grid gap-2 text-sm text-slate-300 md:grid-cols-3">
-          <p>Category: {currentRule.categoryLabel}</p>
+          <p>
+            Subcategory:{" "}
+            {currentSubcategory
+              ? `${currentSubcategory.group} — ${currentSubcategory.label}`
+              : currentRule.categoryLabel}
+          </p>
           <p>Strategy: {currentRule.matchStrategy.replaceAll("_", " ")}</p>
           <p>Hit rate: {(currentRule.hitRate * 100).toFixed(0)}%</p>
           <p className="break-words md:col-span-3">

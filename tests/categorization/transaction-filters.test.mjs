@@ -8,33 +8,36 @@ import {
 
 test("normalizes category and subcategory URL filters independently", () => {
   const filters = normalizeTransactionFilters({
-    categoryGroups: " Lifestyle, Essential ",
+    categoryGroups: " lifestyle-abc123, essential-def456 ",
     categoryIds: "dining,travel",
   });
 
-  assert.deepEqual(filters.categoryGroups, ["Lifestyle", "Essential"]);
+  assert.deepEqual(filters.categoryGroupIds, [
+    "lifestyle-abc123",
+    "essential-def456",
+  ]);
   assert.deepEqual(filters.categoryIds, ["dining", "travel"]);
 });
 
 test("builds BigQuery parameters for parent-only category filtering", () => {
   const params = buildTransactionQueryParams({
-    categoryGroups: ["Lifestyle"],
+    categoryGroupLabels: ["Lifestyle"],
   });
 
   assert.equal(params.hasCategoryGroups, true);
-  assert.deepEqual(params.categoryGroups, ["Lifestyle"]);
+  assert.deepEqual(params.categoryGroups, ["lifestyle"]);
   assert.equal(params.hasCategoryIds, false);
   assert.deepEqual(params.categoryIds, [""]);
 });
 
 test("builds combined category and subcategory query parameters", () => {
   const params = buildTransactionQueryParams({
-    categoryGroups: ["Lifestyle"],
+    categoryGroupLabels: ["Lifestyle"],
     categoryIds: ["dining"],
   });
 
   assert.equal(params.hasCategoryGroups, true);
   assert.equal(params.hasCategoryIds, true);
-  assert.deepEqual(params.categoryGroups, ["Lifestyle"]);
+  assert.deepEqual(params.categoryGroups, ["lifestyle"]);
   assert.deepEqual(params.categoryIds, ["dining"]);
 });

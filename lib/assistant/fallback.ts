@@ -69,7 +69,7 @@ function buildQuickRead(context: DashboardAssistantContext) {
 function buildUsageGuide(context: DashboardAssistantContext) {
   const lines = [
     "Use the dashboard like this:",
-    "- Start on Overview for the big picture: balances, month-to-date movement, top category concentration, top merchants, and review queue pressure.",
+    "- Start on Overview for the big picture: balances, month-to-date movement, top subcategory concentration, top merchants, and review queue pressure.",
     "- Move to Transactions when you need row-level search, filter combinations, or manual recategorization from the drawer.",
     "- Use Cash Flow when you want inflow, outflow, and net movement split apart before drilling into causes.",
     "- Use Categories and Merchants when you want pattern-finding: which buckets dominate spend, which merchants look recurring, and where normalization or new rules would help.",
@@ -91,11 +91,11 @@ function buildOverviewReply(context: DashboardAssistantContext) {
 
   return [
     "Overview page:",
-    "- This is the fastest read on overall posture: balances, month-to-date spend and income, current largest expense, category concentration, top merchants, and review queue pressure.",
+    "- This is the fastest read on overall posture: balances, month-to-date spend and income, current largest expense, subcategory concentration, top merchants, and review queue pressure.",
     `- Right now the headline numbers are ${formatCurrency(context.overview.totalBalance)} total balance, ${formatCurrency(context.overview.availableCash)} available cash, and ${context.reviewQueue.length} review item${context.reviewQueue.length === 1 ? "" : "s"}.`,
     topCategory
-      ? `- ${topCategory.label} is the leading category at ${formatPercent(topCategory.share)} of spend.`
-      : "- Category concentration data is not populated yet.",
+      ? `- ${topCategory.label} is the leading subcategory at ${formatPercent(topCategory.share)} of spend.`
+      : "- Subcategory concentration data is not populated yet.",
     topMerchant
       ? `- ${topMerchant.merchant} is the top merchant concentration to investigate next.`
       : "- Merchant concentration data is not populated yet.",
@@ -123,7 +123,7 @@ function buildTransactionWorkflowReply(context: DashboardAssistantContext) {
     "To fix a transaction:",
     "- Open Transactions and filter until you find the row you want.",
     "- Select the row to open the drawer.",
-    "- In Manual recategorization, choose the category and submit.",
+    "- In Manual recategorization, choose a category, then a subcategory, and submit.",
     "- The app posts that change to `/api/categories/override`, which is intended to land in `ops_finance.manual_overrides` and replay into reporting on the next warehouse pass.",
     focusItem
       ? `- A good candidate right now is ${focusItem.merchant}, which is sitting in the review queue at ${(focusItem.confidenceScore * 100).toFixed(0)}% confidence.`
@@ -137,7 +137,7 @@ function buildRulesReply(context: DashboardAssistantContext) {
   return [
     "Rules & Review page:",
     "- This is where you tune the deterministic engine before relying on AI-only suggestions.",
-    "- Each rule exposes category target, matching strategy, priority, and hit-rate so the system stays auditable.",
+    "- Each rule exposes its subcategory target, matching strategy, priority, and hit-rate so the system stays auditable.",
     `- The review queue currently has ${context.reviewQueue.length} item${context.reviewQueue.length === 1 ? "" : "s"} waiting for confirmation.`,
     highestPriorityRule
       ? `- The highest-priority visible rule is ${highestPriorityRule.name} at priority ${highestPriorityRule.priority}.`
@@ -189,7 +189,7 @@ function buildCategoryReply(context: DashboardAssistantContext) {
 
   return [
     "Category view read:",
-    `- The top categories right now are ${topCategories || "not available yet"}.`,
+    `- The top subcategories right now are ${topCategories || "not available yet"}.`,
     "- This screen is where you decide whether concentration is real behavior or a classification issue.",
     `- The review queue has ${context.reviewQueue.length} item${context.reviewQueue.length === 1 ? "" : "s"}, so it is also the fastest place to see what still needs confirmation.`,
   ].join("\n");
@@ -272,7 +272,16 @@ export function generateLocalAssistantReply(
     return buildCashflowReply(context);
   }
 
-  if (includesAny(normalized, ["category", "categories", "spend driver", "spending driver"])) {
+  if (
+    includesAny(normalized, [
+      "category",
+      "categories",
+      "subcategory",
+      "subcategories",
+      "spend driver",
+      "spending driver",
+    ])
+  ) {
     return buildCategoryReply(context);
   }
 

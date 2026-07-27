@@ -151,10 +151,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Transaction not found." }, { status: 404 });
     }
 
-    // The API is the trust boundary, not the <select>: never pin an unknown category.
+    // The API is the trust boundary, not the <select>: never pin an unknown subcategory.
     const category = categories.find((item) => item.id === payload.categoryId);
     if (!category) {
-      return NextResponse.json({ error: "Unknown category." }, { status: 400 });
+      return NextResponse.json({ error: "Unknown subcategory." }, { status: 400 });
     }
 
     const action = resolveRuleAction({

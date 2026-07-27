@@ -1,0 +1,92 @@
+config {
+  type: "operations",
+  schema: "ops_finance",
+  name: "category_group_definitions",
+  description: "User-maintained, append-only parent category catalog. The latest row per (user_id, category_group_id) is current; archived rows are soft-delete tombstones.",
+  hasOutput: true
+}
+
+create table if not exists ${self()} (
+  user_id string,
+  category_group_id string,
+  label string,
+  color string,
+  sort_order int64,
+  -- 'active' | 'archived' (archived = soft-delete tombstone)
+  status string,
+  -- Seed-derived parent categories may be renamed/recolored but never archived.
+  is_system bool,
+  -- 'user' | 'seed' | 'import'
+  change_source string,
+  updated_at timestamp,
+  created_at timestamp
+)
+options (
+  description = "User-maintained, append-only parent category catalog (latest row per user and category group wins)."
+);
+
+-- Give pre-existing custom category groups an explicit parent record so they continue
+-- to exist if their last subcategory is later moved elsewhere.
+insert into ${self()} (
+  user_id,
+  category_group_id,
+  label,
+  color,
+  sort_order,
+  status,
+  is_system,
+  change_source,
+  updated_at,
+  created_at
+)
+with latest_subcategories as (
+  select
+    user_id,
+    category_id,
+    trim(category_l1) as category_group_label,
+    nullif(trim(color), "") as color,
+    status,
+    updated_at
+  from ${ref("category_definitions")}
+  where trim(category_l1) != ""
+  qualify row_number() over (
+    partition by user_id, category_id
+    order by updated_at desc
+  ) = 1
+),
+active_custom_groups as (
+  select
+    user_id,
+    lower(category_group_label) as normalized_label,
+    (array_agg(category_group_label order by updated_at desc limit 1))[offset(0)] as label,
+    (array_agg(color ignore nulls order by updated_at desc limit 1))[safe_offset(0)] as color
+  from latest_subcategories
+  where status = "active"
+  group by user_id, normalized_label
+),
+seed_groups as (
+  select distinct lower(trim(category_l1)) as normalized_label
+  from ${ref("dim_category")}
+  where trim(category_l1) != ""
+)
+select
+  groups.user_id,
+  concat("legacy-", to_hex(md5(groups.normalized_label))) as category_group_id,
+  groups.label,
+  coalesce(groups.color, "#64748b") as color,
+  cast(null as int64) as sort_order,
+  "active" as status,
+  false as is_system,
+  "import" as change_source,
+  current_timestamp() as updated_at,
+  current_timestamp() as created_at
+from active_custom_groups as groups
+left join seed_groups
+  using (normalized_label)
+where seed_groups.normalized_label is null
+  and not exists (
+    select 1
+    from ${self()} as existing
+    where existing.user_id = groups.user_id
+      and lower(trim(existing.label)) = groups.normalized_label
+  )

@@ -7,11 +7,13 @@ import { Lock, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import type { Category } from "@/lib/types/finance";
+import { normalizeCategoryGroupLabel } from "@/lib/categorization/category-group-catalog";
+import type { Category, CategoryGroup } from "@/lib/types/finance";
 import { cn } from "@/lib/utils";
 
 type CategoryManagerProps = {
   categories: Category[];
+  categoryGroups: CategoryGroup[];
 };
 
 type DraftState = {
@@ -44,7 +46,10 @@ function toDraft(category: Category): DraftState {
   };
 }
 
-export function CategoryManager({ categories }: CategoryManagerProps) {
+export function CategoryManager({
+  categories,
+  categoryGroups,
+}: CategoryManagerProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<DraftState | null>(null);
@@ -61,12 +66,18 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
   const grouped = useMemo(() => {
     const map = new Map<string, Category[]>();
     for (const category of categories) {
-      const list = map.get(category.group) ?? [];
+      const parentLabel =
+        categoryGroups.find(
+          (group) =>
+            normalizeCategoryGroupLabel(group.label) ===
+            normalizeCategoryGroupLabel(category.group),
+        )?.label ?? category.group.trim();
+      const list = map.get(parentLabel) ?? [];
       list.push(category);
-      map.set(category.group, list);
+      map.set(parentLabel, list);
     }
     return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-  }, [categories]);
+  }, [categories, categoryGroups]);
 
   const reassignOptions = pendingDelete
     ? categories.filter((item) => item.id !== pendingDelete.category.id)
@@ -100,13 +111,18 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
       const payload = await response.json().catch(() => null);
 
       if (!response.ok) {
-        setFeedback({ tone: "error", message: payload?.error ?? "Unable to save category." });
+        setFeedback({
+          tone: "error",
+          message: payload?.error ?? "Unable to save subcategory.",
+        });
         return;
       }
 
       setFeedback({
         tone: "success",
-        message: draft.categoryId ? "Category updated." : "Category created.",
+        message: draft.categoryId
+          ? "Subcategory updated."
+          : "Subcategory created.",
       });
       setDraft(null);
       refresh();
@@ -134,7 +150,10 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
       }
 
       if (!response.ok) {
-        setFeedback({ tone: "error", message: payload?.error ?? "Unable to delete category." });
+        setFeedback({
+          tone: "error",
+          message: payload?.error ?? "Unable to delete subcategory.",
+        });
         return;
       }
 
@@ -156,7 +175,10 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
       const payload = await response.json().catch(() => null);
 
       if (!response.ok) {
-        setFeedback({ tone: "error", message: payload?.error ?? "Unable to delete category." });
+        setFeedback({
+          tone: "error",
+          message: payload?.error ?? "Unable to delete subcategory.",
+        });
         return;
       }
 
@@ -174,7 +196,7 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
     <>
       <Button type="button" size="sm" onClick={() => setOpen(true)} className="gap-2">
         <Pencil className="size-4" />
-        Manage categories
+        Manage subcategories
       </Button>
 
       <div
@@ -186,7 +208,7 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
       >
         <button
           type="button"
-          aria-label="Close category manager"
+          aria-label="Close subcategory manager"
           className={cn(
             "absolute inset-0 bg-slate-950/55 backdrop-blur-sm transition-opacity",
             open ? "opacity-100" : "opacity-0",
@@ -199,16 +221,16 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
             "absolute right-0 top-0 flex h-full w-full max-w-lg flex-col overflow-hidden border-l border-border bg-card transition-transform duration-300",
             open ? "translate-x-0" : "translate-x-full",
           )}
-          aria-label="Category management"
+          aria-label="Subcategory management"
         >
           <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-5">
             <div className="min-w-0">
               <p className="font-mono text-xs uppercase tracking-[0.2em] text-emerald-500">
-                Category catalog
+                Subcategory catalog
               </p>
               <p className="mt-1 text-sm text-slate-400">
-                Add, rename, recolor, or remove categories. Edits are versioned and apply
-                across rules, overrides, and dashboards.
+                Add, rename, recolor, or remove subcategories. Edits are
+                versioned and apply across rules, overrides, and dashboards.
               </p>
             </div>
             <Button variant="ghost" size="sm" aria-label="Close" onClick={closePanel}>
@@ -237,8 +259,8 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
                 </p>
                 <p className="break-words text-xs text-amber-400/80">
                   {pendingDelete.references.transactions} transaction(s) and{" "}
-                  {pendingDelete.references.rules} rule(s) currently use this category. Pick a
-                  replacement to move them to.
+                  {pendingDelete.references.rules} rule(s) currently use this
+                  subcategory. Pick a replacement to move them to.
                 </p>
                 <Select
                   value={pendingDelete.reassignTo}
@@ -247,7 +269,7 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
                       current ? { ...current, reassignTo: event.target.value } : current,
                     )
                   }
-                  aria-label="Reassign to category"
+                  aria-label="Reassign to subcategory"
                 >
                   {reassignOptions.map((option) => (
                     <option key={option.id} value={option.id}>
@@ -280,7 +302,7 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
               <div className="space-y-3 rounded-sm border border-border bg-background p-4">
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-medium text-white">
-                    {draft.categoryId ? "Edit category" : "New category"}
+                    {draft.categoryId ? "Edit subcategory" : "New subcategory"}
                   </p>
                   {draft.isSystem ? (
                     <span className="inline-flex items-center gap-1 text-xs text-slate-400">
@@ -290,7 +312,7 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
                 </div>
 
                 <label className="grid gap-1.5 text-xs uppercase tracking-[0.18em] text-slate-500">
-                  Label
+                  Subcategory
                   <Input
                     value={draft.label}
                     onChange={(event) =>
@@ -304,19 +326,32 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
 
                 <div className="grid grid-cols-2 gap-3">
                   <label className="grid gap-1.5 text-xs uppercase tracking-[0.18em] text-slate-500">
-                    Group
-                    <Input
+                    Category
+                    <Select
                       value={draft.group}
                       onChange={(event) =>
                         setDraft((current) =>
                           current ? { ...current, group: event.target.value } : current,
                         )
                       }
-                      placeholder="e.g. Lifestyle"
-                    />
+                      aria-label="Parent category"
+                    >
+                      <option value="">Choose category…</option>
+                      {categoryGroups.map((group) => (
+                        <option key={group.id} value={group.label}>
+                          {group.label}
+                        </option>
+                      ))}
+                      {draft.group &&
+                      !categoryGroups.some(
+                        (group) => group.label === draft.group,
+                      ) ? (
+                        <option value={draft.group}>{draft.group}</option>
+                      ) : null}
+                    </Select>
                   </label>
                   <label className="grid gap-1.5 text-xs uppercase tracking-[0.18em] text-slate-500">
-                    Subcategory
+                    Description
                     <Input
                       value={draft.sublabel}
                       onChange={(event) =>
@@ -324,7 +359,7 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
                           current ? { ...current, sublabel: event.target.value } : current,
                         )
                       }
-                      placeholder="optional"
+                      placeholder="e.g. Restaurants"
                     />
                   </label>
                 </div>
@@ -341,7 +376,7 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
                         )
                       }
                       className="h-9 w-12 cursor-pointer rounded-sm border border-border bg-transparent"
-                      aria-label="Category color"
+                      aria-label="Subcategory color"
                     />
                     <Input
                       value={draft.color}
@@ -362,7 +397,7 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
                     disabled={isSaving || !draft.label.trim() || !draft.group.trim()}
                     onClick={saveDraft}
                   >
-                    {isSaving ? "Saving…" : "Save category"}
+                    {isSaving ? "Saving…" : "Save subcategory"}
                   </Button>
                   <Button type="button" size="sm" variant="ghost" onClick={() => setDraft(null)}>
                     Cancel
@@ -381,7 +416,7 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
                 }}
               >
                 <Plus className="size-4" />
-                Add category
+                Add subcategory
               </Button>
             )}
 
@@ -412,12 +447,18 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
                         </div>
                         <button
                           type="button"
-                          aria-label={`Edit ${category.label}`}
+                          aria-label={`Edit subcategory ${category.label}`}
                           className="rounded-sm p-1.5 text-slate-400 transition-colors hover:bg-white/10 hover:text-white"
                           onClick={() => {
                             setFeedback(null);
                             setPendingDelete(null);
-                            setDraft(toDraft(category));
+                            const parentLabel =
+                              categoryGroups.find(
+                                (group) =>
+                                  normalizeCategoryGroupLabel(group.label) ===
+                                  normalizeCategoryGroupLabel(category.group),
+                              )?.label ?? category.group;
+                            setDraft({ ...toDraft(category), group: parentLabel });
                           }}
                         >
                           <Pencil className="size-4" />
@@ -425,14 +466,14 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
                         {category.isSystem ? (
                           <span
                             className="rounded-sm p-1.5 text-slate-600"
-                            title="System category — cannot be deleted"
+                            title="System subcategory — cannot be deleted"
                           >
                             <Lock className="size-4" />
                           </span>
                         ) : (
                           <button
                             type="button"
-                            aria-label={`Delete ${category.label}`}
+                            aria-label={`Delete subcategory ${category.label}`}
                             disabled={isSaving}
                             className="rounded-sm p-1.5 text-slate-400 transition-colors hover:bg-red-500/15 hover:text-red-400 disabled:opacity-40"
                             onClick={() => requestDelete(category)}

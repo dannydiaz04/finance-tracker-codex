@@ -531,7 +531,7 @@ export const sampleTransactions: Transaction[] = [
     ruleId: null,
     isTransfer: false,
     isDuplicate: false,
-    notes: ["Should probably become its own fee category later."],
+    notes: ["Should probably become its own fee subcategory later."],
     keywordArray: ["atm", "fee"],
     rawPayloadJson: {
       source: "csv",
@@ -544,7 +544,7 @@ export const sampleTransactions: Transaction[] = [
         confidenceScore: 0.55,
         categoryId: "transfers",
         categoryLabel: "Transfers",
-        note: "Low-confidence fallback awaiting category cleanup.",
+        note: "Low-confidence fallback awaiting subcategory cleanup.",
       },
     ],
   },
@@ -724,7 +724,7 @@ export const sampleReviewQueue: ReviewQueueItem[] = [
     currentCategoryId: "uncategorized",
     merchantNorm: "atm fee",
     confidenceScore: 0.55,
-    reason: "Low-confidence fallback category, no explicit fee rule yet.",
+    reason: "Low-confidence fallback subcategory, no explicit fee rule yet.",
   },
 ];
 

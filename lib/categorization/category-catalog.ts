@@ -52,6 +52,29 @@ export function isSystemCategoryId(categoryId: string): boolean {
   return SYSTEM_CATEGORY_IDS.has(categoryId);
 }
 
+export function buildCategoryDefinitionRow(input: {
+  userId: string;
+  category: Category;
+  status: "active" | "archived";
+  isSystem: boolean;
+  now: string;
+}) {
+  return {
+    user_id: input.userId,
+    category_id: input.category.id,
+    label: input.category.label,
+    category_l1: input.category.group,
+    category_l2: input.category.sublabel,
+    color: input.category.color,
+    sort_order: input.category.sortOrder ?? null,
+    status: input.status,
+    is_system: input.isSystem,
+    change_source: "user",
+    updated_at: input.now,
+    created_at: input.now,
+  };
+}
+
 /**
  * Merge the immutable seed catalog with a user's latest definition per category id.
  * Active user rows upsert (override seed or add new); archived rows remove the category

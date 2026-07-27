@@ -9,12 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import {
-  getCategoryGroups,
   resolveCategoryGroup,
 } from "@/lib/categorization/category-catalog";
+import { normalizeCategoryGroupLabel } from "@/lib/categorization/category-group-catalog";
 import type {
   Account,
   Category,
+  CategoryGroup,
   TransactionFilters,
   TransactionSearchSuggestion,
 } from "@/lib/types/finance";
@@ -23,6 +24,7 @@ import { formatCompactCurrency } from "@/lib/utils";
 type TransactionFiltersProps = {
   accounts: Account[];
   categories: Category[];
+  categoryGroups: CategoryGroup[];
   initialFilters: TransactionFilters;
   suggestions: TransactionSearchSuggestion[];
 };
@@ -30,6 +32,7 @@ type TransactionFiltersProps = {
 export function TransactionFilters({
   accounts,
   categories,
+  categoryGroups,
   initialFilters,
   suggestions,
 }: TransactionFiltersProps) {
@@ -37,10 +40,23 @@ export function TransactionFilters({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const initialCategoryId = initialFilters.categoryIds?.[0] ?? "";
+  const requestedCategoryGroupId = initialFilters.categoryGroupIds?.[0] ?? "";
+  const resolvedInitialCategoryGroup = resolveCategoryGroup(
+    initialCategoryId,
+    categories,
+  );
+  const initialCategoryGroupId =
+    categoryGroups.find((group) => group.id === requestedCategoryGroupId)?.id ??
+    categoryGroups.find(
+      (group) =>
+        normalizeCategoryGroupLabel(group.label) ===
+        normalizeCategoryGroupLabel(resolvedInitialCategoryGroup),
+    )?.id ??
+    "";
   type FormState = {
     query: string;
     accountId: string;
-    categoryGroup: string;
+    categoryGroupId: string;
     categoryId: string;
     direction: NonNullable<TransactionFilters["direction"]>;
     transactionClass: NonNullable<TransactionFilters["transactionClass"]>;
@@ -55,9 +71,7 @@ export function TransactionFilters({
   const [formState, setFormState] = useState<FormState>({
     query: initialFilters.query ?? "",
     accountId: initialFilters.accountIds?.[0] ?? "",
-    categoryGroup:
-      initialFilters.categoryGroups?.[0] ??
-      resolveCategoryGroup(initialCategoryId, categories),
+    categoryGroupId: initialCategoryGroupId,
     categoryId: initialCategoryId,
     direction: initialFilters.direction ?? "all",
     transactionClass: initialFilters.transactionClass ?? "all",
@@ -75,14 +89,20 @@ export function TransactionFilters({
     excludePlaid: initialFilters.excludePlaid ?? false,
   });
 
-  const categoryGroups = useMemo(() => getCategoryGroups(categories), [categories]);
-  const subcategoryOptions = useMemo(
-    () =>
-      categories.filter(
-        (category) => category.group.trim() === formState.categoryGroup,
-      ),
-    [categories, formState.categoryGroup],
+  const selectedCategoryGroup = categoryGroups.find(
+    (group) => group.id === formState.categoryGroupId,
   );
+  const subcategoryOptions = useMemo(() => {
+    if (!selectedCategoryGroup) {
+      return [];
+    }
+
+    return categories.filter(
+      (category) =>
+        normalizeCategoryGroupLabel(category.group) ===
+        normalizeCategoryGroupLabel(selectedCategoryGroup.label),
+    );
+  }, [categories, selectedCategoryGroup]);
 
   const updateField = (field: keyof FormState, value: string | boolean) => {
     setFormState((current) => ({
@@ -91,14 +111,20 @@ export function TransactionFilters({
     }));
   };
 
-  const updateCategoryGroup = (categoryGroup: string) => {
+  const updateCategoryGroup = (categoryGroupId: string) => {
+    const categoryGroup = categoryGroups.find(
+      (group) => group.id === categoryGroupId,
+    );
+
     setFormState((current) => ({
       ...current,
-      categoryGroup,
+      categoryGroupId,
       categoryId: categories.some(
         (category) =>
           category.id === current.categoryId &&
-          category.group.trim() === categoryGroup,
+          categoryGroup &&
+          normalizeCategoryGroupLabel(category.group) ===
+            normalizeCategoryGroupLabel(categoryGroup.label),
       )
         ? current.categoryId
         : "",
@@ -132,7 +158,7 @@ export function TransactionFilters({
           return;
         }
 
-        if (key === "categoryGroup") {
+        if (key === "categoryGroupId") {
           params.set("categoryGroups", value);
           return;
         }
@@ -194,14 +220,14 @@ export function TransactionFilters({
             Category
           </label>
           <Select
-            value={formState.categoryGroup}
+            value={formState.categoryGroupId}
             onChange={(event) => updateCategoryGroup(event.target.value)}
             aria-label="Category"
           >
             <option value="">All categories</option>
             {categoryGroups.map((group) => (
-              <option key={group} value={group}>
-                {group}
+              <option key={group.id} value={group.id}>
+                {group.label}
               </option>
             ))}
           </Select>
@@ -215,10 +241,10 @@ export function TransactionFilters({
             value={formState.categoryId}
             onChange={(event) => updateField("categoryId", event.target.value)}
             aria-label="Subcategory"
-            disabled={!formState.categoryGroup}
+            disabled={!formState.categoryGroupId}
           >
             <option value="">
-              {formState.categoryGroup
+              {formState.categoryGroupId
                 ? "All subcategories"
                 : "Choose category first"}
             </option>
@@ -380,7 +406,7 @@ export function TransactionFilters({
             const resetState: FormState = {
               query: "",
               accountId: "",
-              categoryGroup: "",
+              categoryGroupId: "",
               categoryId: "",
               direction: "all",
               transactionClass: "all",

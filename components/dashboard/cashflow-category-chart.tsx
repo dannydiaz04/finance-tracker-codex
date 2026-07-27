@@ -61,9 +61,9 @@ export function CashflowCategoryChart({
         <div className="space-y-1.5">
           <CardTitle>Where the money went</CardTitle>
           <CardDescription>
-            Cash flow split by category for the current scope. Transfers and card
+            Cash flow split by subcategory for the current scope. Transfers and card
             payments are excluded, so every bar is money that actually left or
-            entered. Select a category to narrow the whole page to it.
+            entered. Select a subcategory to narrow the whole page to it.
           </CardDescription>
         </div>
         <Badge className="shrink-0 border-red-500/40 text-red-400">
@@ -74,7 +74,7 @@ export function CashflowCategoryChart({
         {slices.length === 0 ? (
           <div className="rounded-sm border border-border bg-background p-4 text-sm text-slate-400">
             No categorized movement in this scope. Widen the time range or clear
-            the category filter.
+            the subcategory filter.
           </div>
         ) : (
           <>
@@ -94,7 +94,7 @@ export function CashflowCategoryChart({
                 </div>
                 <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-slate-500">
                   Outflow composition · {composition.length}{" "}
-                  {composition.length === 1 ? "category" : "categories"}
+                  {composition.length === 1 ? "subcategory" : "subcategories"}
                 </p>
               </div>
             ) : null}

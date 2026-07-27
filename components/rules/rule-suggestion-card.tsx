@@ -68,6 +68,9 @@ export function RuleSuggestionCard({
     null,
   );
   const [isPending, startTransition] = useTransition();
+  const currentSubcategory = categories.find(
+    (category) => category.id === suggestion.categoryId,
+  );
 
   const openEditor = () => {
     setDraft(toDraft(suggestion));
@@ -181,7 +184,7 @@ export function RuleSuggestionCard({
 
           <div className="grid gap-3 md:grid-cols-2">
             <label className="grid gap-1 text-xs text-slate-400">
-              Category
+              Subcategory
               <Select
                 value={draft.categoryId}
                 onChange={(event) =>
@@ -191,7 +194,7 @@ export function RuleSuggestionCard({
               >
                 {categories.map((category) => (
                   <option key={category.id} value={category.id}>
-                    {category.label}
+                    {category.group} — {category.label}
                   </option>
                 ))}
               </Select>
@@ -247,7 +250,11 @@ export function RuleSuggestionCard({
       ) : (
         <>
           <div className="mt-3 flex flex-wrap gap-2">
-            <Badge>{suggestion.categoryLabel}</Badge>
+            <Badge>
+              {currentSubcategory
+                ? `${currentSubcategory.group} — ${currentSubcategory.label}`
+                : suggestion.categoryLabel}
+            </Badge>
             <Badge>{suggestion.matchStrategy.replaceAll("_", " ")}</Badge>
             <Badge>{suggestion.matchValue}</Badge>
           </div>

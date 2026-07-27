@@ -67,12 +67,12 @@ export function planRuleRevision(input: {
 
   if (dedupe.status === "exists") {
     throw new RuleRevisionConflictError(
-      "Another active rule already uses this match and category. Edit that rule instead.",
+      "Another active rule already uses this match and subcategory. Edit that rule instead.",
     );
   }
   if (dedupe.status === "conflict") {
     throw new RuleRevisionConflictError(
-      "Another active rule already uses this match for a different category.",
+      "Another active rule already uses this match for a different subcategory.",
     );
   }
 

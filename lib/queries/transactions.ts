@@ -1,5 +1,6 @@
 import "server-only";
 
+import { normalizeCategoryGroupLabel } from "@/lib/categorization/category-group-catalog";
 import { normalizeDescription } from "@/lib/categorization/normalize";
 import { getCurrentUserId } from "@/lib/auth/session";
 import {
@@ -71,8 +72,10 @@ function matchesFilters(transaction: Transaction, filters: TransactionFilters) {
   }
 
   if (
-    filters.categoryGroups?.length &&
-    !filters.categoryGroups.includes(transaction.categoryGroup)
+    filters.categoryGroupLabels?.length &&
+    !filters.categoryGroupLabels
+      .map(normalizeCategoryGroupLabel)
+      .includes(normalizeCategoryGroupLabel(transaction.categoryGroup))
   ) {
     return false;
   }
@@ -268,7 +271,10 @@ const transactionBaseQuery = `
       OR merchant_norm LIKE CONCAT('%', @query, '%')
     )
     AND (NOT @hasAccountIds OR account_id IN UNNEST(@accountIds))
-    AND (NOT @hasCategoryGroups OR category_group IN UNNEST(@categoryGroups))
+    AND (
+      NOT @hasCategoryGroups
+      OR LOWER(TRIM(category_group)) IN UNNEST(@categoryGroups)
+    )
     AND (NOT @hasCategoryIds OR derived_category_id IN UNNEST(@categoryIds))
     AND (@merchant = '' OR merchant_norm LIKE CONCAT('%', @merchant, '%'))
     AND (@direction = '' OR direction = @direction)

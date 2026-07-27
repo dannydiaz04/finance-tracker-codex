@@ -37,7 +37,7 @@ export function normalizeTransactionFilters(
   return {
     query: getSingleValue(searchParams.query)?.trim() || undefined,
     accountIds: getStringArray(searchParams.accountIds),
-    categoryGroups: getStringArray(searchParams.categoryGroups),
+    categoryGroupIds: getStringArray(searchParams.categoryGroups),
     categoryIds: getStringArray(searchParams.categoryIds),
     merchant: getSingleValue(searchParams.merchant)?.trim() || undefined,
     direction:
@@ -73,7 +73,9 @@ export function scopeToTransactionFilters(
 
 export function buildTransactionQueryParams(filters: TransactionFilters) {
   const accountIds = filters.accountIds ?? [];
-  const categoryGroups = filters.categoryGroups ?? [];
+  const categoryGroups = (filters.categoryGroupLabels ?? []).map((group) =>
+    group.trim().toLowerCase(),
+  );
   const categoryIds = filters.categoryIds ?? [];
 
   return {

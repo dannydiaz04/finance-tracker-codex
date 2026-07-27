@@ -141,7 +141,7 @@ export async function PATCH(
     const categories = await getCategories();
     const category = categories.find((item) => item.id === payload.categoryId);
     if (!category) {
-      return NextResponse.json({ error: "Unknown category." }, { status: 400 });
+      return NextResponse.json({ error: "Unknown subcategory." }, { status: 400 });
     }
 
     const guarded = applyRuleGuardrails({
