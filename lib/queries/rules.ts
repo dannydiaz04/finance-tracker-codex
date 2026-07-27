@@ -31,6 +31,15 @@ type RawRuleSuggestion = Omit<
   reviewedAt: unknown;
 };
 
+type RawReviewQueueItem = Omit<
+  ReviewQueueItem,
+  "amount" | "postedAt" | "confidenceScore"
+> & {
+  amount: unknown;
+  postedAt: unknown;
+  confidenceScore: unknown;
+};
+
 type RawInternalMovementReconciliationItem = Omit<
   InternalMovementReconciliationItem,
   "postedAt" | "signedAmount" | "dayDelta" | "amountDelta"
@@ -75,7 +84,7 @@ export async function getLowConfidenceReviewItems(timeFilter?: TimeFilter) {
   const userId = await getCurrentUserId();
   const projectId = getBigQueryProjectId() ?? "project";
   const rows = userId
-    ? await runBigQueryQuery<ReviewQueueItem>(
+    ? await runBigQueryQuery<RawReviewQueueItem>(
         `
       SELECT
         review_queue.transaction_id AS transactionId,
@@ -103,7 +112,14 @@ export async function getLowConfidenceReviewItems(timeFilter?: TimeFilter) {
       )
     : null;
 
-  return rows ?? filterByPostedAt(sampleReviewQueue, timeFilter ?? { preset: "all" });
+  return rows
+    ? rows.map((row) => ({
+        ...row,
+        amount: coerceNumber(row.amount),
+        postedAt: coerceDateString(row.postedAt),
+        confidenceScore: coerceNumber(row.confidenceScore),
+      }))
+    : filterByPostedAt(sampleReviewQueue, timeFilter ?? { preset: "all" });
 }
 
 export async function getRuleSuggestions() {
