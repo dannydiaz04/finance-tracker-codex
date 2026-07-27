@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 
@@ -18,9 +18,14 @@ import {
 } from "@/lib/queries/rules";
 import { getTransactionById } from "@/lib/queries/transactions";
 import type { Rule } from "@/lib/types/finance";
+import {
+  refreshWarehouseMarts,
+  summarizeWarehouseRefresh,
+} from "@/lib/warehouse/dataform-refresh";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 
 const booleanLikeSchema = z.preprocess(
   (value) => value === true || value === "true" || value === "on" || value === "1",
@@ -256,6 +261,18 @@ export async function POST(request: NextRequest) {
         ruleSuggestionError =
           error instanceof Error ? error.message : "Unable to save rule suggestion.";
       }
+    }
+
+    if (overridePersisted) {
+      // The saved transaction is visible immediately through the live override overlay.
+      // Rebuild the canonical facts after responding so active rules and downstream
+      // reports catch up without making the user wait for Dataform.
+      after(async () => {
+        const warehouseRefresh = await refreshWarehouseMarts();
+        console.info("[category:override] warehouse refresh complete", {
+          warehouseRefresh: summarizeWarehouseRefresh(warehouseRefresh),
+        });
+      });
     }
 
     return NextResponse.json({
