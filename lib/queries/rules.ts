@@ -169,9 +169,11 @@ export async function getRuleSuggestions() {
           WHERE user_id = @userId
         )
         WHERE suggestion_rank = 1
-          AND status = "pending"
-        ORDER BY created_at DESC
-        LIMIT 25
+          AND status IN ("pending", "accepted", "dismissed")
+        ORDER BY
+          IF(status = "pending", 0, 1),
+          COALESCE(reviewed_at, updated_at) DESC
+        LIMIT 50
       `,
         { userId },
       );

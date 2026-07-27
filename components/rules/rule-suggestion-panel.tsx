@@ -1,12 +1,17 @@
 "use client";
 
-import { CheckCircle2, Sparkles, XCircle } from "lucide-react";
-import { useState } from "react";
+import { CheckCircle2, Pencil, Sparkles, XCircle } from "lucide-react";
+import { useState, useTransition } from "react";
 
 import { RuleSuggestionCard } from "@/components/rules/rule-suggestion-card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { RuleSuggestionResolution } from "@/lib/categorization/rule-suggestion-state";
+import {
+  type RuleSuggestionActionResponse,
+  type RuleSuggestionResolution,
+  updateSuggestionReviewStatus,
+} from "@/lib/categorization/rule-suggestion-state";
 import type { Category, RuleSuggestion } from "@/lib/types/finance";
 
 type RuleSuggestionPanelProps = {
@@ -15,6 +20,7 @@ type RuleSuggestionPanelProps = {
 };
 
 type ResolutionNotice = {
+  suggestionId: string;
   ruleName: string;
   resolution: RuleSuggestionResolution;
 };
@@ -23,30 +29,84 @@ export function RuleSuggestionPanel({
   suggestions,
   categories,
 }: RuleSuggestionPanelProps) {
-  const [pending, setPending] = useState(suggestions);
+  const [items, setItems] = useState(suggestions);
   const [notice, setNotice] = useState<ResolutionNotice | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [isReopening, startReopening] = useTransition();
+  const pending = items.filter((suggestion) => suggestion.status === "pending");
+  const reviewed = items.filter(
+    (suggestion) =>
+      suggestion.status !== "pending" &&
+      suggestion.suggestionId !== notice?.suggestionId,
+  );
 
   const resolveSuggestion = (
     suggestion: RuleSuggestion,
     resolution: RuleSuggestionResolution,
   ) => {
-    // Remove the item from the review bucket immediately. BigQuery's append-only
-    // suggestion status can take a few seconds to disappear from a refreshed query.
-    setPending((current) =>
-      current.filter((item) => item.suggestionId !== suggestion.suggestionId),
+    const now = new Date().toISOString();
+    setItems((current) =>
+      current.map((item) =>
+        item.suggestionId === suggestion.suggestionId
+          ? updateSuggestionReviewStatus(item, resolution.state, now)
+          : item,
+      ),
     );
-    setNotice({ ruleName: suggestion.ruleName, resolution });
+    setNotice({
+      suggestionId: suggestion.suggestionId,
+      ruleName: suggestion.ruleName,
+      resolution,
+    });
+    setActionError(null);
   };
 
   const accepted = notice?.resolution.state === "accepted";
 
   const updateSuggestion = (updated: RuleSuggestion) => {
-    setPending((current) =>
+    setItems((current) =>
       current.map((item) =>
         item.suggestionId === updated.suggestionId ? updated : item,
       ),
     );
   };
+
+  const reopenSuggestion = (suggestion: RuleSuggestion) => {
+    setActionError(null);
+    startReopening(async () => {
+      const response = await fetch(
+        `/api/rule-suggestions/${suggestion.suggestionId}`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ action: "reopen" }),
+        },
+      );
+      const payload = (await response.json().catch(() => null)) as
+        | RuleSuggestionActionResponse
+        | null;
+
+      if (!response.ok) {
+        setActionError(payload?.error ?? "Unable to reopen this review.");
+        return;
+      }
+
+      const now = new Date().toISOString();
+      setItems((current) =>
+        current.map((item) =>
+          item.suggestionId === suggestion.suggestionId
+            ? updateSuggestionReviewStatus(item, "pending", now)
+            : item,
+        ),
+      );
+      setNotice((current) =>
+        current?.suggestionId === suggestion.suggestionId ? null : current,
+      );
+    });
+  };
+
+  const noticeSuggestion = notice
+    ? items.find((item) => item.suggestionId === notice.suggestionId)
+    : null;
 
   return (
     <Card tone="behavior">
@@ -93,15 +153,30 @@ export function RuleSuggestionPanel({
                   </p>
                 </div>
               </div>
-              <Badge
-                className={
-                  accepted
-                    ? "border-emerald-500/40 text-emerald-400"
-                    : "border-slate-600 text-slate-400"
-                }
-              >
-                {accepted ? "Active" : "Dismissed"}
-              </Badge>
+              <div className="flex shrink-0 items-center gap-2">
+                <Badge
+                  className={
+                    accepted
+                      ? "border-emerald-500/40 text-emerald-400"
+                      : "border-slate-600 text-slate-400"
+                  }
+                >
+                  {accepted ? "Active" : "Dismissed"}
+                </Badge>
+                {noticeSuggestion ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="gap-1.5"
+                    disabled={isReopening}
+                    onClick={() => reopenSuggestion(noticeSuggestion)}
+                  >
+                    <Pencil className="size-3.5" />
+                    Edit review
+                  </Button>
+                ) : null}
+              </div>
             </div>
           </div>
         ) : null}
@@ -120,6 +195,77 @@ export function RuleSuggestionPanel({
             Review queue clear — no learned rules are waiting for approval.
           </p>
         ) : null}
+
+        {reviewed.length > 0 ? (
+          <div className="space-y-3 border-t border-border pt-4">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                Recently reviewed
+              </p>
+              <Badge>{reviewed.length} reviewed</Badge>
+            </div>
+            {reviewed.map((suggestion) => {
+              const subcategory = categories.find(
+                (category) => category.id === suggestion.categoryId,
+              );
+              const wasAccepted = suggestion.status === "accepted";
+
+              return (
+                <div
+                  key={suggestion.suggestionId}
+                  className="rounded-sm border border-border bg-background px-4 py-4"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-medium text-white">{suggestion.ruleName}</p>
+                      <p className="mt-1 text-sm text-slate-400">
+                        {suggestion.ruleDescription}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Badge
+                        className={
+                          wasAccepted
+                            ? "border-emerald-500/40 text-emerald-400"
+                            : "border-slate-600 text-slate-400"
+                        }
+                      >
+                        {wasAccepted ? "Accepted" : "Dismissed"}
+                      </Badge>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="gap-1.5"
+                        disabled={isReopening}
+                        onClick={() => reopenSuggestion(suggestion)}
+                      >
+                        <Pencil className="size-3.5" />
+                        Edit review
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Badge>
+                      {subcategory
+                        ? `${subcategory.group} — ${subcategory.label}`
+                        : suggestion.categoryLabel}
+                    </Badge>
+                    <Badge>{suggestion.matchStrategy.replaceAll("_", " ")}</Badge>
+                    <Badge>{suggestion.matchValue}</Badge>
+                  </div>
+                  <p className="mt-3 text-xs text-slate-500">
+                    {wasAccepted
+                      ? "Reopen to revise this decision; the current active rule remains in effect until you accept the corrected review."
+                      : "Reopen to change or accept this dismissed suggestion."}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        ) : null}
+
+        {actionError ? <p className="text-xs text-red-400">{actionError}</p> : null}
       </CardContent>
     </Card>
   );

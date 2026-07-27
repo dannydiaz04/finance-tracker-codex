@@ -28,7 +28,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
 const actionSchema = z.object({
-  action: z.enum(["accept", "dismiss"]),
+  action: z.enum(["accept", "dismiss", "reopen"]),
 });
 
 const suggestionUpdateSchema = z.object({
@@ -39,6 +39,8 @@ const suggestionUpdateSchema = z.object({
   matchStrategy: z.enum(["merchant_exact", "merchant_contains", "description_regex"]),
   matchValue: z.string().min(1),
 });
+
+type SuggestionStatus = "pending" | "accepted" | "dismissed";
 
 type RawSuggestion = {
   suggestion_id: string;
@@ -51,6 +53,7 @@ type RawSuggestion = {
   rule_name: string;
   rule_description: string;
   source: string;
+  status: SuggestionStatus;
   note: string | null;
   created_at: string;
 };
@@ -75,6 +78,7 @@ async function loadSuggestion(suggestionId: string, userId: string) {
         rule_name,
         rule_description,
         source,
+        status,
         note,
         CAST(created_at AS STRING) AS created_at
       FROM \`${projectId}.ops_finance.category_rule_suggestions\`
@@ -85,7 +89,7 @@ async function loadSuggestion(suggestionId: string, userId: string) {
           ORDER BY updated_at DESC
         ) = 1
         AND suggestion_id = @suggestionId
-        AND status = "pending"
+        AND status IN ("pending", "accepted", "dismissed")
     `,
     { suggestionId, userId },
   );
@@ -99,7 +103,7 @@ async function insertSuggestionStatus({
   userId,
 }: {
   suggestion: RawSuggestion;
-  status: "accepted" | "dismissed";
+  status: SuggestionStatus;
   userId: string;
 }) {
   const now = new Date().toISOString();
@@ -121,9 +125,37 @@ async function insertSuggestionStatus({
       note: suggestion.note,
       created_at: suggestion.created_at,
       updated_at: now,
-      reviewed_at: now,
+      reviewed_at: status === "pending" ? null : now,
     },
   ]);
+}
+
+function disabledRuleRow(rule: Rule, userId: string, now: string) {
+  return {
+    user_id: userId,
+    rule_id: rule.id,
+    name: rule.name,
+    description: rule.description,
+    priority: rule.priority,
+    enabled: false,
+    category_id: rule.categoryId,
+    category_label: rule.categoryLabel,
+    match_strategy: rule.matchStrategy,
+    match_value: rule.matchValue,
+    confidence_boost: rule.confidenceBoost,
+    hit_rate: rule.hitRate,
+    last_matched_at: rule.lastMatchedAt ?? null,
+    created_at: now,
+  };
+}
+
+function scheduleSuggestionRefresh(event: "accepted" | "dismissed") {
+  after(async () => {
+    const warehouseRefresh = await refreshWarehouseMarts();
+    console.info(`[rule-suggestion:${event}] warehouse refresh complete`, {
+      warehouseRefresh: summarizeWarehouseRefresh(warehouseRefresh),
+    });
+  });
 }
 
 export async function PATCH(
@@ -168,7 +200,7 @@ export async function PATCH(
     }
 
     const suggestion = await loadSuggestion(suggestionId, userId);
-    if (!suggestion) {
+    if (!suggestion || suggestion.status !== "pending") {
       return NextResponse.json(
         { error: "Pending rule suggestion was not found." },
         { status: 404 },
@@ -236,8 +268,14 @@ export async function POST(
     const payload = actionSchema.parse(await request.json());
 
     if (!isBigQueryConfigured()) {
+      const status =
+        payload.action === "reopen"
+          ? "pending"
+          : payload.action === "accept"
+            ? "accepted"
+            : "dismissed";
       return NextResponse.json({
-        status: payload.action === "accept" ? "accepted" : "dismissed",
+        status,
         persisted: false,
       });
     }
@@ -246,14 +284,44 @@ export async function POST(
 
     if (!suggestion) {
       return NextResponse.json(
-        { error: "Pending rule suggestion was not found." },
+        { error: "Rule suggestion was not found." },
         { status: 404 },
       );
     }
 
+    if (payload.action === "reopen") {
+      if (suggestion.status !== "pending") {
+        await insertSuggestionStatus({ suggestion, status: "pending", userId });
+      }
+      return NextResponse.json({ status: "pending", persisted: true });
+    }
+
+    if (suggestion.status !== "pending") {
+      return NextResponse.json(
+        { error: "This suggestion was already reviewed. Reopen it before making changes." },
+        { status: 409 },
+      );
+    }
+
+    const existingRules = await getRules();
+    const learnedRuleId = `learned-${suggestion.suggestion_id}`;
+    const existingLearnedRule = existingRules.find(
+      (rule) => rule.id === learnedRuleId,
+    );
+
     if (payload.action === "dismiss") {
+      if (existingLearnedRule) {
+        await insertBigQueryRows("ops_finance", "category_rules", [
+          disabledRuleRow(existingLearnedRule, userId, new Date().toISOString()),
+        ]);
+        scheduleSuggestionRefresh("dismissed");
+      }
       await insertSuggestionStatus({ suggestion, status: "dismissed", userId });
-      return NextResponse.json({ status: "dismissed", persisted: true });
+      return NextResponse.json({
+        status: "dismissed",
+        persisted: true,
+        revised: Boolean(existingLearnedRule),
+      });
     }
 
     // Guard + dedupe at the REAL category_rules write boundary — the suggestion draft is
@@ -271,7 +339,6 @@ export async function POST(
       throw error;
     }
 
-    const existingRules = await getRules();
     const dedupe = dedupePlan({
       existingRules: existingRules.map((item) => ({
         ruleId: item.id,
@@ -285,43 +352,47 @@ export async function POST(
       categoryId: suggestion.category_id,
     });
 
-    // An identical active rule already exists — accept the suggestion without writing a
-    // duplicate (idempotent against double-clicks / retries).
-    if (dedupe.status === "exists") {
+    const dedupeTargetsLearnedRule =
+      dedupe.conflictRuleId === learnedRuleId;
+
+    // An identical active rule already exists. When this is a reopened learned rule,
+    // append a corrected version below; otherwise avoid writing a duplicate.
+    if (dedupe.status === "exists" && !dedupeTargetsLearnedRule) {
+      if (existingLearnedRule) {
+        await insertBigQueryRows("ops_finance", "category_rules", [
+          disabledRuleRow(existingLearnedRule, userId, new Date().toISOString()),
+        ]);
+        scheduleSuggestionRefresh("accepted");
+      }
       await insertSuggestionStatus({ suggestion, status: "accepted", userId });
-      return NextResponse.json({ status: "accepted", persisted: true, dedupe: "exists", rule: null });
+      return NextResponse.json({
+        status: "accepted",
+        persisted: true,
+        dedupe: "exists",
+        revised: Boolean(existingLearnedRule),
+        rule: null,
+      });
     }
 
     const now = new Date().toISOString();
 
     // Contradictory rule for the same merchant → disable it before writing the new one.
-    if (dedupe.status === "conflict" && dedupe.conflictRuleId) {
+    if (
+      dedupe.status === "conflict" &&
+      dedupe.conflictRuleId &&
+      dedupe.conflictRuleId !== learnedRuleId
+    ) {
       const conflict = existingRules.find((item) => item.id === dedupe.conflictRuleId);
       if (conflict) {
         await insertBigQueryRows("ops_finance", "category_rules", [
-          {
-            user_id: userId,
-            rule_id: conflict.id,
-            name: conflict.name,
-            description: conflict.description,
-            priority: conflict.priority,
-            enabled: false,
-            category_id: conflict.categoryId,
-            category_label: conflict.categoryLabel,
-            match_strategy: conflict.matchStrategy,
-            match_value: conflict.matchValue,
-            confidence_boost: conflict.confidenceBoost,
-            hit_rate: conflict.hitRate,
-            last_matched_at: conflict.lastMatchedAt ?? null,
-            created_at: now,
-          },
+          disabledRuleRow(conflict, userId, now),
         ]);
       }
     }
 
     const rule = {
       user_id: userId,
-      rule_id: `learned-${suggestion.suggestion_id}`,
+      rule_id: learnedRuleId,
       name: suggestion.rule_name,
       description: suggestion.rule_description,
       priority: suggestion.priority ?? LEARNED_RULE_PRIORITY,
@@ -339,17 +410,13 @@ export async function POST(
     await insertBigQueryRows("ops_finance", "category_rules", [rule]);
     await insertSuggestionStatus({ suggestion, status: "accepted", userId });
 
-    after(async () => {
-      const warehouseRefresh = await refreshWarehouseMarts();
-      console.info("[rule-suggestion:accepted] warehouse refresh complete", {
-        warehouseRefresh: summarizeWarehouseRefresh(warehouseRefresh),
-      });
-    });
+    scheduleSuggestionRefresh("accepted");
 
     return NextResponse.json({
       status: "accepted",
       persisted: true,
       dedupe: dedupe.status,
+      revised: Boolean(existingLearnedRule),
       rule,
     });
   } catch (error) {

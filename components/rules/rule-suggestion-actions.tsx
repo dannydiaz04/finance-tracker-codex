@@ -6,8 +6,8 @@ import { useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
-  type RuleSuggestionAction,
   type RuleSuggestionActionResponse,
+  type RuleSuggestionReviewAction,
   type RuleSuggestionResolution,
   describeSuggestionResolution,
 } from "@/lib/categorization/rule-suggestion-state";
@@ -25,7 +25,7 @@ export function RuleSuggestionActions({
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  const submitAction = (action: RuleSuggestionAction) => {
+  const submitAction = (action: RuleSuggestionReviewAction) => {
     setError(null);
     startTransition(async () => {
       const response = await fetch(`/api/rule-suggestions/${suggestionId}`, {
