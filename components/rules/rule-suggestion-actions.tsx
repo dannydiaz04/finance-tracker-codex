@@ -5,19 +5,27 @@ import { Check, X } from "lucide-react";
 import { useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
+import {
+  type RuleSuggestionAction,
+  type RuleSuggestionActionResponse,
+  type RuleSuggestionResolution,
+  describeSuggestionResolution,
+} from "@/lib/categorization/rule-suggestion-state";
 
 type RuleSuggestionActionsProps = {
   suggestionId: string;
+  onResolved?: (resolution: RuleSuggestionResolution) => void;
 };
 
 export function RuleSuggestionActions({
   suggestionId,
+  onResolved,
 }: RuleSuggestionActionsProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  const submitAction = (action: "accept" | "dismiss") => {
+  const submitAction = (action: RuleSuggestionAction) => {
     setError(null);
     startTransition(async () => {
       const response = await fetch(`/api/rule-suggestions/${suggestionId}`, {
@@ -28,14 +36,16 @@ export function RuleSuggestionActions({
         body: JSON.stringify({ action }),
       });
 
+      const payload = (await response.json().catch(() => null)) as
+        | RuleSuggestionActionResponse
+        | null;
+
       if (!response.ok) {
-        const payload = (await response.json().catch(() => null)) as
-          | { error?: string }
-          | null;
         setError(payload?.error ?? "Unable to update suggestion.");
         return;
       }
 
+      onResolved?.(describeSuggestionResolution({ action, payload }));
       router.refresh();
     });
   };
