@@ -70,23 +70,23 @@ seed_groups as (
   where trim(category_l1) != ""
 )
 select
-  groups.user_id,
-  concat("legacy-", to_hex(md5(groups.normalized_label))) as category_group_id,
-  groups.label,
-  coalesce(groups.color, "#64748b") as color,
+  custom_group.user_id,
+  concat("legacy-", to_hex(md5(custom_group.normalized_label))) as category_group_id,
+  custom_group.label,
+  coalesce(custom_group.color, "#64748b") as color,
   cast(null as int64) as sort_order,
   "active" as status,
   false as is_system,
   "import" as change_source,
   current_timestamp() as updated_at,
   current_timestamp() as created_at
-from active_custom_groups as groups
+from active_custom_groups as custom_group
 left join seed_groups
   using (normalized_label)
 where seed_groups.normalized_label is null
   and not exists (
     select 1
     from ${self()} as existing
-    where existing.user_id = groups.user_id
-      and lower(trim(existing.label)) = groups.normalized_label
+    where existing.user_id = custom_group.user_id
+      and lower(trim(existing.label)) = custom_group.normalized_label
   )
