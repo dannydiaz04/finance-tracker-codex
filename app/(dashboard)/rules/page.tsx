@@ -1,9 +1,10 @@
-import { GitPullRequestDraft, Repeat2, ShieldCheck, Sparkles } from "lucide-react";
+import { GitPullRequestDraft, Repeat2, ShieldCheck } from "lucide-react";
 
 import { PageHeader } from "@/components/dashboard/page-header";
 import { TimeFilterSummary } from "@/components/dashboard/time-filter-summary";
 import { ReviewQueueCard } from "@/components/rules/review-queue-card";
-import { RuleSuggestionCard } from "@/components/rules/rule-suggestion-card";
+import { RuleCard } from "@/components/rules/rule-card";
+import { RuleSuggestionPanel } from "@/components/rules/rule-suggestion-panel";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCategories } from "@/lib/queries/catalog";
@@ -45,53 +46,38 @@ export default async function RulesPage({ searchParams }: RulesPageProps) {
       />
 
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-        <Card>
-          <CardHeader className="flex-row items-center gap-3">
-            <ShieldCheck className="size-5 text-emerald-500" />
-            <CardTitle>Category rules</CardTitle>
+        <Card tone="balance">
+          <CardHeader className="flex-row items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <ShieldCheck className="size-5 text-emerald-500" />
+              <div>
+                <CardTitle>Active rules</CardTitle>
+                <p className="mt-1 text-xs text-slate-500">
+                  Accepted rules currently used by the categorization engine.
+                </p>
+              </div>
+            </div>
+            <Badge className="border-emerald-500/40 text-emerald-400">
+              {rules.length} active
+            </Badge>
           </CardHeader>
           <CardContent className="space-y-3">
             {rules.map((rule) => (
-              <div
-                key={rule.id}
-                className="rounded-sm border border-border bg-background px-4 py-4"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="font-medium text-white">{rule.name}</p>
-                    <p className="mt-1 text-sm text-slate-400">{rule.description}</p>
-                  </div>
-                  <Badge>priority {rule.priority}</Badge>
-                </div>
-                <div className="mt-4 grid gap-2 text-sm text-slate-300 md:grid-cols-3">
-                  <p>Category: {rule.categoryLabel}</p>
-                  <p>Strategy: {rule.matchStrategy.replace("_", " ")}</p>
-                  <p>Hit rate: {(rule.hitRate * 100).toFixed(0)}%</p>
-                </div>
-              </div>
+              <RuleCard key={rule.id} rule={rule} categories={categoryOptions} />
             ))}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex-row items-center gap-3">
-            <Sparkles className="size-5 text-emerald-500" />
-            <CardTitle>Learning suggestions</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {ruleSuggestions.map((suggestion) => (
-              <RuleSuggestionCard
-                key={suggestion.suggestionId}
-                suggestion={suggestion}
-              />
-            ))}
-            {ruleSuggestions.length === 0 ? (
+            {rules.length === 0 ? (
               <p className="rounded-sm border border-border bg-background px-4 py-6 text-sm text-slate-400">
-                No pending learned rules.
+                No active category rules yet.
               </p>
             ) : null}
           </CardContent>
         </Card>
+
+        <RuleSuggestionPanel
+          key={ruleSuggestions.map((suggestion) => suggestion.suggestionId).join("|")}
+          suggestions={ruleSuggestions}
+          categories={categoryOptions}
+        />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">

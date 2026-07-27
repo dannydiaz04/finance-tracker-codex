@@ -113,6 +113,7 @@ async function supersedePriorSuggestions(input: {
       user_id: input.userId,
       suggestion_id: row.suggestion_id,
       transaction_id: row.transaction_id,
+      priority: row.priority,
       category_id: row.category_id,
       category_label: row.category_label,
       match_strategy: row.match_strategy,

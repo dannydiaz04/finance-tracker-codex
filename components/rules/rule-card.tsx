@@ -1,68 +1,51 @@
 "use client";
 
-import { Pencil } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { CheckCircle2, Pencil } from "lucide-react";
 import { type FormEvent, useState, useTransition } from "react";
 
-import { RuleSuggestionActions } from "@/components/rules/rule-suggestion-actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import type { RuleSuggestionResolution } from "@/lib/categorization/rule-suggestion-state";
-import type { Category, Rule, RuleSuggestion } from "@/lib/types/finance";
+import type { Category, Rule } from "@/lib/types/finance";
 
-type RuleSuggestionCardProps = {
-  suggestion: RuleSuggestion;
+type RuleCardProps = {
+  rule: Rule;
   categories: Category[];
-  onUpdated?: (suggestion: RuleSuggestion) => void;
-  onResolved?: (resolution: RuleSuggestionResolution) => void;
 };
 
-type SuggestionDraft = {
-  ruleName: string;
-  ruleDescription: string;
+type RuleDraft = {
+  name: string;
+  description: string;
   priority: string;
   categoryId: string;
   matchStrategy: Rule["matchStrategy"];
   matchValue: string;
 };
 
-type EditableSuggestion = Pick<
-  RuleSuggestion,
-  | "ruleName"
-  | "ruleDescription"
-  | "priority"
-  | "categoryId"
-  | "categoryLabel"
-  | "matchStrategy"
-  | "matchValue"
->;
-
-type SuggestionUpdateResponse = {
+type RuleUpdateResponse = {
   persisted?: boolean;
-  suggestion?: EditableSuggestion;
+  rule?: Rule;
   guardrailNote?: string | null;
   error?: string;
 };
 
-function toDraft(suggestion: RuleSuggestion): SuggestionDraft {
+function toDraft(rule: Rule): RuleDraft {
   return {
-    ruleName: suggestion.ruleName,
-    ruleDescription: suggestion.ruleDescription,
-    priority: String(suggestion.priority),
-    categoryId: suggestion.categoryId,
-    matchStrategy: suggestion.matchStrategy,
-    matchValue: suggestion.matchValue,
+    name: rule.name,
+    description: rule.description,
+    priority: String(rule.priority),
+    categoryId: rule.categoryId,
+    matchStrategy: rule.matchStrategy,
+    matchValue: rule.matchValue,
   };
 }
 
-export function RuleSuggestionCard({
-  suggestion,
-  categories,
-  onUpdated,
-  onResolved,
-}: RuleSuggestionCardProps) {
-  const [draft, setDraft] = useState(() => toDraft(suggestion));
+export function RuleCard({ rule, categories }: RuleCardProps) {
+  const router = useRouter();
+  const [currentRule, setCurrentRule] = useState(rule);
+  const [draft, setDraft] = useState(() => toDraft(rule));
   const [editing, setEditing] = useState(false);
   const [result, setResult] = useState<{ tone: "success" | "error"; message: string } | null>(
     null,
@@ -70,7 +53,7 @@ export function RuleSuggestionCard({
   const [isPending, startTransition] = useTransition();
 
   const openEditor = () => {
-    setDraft(toDraft(suggestion));
+    setDraft(toDraft(currentRule));
     setResult(null);
     setEditing(true);
   };
@@ -85,47 +68,57 @@ export function RuleSuggestionCard({
 
     setResult(null);
     startTransition(async () => {
-      const response = await fetch(`/api/rule-suggestions/${suggestion.suggestionId}`, {
+      const response = await fetch("/api/rules", {
         method: "PATCH",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ ...draft, priority }),
+        body: JSON.stringify({
+          ruleId: currentRule.id,
+          ...draft,
+          priority,
+        }),
       });
-      const payload = (await response.json().catch(() => null)) as
-        | SuggestionUpdateResponse
-        | null;
+      const payload = (await response.json().catch(() => null)) as RuleUpdateResponse | null;
 
-      if (!response.ok || !payload?.suggestion) {
+      if (!response.ok || !payload?.rule) {
         setResult({
           tone: "error",
-          message: payload?.error ?? "Unable to update this suggestion.",
+          message: payload?.error ?? "Unable to update this rule.",
         });
         return;
       }
 
-      const updated = { ...suggestion, ...payload.suggestion };
-      setDraft(toDraft(updated));
+      setCurrentRule(payload.rule);
+      setDraft(toDraft(payload.rule));
       setEditing(false);
       setResult({
         tone: "success",
         message:
           payload.persisted === false
-            ? "Updated locally — connect a warehouse to persist this suggestion."
-            : ["Suggestion updated.", payload.guardrailNote].filter(Boolean).join(" "),
+            ? "Updated locally — connect a warehouse to persist this rule."
+            : [
+                "Rule updated. Matching transactions are refreshing in the background.",
+                payload.guardrailNote,
+              ]
+                .filter(Boolean)
+                .join(" "),
       });
-      onUpdated?.(updated);
+      router.refresh();
     });
   };
 
   return (
-    <div className="rounded-sm border border-amber-500/30 bg-amber-500/[0.03] px-4 py-4">
+    <div className="rounded-sm border border-emerald-500/30 bg-emerald-500/[0.03] px-4 py-4">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <p className="font-medium text-white">{suggestion.ruleName}</p>
-          <p className="mt-1 text-sm text-slate-400">{suggestion.ruleDescription}</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <CheckCircle2 className="size-4 text-emerald-400" />
+            <p className="font-medium text-white">{currentRule.name}</p>
+            <Badge className="border-emerald-500/40 text-emerald-400">Active</Badge>
+          </div>
+          <p className="mt-1 text-sm text-slate-400">{currentRule.description}</p>
         </div>
-        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-          <Badge>priority {suggestion.priority}</Badge>
-          <Badge className="border-amber-500/40 text-amber-400">Needs review</Badge>
+        <div className="flex shrink-0 items-center gap-2">
+          <Badge>priority {currentRule.priority}</Badge>
           <Button
             type="button"
             size="sm"
@@ -146,10 +139,8 @@ export function RuleSuggestionCard({
             <label className="grid gap-1 text-xs text-slate-400">
               Rule name
               <Input
-                value={draft.ruleName}
-                onChange={(event) =>
-                  setDraft((value) => ({ ...value, ruleName: event.target.value }))
-                }
+                value={draft.name}
+                onChange={(event) => setDraft((value) => ({ ...value, name: event.target.value }))}
                 required
               />
             </label>
@@ -171,9 +162,9 @@ export function RuleSuggestionCard({
           <label className="grid gap-1 text-xs text-slate-400">
             Description
             <Input
-              value={draft.ruleDescription}
+              value={draft.description}
               onChange={(event) =>
-                setDraft((value) => ({ ...value, ruleDescription: event.target.value }))
+                setDraft((value) => ({ ...value, description: event.target.value }))
               }
               required
             />
@@ -235,7 +226,7 @@ export function RuleSuggestionCard({
               variant="ghost"
               disabled={isPending}
               onClick={() => {
-                setDraft(toDraft(suggestion));
+                setDraft(toDraft(currentRule));
                 setEditing(false);
                 setResult(null);
               }}
@@ -245,19 +236,14 @@ export function RuleSuggestionCard({
           </div>
         </form>
       ) : (
-        <>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Badge>{suggestion.categoryLabel}</Badge>
-            <Badge>{suggestion.matchStrategy.replaceAll("_", " ")}</Badge>
-            <Badge>{suggestion.matchValue}</Badge>
-          </div>
-          <div className="mt-4">
-            <RuleSuggestionActions
-              suggestionId={suggestion.suggestionId}
-              onResolved={onResolved}
-            />
-          </div>
-        </>
+        <div className="mt-4 grid gap-2 text-sm text-slate-300 md:grid-cols-3">
+          <p>Category: {currentRule.categoryLabel}</p>
+          <p>Strategy: {currentRule.matchStrategy.replaceAll("_", " ")}</p>
+          <p>Hit rate: {(currentRule.hitRate * 100).toFixed(0)}%</p>
+          <p className="break-words md:col-span-3">
+            Match value: <span className="font-mono text-slate-400">{currentRule.matchValue}</span>
+          </p>
+        </div>
       )}
 
       {result ? (

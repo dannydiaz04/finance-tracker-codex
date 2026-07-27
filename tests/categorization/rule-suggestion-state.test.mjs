@@ -8,8 +8,9 @@ test("accepting a new suggestion confirms the rule was saved", () => {
     action: "accept",
     payload: { status: "accepted", persisted: true, dedupe: "new" },
   });
-  assert.equal(resolution.headline, "rule saved");
-  assert.match(resolution.detail, /next warehouse refresh/);
+  assert.equal(resolution.state, "accepted");
+  assert.equal(resolution.headline, "Moved to Active rules");
+  assert.match(resolution.detail, /refreshing in the background/);
 });
 
 test("accepting over a conflicting rule says the old one was replaced", () => {
@@ -25,7 +26,7 @@ test("accepting a duplicate reports that nothing was written twice", () => {
     action: "accept",
     payload: { status: "accepted", persisted: true, dedupe: "exists" },
   });
-  assert.equal(resolution.headline, "accepted");
+  assert.equal(resolution.headline, "Already active");
   assert.match(resolution.detail, /already exists/);
 });
 
@@ -34,7 +35,8 @@ test("dismissing confirms the suggestion will not return", () => {
     action: "dismiss",
     payload: { status: "dismissed", persisted: true },
   });
-  assert.equal(resolution.headline, "dismissed");
+  assert.equal(resolution.state, "dismissed");
+  assert.equal(resolution.headline, "Dismissed");
   assert.match(resolution.detail, /won’t come back/);
 });
 
@@ -51,5 +53,5 @@ test("sample mode is reported as a local-only save", () => {
 
 test("a response without a persisted flag is treated as persisted", () => {
   const resolution = describeSuggestionResolution({ action: "accept", payload: null });
-  assert.equal(resolution.headline, "rule saved");
+  assert.equal(resolution.headline, "Moved to Active rules");
 });
