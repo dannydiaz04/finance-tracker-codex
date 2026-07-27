@@ -40,10 +40,10 @@ export function MonthlyMoneyChart({
             <div
               key={summary.month}
               className={cn(
-                "grid gap-3 rounded-2xl border px-4 py-4 md:grid-cols-[140px_1fr_120px]",
+                "grid gap-3 rounded-sm border px-4 py-3 md:grid-cols-[140px_1fr_120px]",
                 summary.month === selectedMonth
-                  ? "border-cyan-300/30 bg-cyan-400/10"
-                  : "border-white/10 bg-white/[0.03]",
+                  ? "border-emerald-500/50 bg-emerald-500/5"
+                  : "border-border bg-background",
               )}
             >
               <div>
@@ -53,32 +53,37 @@ export function MonthlyMoneyChart({
                 </p>
               </div>
               <div className="grid content-center gap-2">
-                <div className="grid grid-cols-[72px_1fr_auto] items-center gap-3 text-xs text-slate-400">
+                <div className="grid grid-cols-[72px_1fr_auto] items-center gap-3 text-xs text-slate-500">
                   <span>Income</span>
-                  <div className="h-2 overflow-hidden rounded-full bg-white/8">
+                  <div className="h-1.5 overflow-hidden bg-white/5">
                     <div
-                      className="h-full rounded-full bg-emerald-300"
+                      className="h-full bg-emerald-500"
                       style={{ width: `${(summary.income / maxValue) * 100}%` }}
                     />
                   </div>
-                  <span>{formatCompactCurrency(summary.income)}</span>
+                  <span className="font-mono">{formatCompactCurrency(summary.income)}</span>
                 </div>
-                <div className="grid grid-cols-[72px_1fr_auto] items-center gap-3 text-xs text-slate-400">
+                <div className="grid grid-cols-[72px_1fr_auto] items-center gap-3 text-xs text-slate-500">
                   <span>Spend</span>
-                  <div className="h-2 overflow-hidden rounded-full bg-white/8">
+                  <div className="h-1.5 overflow-hidden bg-white/5">
                     <div
-                      className="h-full rounded-full bg-fuchsia-300"
+                      className="h-full bg-red-500"
                       style={{ width: `${(summary.spend / maxValue) * 100}%` }}
                     />
                   </div>
-                  <span>{formatCompactCurrency(summary.spend)}</span>
+                  <span className="font-mono">{formatCompactCurrency(summary.spend)}</span>
                 </div>
               </div>
               <div className="text-left md:text-right">
                 <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
                   Net
                 </p>
-                <p className="mt-1 text-lg font-semibold text-white">
+                <p
+                  className={cn(
+                    "mt-1 font-mono text-lg font-semibold",
+                    summary.net >= 0 ? "text-emerald-400" : "text-red-400",
+                  )}
+                >
                   {formatCurrency(summary.net)}
                 </p>
               </div>

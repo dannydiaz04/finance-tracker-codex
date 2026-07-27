@@ -51,8 +51,8 @@ export function MobileNav() {
   }, []);
 
   return (
-    <nav className="sticky top-0 z-40 overflow-x-auto border-b border-white/10 bg-slate-950/80 backdrop-blur xl:hidden">
-      <div className="flex min-w-max gap-2 px-4 py-3">
+    <nav className="sticky top-0 z-40 overflow-x-auto border-b border-border bg-background xl:hidden">
+      <div className="flex min-w-max gap-1 px-4 py-2">
         {items.map((item) => (
           <Link
             key={item.href}
@@ -60,10 +60,10 @@ export function MobileNav() {
               `${item.href}${timeQueryString ? `?${timeQueryString}` : ""}` as Route
             }
             className={cn(
-              "rounded-full px-3 py-2 text-sm transition-colors",
+              "border-b-2 px-3 py-2 text-sm transition-colors",
               pathname === item.href
-                ? "bg-cyan-400/10 text-cyan-100 ring-1 ring-cyan-300/20"
-                : "text-slate-400 hover:bg-white/[0.04] hover:text-white",
+                ? "border-emerald-500 text-white"
+                : "border-transparent text-slate-500 hover:text-slate-200",
             )}
           >
             {item.label}

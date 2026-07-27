@@ -64,7 +64,7 @@ export function RuleSuggestionActions({
         <X className="size-4" />
         Dismiss
       </Button>
-      {error ? <p className="basis-full text-xs text-rose-200">{error}</p> : null}
+      {error ? <p className="basis-full text-xs text-red-400">{error}</p> : null}
     </div>
   );
 }

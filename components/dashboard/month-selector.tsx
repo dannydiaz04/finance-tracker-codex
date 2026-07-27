@@ -42,9 +42,9 @@ export function MonthSelector({ months, selectedMonth }: MonthSelectorProps) {
   };
 
   return (
-    <div className="grid gap-4 rounded-3xl border border-white/10 bg-white/[0.04] p-4 lg:grid-cols-[1fr_auto] lg:items-center">
+    <div className="grid gap-4 rounded-sm border border-border bg-card p-4 lg:grid-cols-[1fr_auto] lg:items-center">
       <div className="flex items-start gap-3">
-        <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-2.5 text-cyan-200">
+        <div className="rounded-sm border border-border bg-background p-2.5 text-emerald-500">
           <CalendarDays className="size-5" />
         </div>
         <div>

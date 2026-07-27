@@ -41,28 +41,34 @@ export default async function CashflowPage({ searchParams }: CashflowPageProps) 
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="flex-row items-center justify-between gap-3">
-            <CardTitle className="text-base">Inflow</CardTitle>
-            <ArrowUpRight className="size-4 text-emerald-300" />
+            <CardTitle>Inflow</CardTitle>
+            <ArrowUpRight className="size-4 text-emerald-400" />
           </CardHeader>
-          <CardContent className="text-3xl font-semibold text-white">
+          <CardContent className="font-mono text-3xl font-semibold text-emerald-400">
             {formatCurrency(inflow)}
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex-row items-center justify-between gap-3">
-            <CardTitle className="text-base">Outflow</CardTitle>
-            <ArrowDownRight className="size-4 text-fuchsia-300" />
+            <CardTitle>Outflow</CardTitle>
+            <ArrowDownRight className="size-4 text-red-400" />
           </CardHeader>
-          <CardContent className="text-3xl font-semibold text-white">
+          <CardContent className="font-mono text-3xl font-semibold text-red-400">
             {formatCurrency(outflow)}
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex-row items-center justify-between gap-3">
-            <CardTitle className="text-base">Net</CardTitle>
-            <Scale className="size-4 text-cyan-300" />
+            <CardTitle>Net</CardTitle>
+            <Scale className="size-4 text-slate-400" />
           </CardHeader>
-          <CardContent className="text-3xl font-semibold text-white">
+          <CardContent
+            className={
+              net >= 0
+                ? "font-mono text-3xl font-semibold text-emerald-400"
+                : "font-mono text-3xl font-semibold text-red-400"
+            }
+          >
             {formatCurrency(net)}
           </CardContent>
         </Card>

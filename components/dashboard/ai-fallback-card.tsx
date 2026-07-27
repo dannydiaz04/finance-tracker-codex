@@ -100,8 +100,8 @@ export function AiFallbackCard({
     <Card tone="review">
       <CardHeader className="flex-row items-start justify-between gap-3">
         <div className="space-y-2">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Sparkles className="size-4 text-cyan-300" />
+          <CardTitle className="flex items-center gap-2">
+            <Sparkles className="size-4 text-emerald-500" />
             AI fallback
           </CardTitle>
           <CardDescription>
@@ -109,14 +109,14 @@ export function AiFallbackCard({
           </CardDescription>
         </div>
         {source === "sample" ? (
-          <Badge className="border-amber-400/30 bg-amber-400/10 text-amber-100">
+          <Badge className="border-amber-500/40 text-amber-400">
             sample
           </Badge>
         ) : null}
       </CardHeader>
       <CardContent className="space-y-4">
         <div>
-          <p className="text-3xl font-semibold text-white">{count}</p>
+          <p className="font-mono text-3xl font-semibold text-white">{count}</p>
           <p className="mt-1 text-sm text-slate-400">
             low-confidence {count === 1 ? "row" : "rows"} awaiting AI fallback
           </p>
@@ -132,11 +132,11 @@ export function AiFallbackCard({
         </Button>
 
         {!openAiConfigured ? (
-          <p className="text-xs text-amber-200/80">
+          <p className="text-xs text-amber-400/90">
             Set OPENAI_API_KEY to enable AI fallback.
           </p>
         ) : !bigQueryConfigured ? (
-          <p className="text-xs text-amber-200/80">
+          <p className="text-xs text-amber-400/90">
             Connect BigQuery to persist AI suggestions.
           </p>
         ) : null}

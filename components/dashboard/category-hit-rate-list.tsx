@@ -33,17 +33,14 @@ export function CategoryHitRateList({ categories }: CategoryHitRateListProps) {
           return (
             <div
               key={category.categoryId}
-              className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3"
+              className="rounded-sm border border-border bg-background px-4 py-3"
             >
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2.5">
                   <span
                     aria-hidden
-                    className="size-2.5 rounded-full"
-                    style={{
-                      background: `linear-gradient(135deg, ${palette.from}, ${palette.to})`,
-                      boxShadow: `0 0 12px ${palette.from}80`,
-                    }}
+                    className="size-2 rounded-full"
+                    style={{ background: palette.from }}
                   />
                   <p className="text-sm font-medium text-white">
                     {category.label}
@@ -60,9 +57,9 @@ export function CategoryHitRateList({ categories }: CategoryHitRateListProps) {
                       {formatPercent(category.share)}
                     </span>
                   </div>
-                  <div className="h-1.5 overflow-hidden rounded-full bg-white/5">
+                  <div className="h-1.5 overflow-hidden bg-white/5">
                     <div
-                      className={cn("h-full rounded-full", palette.bar)}
+                      className={cn("h-full", palette.bar)}
                       style={{ width: `${sharePercent * 100}%` }}
                     />
                   </div>

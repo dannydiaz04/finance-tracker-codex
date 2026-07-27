@@ -99,11 +99,11 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
         title="Monthly income, spend, categories, and weekday behavior."
         description="The overview centers on posted transaction months so inflow, outflow, spending mix, and weekday patterns answer the same time-scoped question."
         action={
-          <div className="rounded-3xl border border-white/10 bg-white/[0.04] px-5 py-4 text-right">
-            <p className="text-xs uppercase tracking-[0.28em] text-slate-500">
+          <div className="rounded-sm border border-border bg-card px-5 py-4 text-right">
+            <p className="text-xs uppercase tracking-wider text-slate-500">
               Needs review
             </p>
-            <p className="mt-2 text-3xl font-semibold text-white">
+            <p className="mt-2 font-mono text-3xl font-semibold text-white">
               {overview.reviewQueueCount}
             </p>
           </div>
@@ -138,17 +138,17 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
+            <div className="rounded-sm border border-border bg-background p-5">
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <p className="text-sm text-slate-400">
                     {overview.largestExpense.merchant}
                   </p>
-                  <p className="mt-2 text-3xl font-semibold text-white">
+                  <p className="mt-2 font-mono text-3xl font-semibold text-red-400">
                     {formatCurrency(-overview.largestExpense.amount)}
                   </p>
                 </div>
-                <div className="rounded-2xl border border-fuchsia-400/20 bg-fuchsia-400/10 p-3 text-fuchsia-200">
+                <div className="rounded-sm border border-red-500/30 bg-red-500/10 p-3 text-red-400">
                   <ArrowUpRight className="size-5" />
                 </div>
               </div>
@@ -163,17 +163,17 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
               {overview.accounts.map((account) => (
                 <div
                   key={account.id}
-                  className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3"
+                  className="flex items-center justify-between rounded-sm border border-border bg-background px-4 py-3"
                 >
                   <div>
-                    <p className="font-medium text-white">{account.name}</p>
-                    <p className="text-sm text-slate-400">{account.institution}</p>
+                    <p className="text-sm font-medium text-white">{account.name}</p>
+                    <p className="text-xs text-slate-500">{account.institution}</p>
                   </div>
                   <div className="text-right">
-                    <p className="font-medium text-white">
+                    <p className="font-mono text-sm font-medium text-white">
                       {formatCompactCurrency(account.currentBalance)}
                     </p>
-                    <p className="text-sm text-slate-400">
+                    <p className="font-mono text-xs text-slate-500">
                       available {formatCompactCurrency(account.availableBalance)}
                     </p>
                   </div>
@@ -209,28 +209,28 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
             {merchants.map((merchant) => (
               <div
                 key={merchant.merchant}
-                className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4"
+                className="rounded-sm border border-border bg-background px-4 py-3"
               >
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <p className="font-medium text-white">{merchant.merchant}</p>
+                    <p className="text-sm font-medium text-white">{merchant.merchant}</p>
                     <div className="mt-2 flex flex-wrap gap-2">
                       {merchant.likelyRecurring ? (
-                        <Badge className="border-cyan-400/20 bg-cyan-400/10 text-cyan-100">
+                        <Badge className="border-emerald-500/40 text-emerald-400">
                           recurring
                         </Badge>
                       ) : null}
                       <Badge>{merchant.transactions} transactions</Badge>
                     </div>
                   </div>
-                  <p className="text-right text-lg font-semibold text-white">
+                  <p className="text-right font-mono text-lg font-semibold text-white">
                     {formatCurrency(merchant.spend)}
                   </p>
                 </div>
               </div>
             ))}
 
-            <div className="rounded-2xl border border-amber-300/20 bg-amber-300/10 p-4 text-sm text-amber-50">
+            <div className="rounded-sm border border-amber-500/40 bg-background p-4 text-sm text-amber-400">
               <div className="flex items-center gap-2">
                 <CircleAlert className="size-4" />
                 Transfer and fee categories still share one placeholder bucket in the
@@ -244,16 +244,16 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
       <div className="grid gap-4 md:grid-cols-2">
         <Card tone="balance">
           <CardHeader className="flex-row items-center gap-3">
-            <Wallet2 className="size-5 text-cyan-300" />
+            <Wallet2 className="size-5 text-emerald-500" />
             <div>
-              <CardTitle className="text-base">Available cash</CardTitle>
+              <CardTitle>Available cash</CardTitle>
               <CardDescription>
                 Liquid balances on non-credit linked accounts (from Plaid sync).
               </CardDescription>
             </div>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-semibold text-white">
+            <p className="font-mono text-3xl font-semibold text-emerald-400">
               {formatCurrency(overview.availableCash)}
             </p>
           </CardContent>
@@ -261,13 +261,13 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
 
         <Card tone="review">
           <CardHeader>
-            <CardTitle className="text-base">Review posture</CardTitle>
+            <CardTitle>Review posture</CardTitle>
             <CardDescription>
               Pending AI suggestions and low-confidence rows to confirm.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-semibold text-white">
+            <p className="font-mono text-3xl font-semibold text-white">
               {overview.reviewQueueCount} items
             </p>
           </CardContent>

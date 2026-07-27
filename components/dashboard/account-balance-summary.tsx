@@ -42,55 +42,55 @@ export function AccountBalanceSummary({
     <div className="grid gap-4 md:grid-cols-2">
       <Card tone="balance">
         <CardHeader className="flex-row items-center gap-3">
-          <Wallet2 className="size-5 text-emerald-300" />
+          <Wallet2 className="size-5 text-emerald-500" />
           <div>
-            <CardTitle className="text-base">Available to spend</CardTitle>
+            <CardTitle>Available to spend</CardTitle>
             <CardDescription>
               Liquid cash plus unused credit ({context}).
             </CardDescription>
           </div>
         </CardHeader>
         <CardContent className="space-y-1">
-          <p className="text-3xl font-semibold text-white">
+          <p className="font-mono text-3xl font-semibold text-emerald-400">
             {formatCurrency(spendingPower)}
           </p>
-          <p className="text-sm text-slate-400">
+          <p className="font-mono text-sm text-slate-500">
             {formatCompactCurrency(availableCash)} cash +{" "}
             {formatCompactCurrency(availableCredit)} available credit
           </p>
         </CardContent>
       </Card>
 
-      <Card tone="balance">
+      <Card tone="spend">
         <CardHeader className="flex-row items-center gap-3">
-          <CreditCard className="size-5 text-rose-300" />
+          <CreditCard className="size-5 text-red-500" />
           <div>
-            <CardTitle className="text-base">Credit card debt</CardTitle>
+            <CardTitle>Credit card debt</CardTitle>
             <CardDescription>
               Outstanding balance owed on credit cards ({context}).
             </CardDescription>
           </div>
         </CardHeader>
         <CardContent>
-          <p className="text-3xl font-semibold text-white">
+          <p className="font-mono text-3xl font-semibold text-red-400">
             {formatCurrency(debtTotal)}
           </p>
         </CardContent>
       </Card>
 
       {scoped.length > 0 ? (
-        <div className="md:col-span-2 space-y-2">
+        <div className="md:col-span-2 divide-y divide-border rounded-sm border border-border bg-card">
           {scoped.map((account) => {
             const isCredit = account.type === "credit";
 
             return (
               <div
                 key={account.id}
-                className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3"
+                className="flex items-center justify-between px-4 py-3"
               >
                 <div className="min-w-0">
-                  <p className="truncate font-medium text-white">{account.name}</p>
-                  <p className="truncate text-sm text-slate-400">
+                  <p className="truncate text-sm font-medium text-white">{account.name}</p>
+                  <p className="truncate text-xs text-slate-500">
                     {account.institution}
                     {account.mask && account.mask !== "unknown" ? ` · •••• ${account.mask}` : ""}
                   </p>
@@ -98,14 +98,16 @@ export function AccountBalanceSummary({
                 <div className="shrink-0 text-right">
                   <p
                     className={
-                      isCredit ? "font-medium text-rose-300" : "font-medium text-white"
+                      isCredit
+                        ? "font-mono text-sm font-medium text-red-400"
+                        : "font-mono text-sm font-medium text-white"
                     }
                   >
                     {isCredit
                       ? `${formatCompactCurrency(account.currentBalance)} owed`
                       : formatCompactCurrency(account.currentBalance)}
                   </p>
-                  <p className="text-sm text-slate-400">
+                  <p className="font-mono text-xs text-slate-500">
                     {isCredit ? "avail credit " : "avail "}
                     {formatCompactCurrency(account.availableBalance)}
                   </p>

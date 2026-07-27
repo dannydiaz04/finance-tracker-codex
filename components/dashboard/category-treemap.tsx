@@ -54,13 +54,13 @@ function MerchantBars({
               <span className="truncate text-slate-300" title={merchant.merchant}>
                 {merchant.merchant}
               </span>
-              <span className="shrink-0 font-medium text-white">
+              <span className="shrink-0 font-mono font-medium text-white">
                 {formatCompactCurrency(merchant.amount)}
               </span>
             </div>
-            <div className="h-1 overflow-hidden rounded-full bg-white/5">
+            <div className="h-1 overflow-hidden bg-white/5">
               <div
-                className={cn("h-full rounded-full", palette.bar)}
+                className={cn("h-full", palette.bar)}
                 style={{ width: `${(merchant.amount / max) * 100}%` }}
               />
             </div>
@@ -100,22 +100,11 @@ export function CategoryTreemap({
                 initial={{ opacity: 0, scale: 0.96 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: index * 0.05, duration: 0.25 }}
-                className={cn(
-                  "relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] p-4 ring-1 ring-inset transition-shadow",
-                  palette.ring,
-                  palette.glow,
-                )}
+                className="relative overflow-hidden rounded-sm border border-border bg-background p-4"
                 style={{
                   minHeight: `${220 + (category.amount / total) * 160}px`,
                 }}
               >
-                <div
-                  aria-hidden
-                  className="pointer-events-none absolute inset-x-0 top-0 h-24 opacity-30"
-                  style={{
-                    background: `radial-gradient(circle at 20% 0%, ${palette.from}40, transparent 60%)`,
-                  }}
-                />
                 <div className="relative space-y-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
@@ -130,7 +119,7 @@ export function CategoryTreemap({
                   </div>
 
                   <div>
-                    <p className="text-2xl font-semibold text-white">
+                    <p className="font-mono text-2xl font-semibold text-white">
                       {formatCurrency(category.amount)}
                     </p>
                     <p className="mt-0.5 text-xs text-slate-500">
@@ -152,7 +141,7 @@ export function CategoryTreemap({
                         {formatPercent(category.share)}
                       </span>
                     </div>
-                    <div className="h-1.5 overflow-hidden rounded-full bg-white/5">
+                    <div className="h-1.5 overflow-hidden bg-white/5">
                       <motion.div
                         initial={{ width: 0 }}
                         animate={{ width: `${sharePercent * 100}%` }}
@@ -161,7 +150,7 @@ export function CategoryTreemap({
                           duration: 0.6,
                           ease: "easeOut",
                         }}
-                        className={cn("h-full rounded-full", palette.bar)}
+                        className={cn("h-full", palette.bar)}
                       />
                     </div>
                   </div>

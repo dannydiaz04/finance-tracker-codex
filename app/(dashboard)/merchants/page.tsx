@@ -35,17 +35,27 @@ export default async function MerchantsPage({
         {merchants.map((merchant) => (
           <Card key={merchant.merchant}>
             <CardHeader>
-              <CardTitle className="text-base">{merchant.merchant}</CardTitle>
+              <CardTitle>{merchant.merchant}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="text-3xl font-semibold text-white">
+              <div className="font-mono text-3xl font-semibold text-white">
                 {formatCurrency(merchant.spend)}
               </div>
               <div className="flex flex-wrap gap-2">
                 <Badge>{merchant.transactions} transactions</Badge>
-                <Badge>trend {formatPercent(merchant.trend)}</Badge>
+                <Badge
+                  className={
+                    merchant.trend > 0
+                      ? "border-red-500/40 text-red-400"
+                      : merchant.trend < 0
+                        ? "border-emerald-500/40 text-emerald-400"
+                        : undefined
+                  }
+                >
+                  trend {formatPercent(merchant.trend)}
+                </Badge>
                 {merchant.likelyRecurring ? (
-                  <Badge className="border-cyan-400/20 bg-cyan-400/10 text-cyan-100">
+                  <Badge className="border-emerald-500/40 text-emerald-400">
                     recurring
                   </Badge>
                 ) : null}
@@ -58,8 +68,8 @@ export default async function MerchantsPage({
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader className="flex-row items-center gap-3">
-            <Repeat2 className="size-5 text-cyan-300" />
-            <CardTitle className="text-base">Recurring candidates</CardTitle>
+            <Repeat2 className="size-5 text-emerald-500" />
+            <CardTitle>Recurring candidates</CardTitle>
           </CardHeader>
           <CardContent className="text-sm leading-7 text-slate-300">
             Merchants with stable cadence and amounts become prime rule candidates
@@ -69,8 +79,8 @@ export default async function MerchantsPage({
 
         <Card>
           <CardHeader className="flex-row items-center gap-3">
-            <BadgeCheck className="size-5 text-emerald-300" />
-            <CardTitle className="text-base">Alias management</CardTitle>
+            <BadgeCheck className="size-5 text-emerald-500" />
+            <CardTitle>Alias management</CardTitle>
           </CardHeader>
           <CardContent className="text-sm leading-7 text-slate-300">
             Merchant aliases are modeled in the ops layer so future imports normalize

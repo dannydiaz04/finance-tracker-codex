@@ -60,7 +60,7 @@ export function UserMenu({ email, name }: UserMenuProps) {
         {confirmOpen ? (
           <div
             role="dialog"
-            className="absolute right-0 top-full z-50 mt-2 w-44 rounded-2xl border border-white/10 bg-slate-950/95 p-2 text-sm shadow-2xl backdrop-blur"
+            className="absolute right-0 top-full z-50 mt-2 w-44 rounded-sm border border-border bg-card p-2 text-sm shadow-xl"
           >
             <div className="flex items-center justify-between px-2 pb-2 pt-1 text-xs uppercase tracking-[0.2em] text-slate-400">
               <span>Account</span>

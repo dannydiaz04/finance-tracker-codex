@@ -42,8 +42,8 @@ export default async function AssistantPage({ searchParams }: AssistantPageProps
             <Badge
               className={
                 runtime.openAiConfigured
-                  ? "border-cyan-400/20 bg-cyan-400/10 text-cyan-200"
-                  : "border-amber-300/20 bg-amber-300/10 text-amber-50"
+                  ? "border-emerald-500/40 text-emerald-400"
+                  : "border-amber-500/40 text-amber-400"
               }
             >
               {runtime.openAiConfigured ? "OpenAI ready" : "Local fallback"}
@@ -78,30 +78,30 @@ export default async function AssistantPage({ searchParams }: AssistantPageProps
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-3">
-              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+              <div className="rounded-sm border border-border bg-background p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
                   Data source
                 </p>
                 <p className="mt-2 font-medium text-white">{context.sourceDetail}</p>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+              <div className="rounded-sm border border-border bg-background p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
                   Available cash
                 </p>
-                <p className="mt-2 text-3xl font-semibold text-white">
+                <p className="mt-2 font-mono text-3xl font-semibold text-emerald-400">
                   {formatCompactCurrency(context.overview.availableCash)}
                 </p>
               </div>
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-1">
-                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                <div className="rounded-sm border border-border bg-background p-4">
                   <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
                     Review queue
                   </p>
-                  <p className="mt-2 text-2xl font-semibold text-white">
+                  <p className="mt-2 font-mono text-2xl font-semibold text-white">
                     {context.reviewQueue.length} items
                   </p>
                 </div>
-                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                <div className="rounded-sm border border-border bg-background p-4">
                   <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
                     Largest current mover
                   </p>
@@ -114,7 +114,7 @@ export default async function AssistantPage({ searchParams }: AssistantPageProps
                 </div>
               </div>
               {topCategory ? (
-                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                <div className="rounded-sm border border-border bg-background p-4">
                   <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
                     Top category
                   </p>
@@ -129,14 +129,14 @@ export default async function AssistantPage({ searchParams }: AssistantPageProps
                 </div>
               ) : null}
               {topMerchant ? (
-                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                <div className="rounded-sm border border-border bg-background p-4">
                   <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
                     Top merchant
                   </p>
                   <div className="mt-2 flex items-center justify-between gap-4">
                     <p className="font-medium text-white">{topMerchant.merchant}</p>
                     {topMerchant.likelyRecurring ? (
-                      <Badge className="border-cyan-400/20 bg-cyan-400/10 text-cyan-200">
+                      <Badge className="border-emerald-500/40 text-emerald-400">
                         recurring
                       </Badge>
                     ) : null}
@@ -152,9 +152,9 @@ export default async function AssistantPage({ searchParams }: AssistantPageProps
 
           <Card>
             <CardHeader className="flex-row items-center gap-3">
-              <Sparkles className="size-5 text-cyan-300" />
+              <Sparkles className="size-5 text-emerald-500" />
               <div>
-                <CardTitle className="text-base">What it can explain</CardTitle>
+                <CardTitle>What it can explain</CardTitle>
                 <CardDescription>
                   Product-level help grounded in the actual dashboard structure.
                 </CardDescription>
@@ -164,7 +164,7 @@ export default async function AssistantPage({ searchParams }: AssistantPageProps
               {context.pageGuides.slice(0, 4).map((guide) => (
                 <div
                   key={guide.title}
-                  className="rounded-2xl border border-white/10 bg-white/[0.03] p-4"
+                  className="rounded-sm border border-border bg-background p-4"
                 >
                   <p className="font-medium text-white">{guide.title}</p>
                   <p className="mt-2 text-sm leading-6 text-slate-400">
@@ -177,9 +177,9 @@ export default async function AssistantPage({ searchParams }: AssistantPageProps
 
           <Card>
             <CardHeader className="flex-row items-center gap-3">
-              <ShieldCheck className="size-5 text-emerald-300" />
+              <ShieldCheck className="size-5 text-emerald-500" />
               <div>
-                <CardTitle className="text-base">Internal flow</CardTitle>
+                <CardTitle>Internal flow</CardTitle>
                 <CardDescription>
                   Ask about imports, rules, overrides, warehouse reads, and Plaid
                   scaffolding.
@@ -190,13 +190,13 @@ export default async function AssistantPage({ searchParams }: AssistantPageProps
               {context.internalGuides.map((guide, index) => (
                 <div
                   key={guide.title}
-                  className="rounded-2xl border border-white/10 bg-white/[0.03] p-4"
+                  className="rounded-sm border border-border bg-background p-4"
                 >
                   <div className="flex items-center gap-3">
                     {index % 2 === 0 ? (
-                      <DatabaseZap className="size-4 text-cyan-300" />
+                      <DatabaseZap className="size-4 text-emerald-500" />
                     ) : (
-                      <ArrowRightLeft className="size-4 text-fuchsia-300" />
+                      <ArrowRightLeft className="size-4 text-slate-400" />
                     )}
                     <p className="font-medium text-white">{guide.title}</p>
                   </div>

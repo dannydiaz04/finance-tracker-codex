@@ -39,7 +39,7 @@ function trimConversation(messages: LocalMessage[]) {
   return messages.slice(-12);
 }
 
-const assistantHighlightClassName = "font-medium text-sky-300";
+const assistantHighlightClassName = "font-mono font-medium text-emerald-400";
 
 function sanitizeAssistantContent(content: string) {
   return content
@@ -222,11 +222,11 @@ export function AssistantChat({
 
   return (
     <Card className="flex h-full min-h-[720px] flex-col">
-      <CardHeader className="gap-4 border-b border-white/10">
+      <CardHeader className="gap-4 border-b border-border">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="space-y-2">
             <div className="flex items-center gap-3">
-              <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-cyan-200">
+              <div className="rounded-sm border border-border bg-background p-3 text-emerald-500">
                 <Sparkles className="size-5" />
               </div>
               <div>
@@ -241,8 +241,8 @@ export function AssistantChat({
               <Badge
                 className={cn(
                   replyMode === "openai"
-                    ? "border-cyan-400/20 bg-cyan-400/10 text-cyan-200"
-                    : "border-amber-300/20 bg-amber-300/10 text-amber-50",
+                    ? "border-emerald-500/40 text-emerald-400"
+                    : "border-amber-500/40 text-amber-400",
                 )}
               >
                 {modeLabel(replyMode, replyModel)}
@@ -250,7 +250,7 @@ export function AssistantChat({
               <Badge>{sourceMode === "warehouse" ? "Warehouse data" : "Sample data"}</Badge>
             </div>
           </div>
-          <div className="max-w-xs rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-slate-300">
+          <div className="max-w-xs rounded-sm border border-border bg-background px-4 py-3 text-sm text-slate-400">
             {openAiConfigured
               ? "OpenAI is configured, so responses can use the model-backed path with local fallback if the request fails."
               : "OpenAI is not configured yet, so replies are coming from the local finance-aware fallback engine."}
@@ -266,7 +266,7 @@ export function AssistantChat({
               onClick={() => {
                 void sendPrompt(prompt);
               }}
-              className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 text-left text-sm text-slate-300 transition-colors hover:bg-white/[0.08] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-sm border border-border bg-background px-3 py-2 text-left text-sm text-slate-400 transition-colors hover:border-emerald-500/50 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
             >
               {prompt}
             </button>
@@ -276,13 +276,13 @@ export function AssistantChat({
 
       <CardContent className="flex flex-1 min-h-0 flex-col gap-4 pt-6">
         {warning ? (
-          <div className="rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-sm text-amber-50">
+          <div className="rounded-sm border border-amber-500/40 bg-background px-4 py-3 text-sm text-amber-400">
             OpenAI request fell back locally: {warning}
           </div>
         ) : null}
 
         {error ? (
-          <div className="rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm text-rose-100">
+          <div className="rounded-sm border border-red-500/40 bg-background px-4 py-3 text-sm text-red-400">
             {error}
           </div>
         ) : null}
@@ -292,10 +292,10 @@ export function AssistantChat({
             <div
               key={message.id}
               className={cn(
-                "max-w-3xl rounded-3xl px-5 py-4 text-sm leading-7 shadow-[0_18px_40px_rgba(3,7,18,0.24)]",
+                "max-w-3xl rounded-sm px-5 py-4 text-sm leading-7",
                 message.role === "assistant"
-                  ? "border border-white/10 bg-white/[0.04] text-slate-200"
-                  : "ml-auto border border-cyan-400/20 bg-cyan-400/10 text-cyan-50",
+                  ? "border border-border bg-background text-slate-200"
+                  : "ml-auto border border-emerald-500/40 bg-emerald-500/5 text-slate-100",
               )}
             >
               <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500">
@@ -306,8 +306,8 @@ export function AssistantChat({
           ))}
 
           {isSending ? (
-            <div className="flex max-w-3xl items-center gap-3 rounded-3xl border border-white/10 bg-white/[0.04] px-5 py-4 text-sm text-slate-300">
-              <LoaderCircle className="size-4 animate-spin text-cyan-300" />
+            <div className="flex max-w-3xl items-center gap-3 rounded-sm border border-border bg-background px-5 py-4 text-sm text-slate-300">
+              <LoaderCircle className="size-4 animate-spin text-emerald-500" />
               Thinking through the dashboard context...
             </div>
           ) : null}

@@ -61,7 +61,7 @@ export function PlaidDisconnectButton({
         size="sm"
         onClick={disconnect}
         disabled={loading}
-        className="text-rose-300 hover:bg-rose-500/10 hover:text-rose-200"
+        className="text-red-400 hover:bg-red-500/10 hover:text-red-300"
       >
         {loading ? (
           <Loader2 className="mr-2 size-4 animate-spin" />

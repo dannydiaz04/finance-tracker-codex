@@ -334,7 +334,7 @@ export function PlaidLinkButton({
         />
       ) : null}
 
-      {error ? <p className="text-sm text-rose-300">{error}</p> : null}
+      {error ? <p className="text-sm text-red-400">{error}</p> : null}
     </div>
   );
 }

@@ -67,30 +67,20 @@ export function SidebarNav() {
   }, []);
 
   return (
-    <aside className="sticky top-0 z-30 hidden h-screen w-72 shrink-0 border-r border-white/10 bg-slate-950/70 px-5 py-6 backdrop-blur xl:flex xl:flex-col">
-      <div className="mb-8 flex items-center justify-between">
+    <aside className="sticky top-0 z-30 hidden h-screen w-60 shrink-0 border-r border-border bg-background px-4 py-5 xl:flex xl:flex-col">
+      <div className="mb-8 flex items-center gap-2.5 px-2">
+        <CandlestickChart className="size-5 text-emerald-500" />
         <div>
-          <p className="text-xs uppercase tracking-[0.32em] text-cyan-300/80">
+          <h1 className="font-mono text-sm font-semibold uppercase tracking-widest text-white">
             Finance Tracker
+          </h1>
+          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-slate-600">
+            Personal ledger
           </p>
-          <h1 className="mt-2 text-xl font-semibold text-white">Warehouse OS</h1>
-        </div>
-        <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-3 text-cyan-200">
-          <CandlestickChart className="size-5" />
         </div>
       </div>
 
-      <div className="mb-8 rounded-3xl border border-white/10 bg-white/[0.04] p-4">
-        <Badge className="border-cyan-400/20 bg-cyan-400/10 text-cyan-200">
-          Single-user MVP
-        </Badge>
-        <p className="mt-4 text-sm leading-6 text-slate-300">
-          CSV-first ingestion with a Plaid-ready event model, deterministic rules,
-          and a review-first explorer.
-        </p>
-      </div>
-
-      <nav className="flex flex-col gap-2">
+      <nav className="flex flex-col gap-0.5">
         {navigation.map((item) => {
           const Icon = item.icon;
           const active = pathname === item.href;
@@ -102,16 +92,16 @@ export function SidebarNav() {
                 `${item.href}${timeQueryString ? `?${timeQueryString}` : ""}` as Route
               }
               className={cn(
-                "group flex items-center gap-3 rounded-2xl px-4 py-3 text-sm transition-colors",
+                "group flex items-center gap-3 border-l-2 px-3 py-2 text-sm transition-colors",
                 active
-                  ? "bg-cyan-400/10 text-white ring-1 ring-cyan-300/20"
-                  : "text-slate-400 hover:bg-white/[0.04] hover:text-white",
+                  ? "border-emerald-500 bg-white/[0.04] text-white"
+                  : "border-transparent text-slate-500 hover:bg-white/[0.03] hover:text-slate-200",
               )}
             >
               <Icon
                 className={cn(
-                  "size-4 transition-transform",
-                  active ? "text-cyan-300" : "text-slate-500 group-hover:text-cyan-300",
+                  "size-4",
+                  active ? "text-emerald-500" : "text-slate-600 group-hover:text-slate-400",
                 )}
               />
               <span>{item.label}</span>
@@ -120,21 +110,8 @@ export function SidebarNav() {
         })}
       </nav>
 
-      <div className="mt-auto rounded-3xl border border-white/10 bg-[radial-gradient(circle_at_top,#1c2840,transparent_60%)] p-4">
-        <p className="text-xs uppercase tracking-[0.28em] text-emerald-300/80">
-          Now live
-        </p>
-        <p className="mt-2 text-sm text-slate-300">
-          On-demand AI fallback for low-confidence rows and abnormal cash-flow
-          alerts now run on top of Plaid + CSV ingestion.
-        </p>
-        <p className="mt-3 text-xs uppercase tracking-[0.28em] text-slate-500">
-          Next phase
-        </p>
-        <p className="mt-2 text-sm text-slate-300">
-          Scheduled syncs and warehouse refreshes so enrichment and alerts stay
-          current without manual runs.
-        </p>
+      <div className="mt-auto border-t border-border px-2 pt-4">
+        <Badge>Single-user MVP</Badge>
       </div>
     </aside>
   );

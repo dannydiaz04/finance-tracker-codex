@@ -16,9 +16,9 @@ export function ReviewQueueCard({ item, categories }: ReviewQueueCardProps) {
 
   if (resolved) {
     return (
-      <div className="rounded-2xl border border-emerald-300/20 bg-emerald-300/10 px-4 py-4 text-sm text-emerald-50">
+      <div className="rounded-sm border border-emerald-500/30 bg-background px-4 py-4 text-sm text-emerald-400">
         <p className="font-medium">{item.merchant} — resolved</p>
-        <p className="mt-1 text-emerald-100/80">
+        <p className="mt-1 text-emerald-400/80">
           {resolved.persisted
             ? "Removed from the queue; reflected in reports on the next warehouse refresh."
             : "Saved locally — connect a warehouse to persist this override."}
@@ -28,7 +28,7 @@ export function ReviewQueueCard({ item, categories }: ReviewQueueCardProps) {
   }
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4">
+    <div className="rounded-sm border border-border bg-background px-4 py-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="font-medium text-white">{item.merchant}</p>
@@ -36,13 +36,13 @@ export function ReviewQueueCard({ item, categories }: ReviewQueueCardProps) {
           <p className="mt-1 text-xs text-slate-500">{item.reason}</p>
         </div>
         <div className="shrink-0 text-right">
-          <p className="font-medium text-white">{formatCurrency(item.amount)}</p>
+          <p className="font-mono font-medium text-white">{formatCurrency(item.amount)}</p>
           <p className="mt-1 text-xs uppercase tracking-[0.18em] text-slate-500">
             {(item.confidenceScore * 100).toFixed(0)}% confidence
           </p>
         </div>
       </div>
-      <div className="mt-3 border-t border-white/5 pt-3">
+      <div className="mt-3 border-t border-border pt-3">
         <OverrideForm
           variant="inline"
           transactionId={item.transactionId}

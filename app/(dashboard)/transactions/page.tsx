@@ -78,37 +78,43 @@ export default async function TransactionsPage({
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex-row items-center justify-between gap-3">
-            <CardTitle className="text-base">Visible rows</CardTitle>
-            <Filter className="size-4 text-cyan-300" />
+            <CardTitle>Visible rows</CardTitle>
+            <Filter className="size-4 text-slate-400" />
           </CardHeader>
-          <CardContent className="text-3xl font-semibold text-white">
+          <CardContent className="font-mono text-3xl font-semibold text-white">
             {transactions.length}
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex-row items-center justify-between gap-3">
-            <CardTitle className="text-base">Operating net</CardTitle>
-            <DatabaseZap className="size-4 text-fuchsia-300" />
+            <CardTitle>Operating net</CardTitle>
+            <DatabaseZap className="size-4 text-slate-400" />
           </CardHeader>
-          <CardContent className="text-3xl font-semibold text-white">
+          <CardContent
+            className={
+              operatingNet >= 0
+                ? "font-mono text-3xl font-semibold text-emerald-400"
+                : "font-mono text-3xl font-semibold text-red-400"
+            }
+          >
             {formatCurrency(operatingNet)}
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex-row items-center justify-between gap-3">
-            <CardTitle className="text-base">Accounting-only net</CardTitle>
-            <DatabaseZap className="size-4 text-cyan-300" />
+            <CardTitle>Accounting-only net</CardTitle>
+            <DatabaseZap className="size-4 text-slate-400" />
           </CardHeader>
-          <CardContent className="text-3xl font-semibold text-white">
+          <CardContent className="font-mono text-3xl font-semibold text-white">
             {formatCurrency(accountingOnlyNet)}
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex-row items-center justify-between gap-3">
-            <CardTitle className="text-base">Low confidence</CardTitle>
-            <SearchCheck className="size-4 text-amber-300" />
+            <CardTitle>Low confidence</CardTitle>
+            <SearchCheck className="size-4 text-amber-400" />
           </CardHeader>
-          <CardContent className="text-3xl font-semibold text-white">
+          <CardContent className="font-mono text-3xl font-semibold text-white">
             {lowConfidence}
           </CardContent>
         </Card>

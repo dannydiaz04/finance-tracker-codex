@@ -29,7 +29,7 @@ const EMPTY_DRAFT: DraftState = {
   label: "",
   group: "",
   sublabel: "",
-  color: "#22d3ee",
+  color: "#22c55e",
   isSystem: false,
 };
 
@@ -196,14 +196,14 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
 
         <aside
           className={cn(
-            "absolute right-0 top-0 flex h-full w-full max-w-lg flex-col overflow-hidden border-l border-white/10 bg-slate-950 shadow-[-24px_0_80px_rgba(2,6,23,0.55)] transition-transform duration-300",
+            "absolute right-0 top-0 flex h-full w-full max-w-lg flex-col overflow-hidden border-l border-border bg-card transition-transform duration-300",
             open ? "translate-x-0" : "translate-x-full",
           )}
           aria-label="Category management"
         >
-          <div className="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-5">
+          <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-5">
             <div className="min-w-0">
-              <p className="text-xs uppercase tracking-[0.28em] text-cyan-300/80">
+              <p className="font-mono text-xs uppercase tracking-[0.2em] text-emerald-500">
                 Category catalog
               </p>
               <p className="mt-1 text-sm text-slate-400">
@@ -220,10 +220,10 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
             {feedback ? (
               <p
                 className={cn(
-                  "break-words rounded-2xl border px-4 py-3 text-sm",
+                  "break-words rounded-sm border bg-background px-4 py-3 text-sm",
                   feedback.tone === "success"
-                    ? "border-emerald-300/20 bg-emerald-300/10 text-emerald-100"
-                    : "border-rose-300/20 bg-rose-300/10 text-rose-100",
+                    ? "border-emerald-500/40 text-emerald-400"
+                    : "border-red-500/40 text-red-400",
                 )}
               >
                 {feedback.message}
@@ -231,11 +231,11 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
             ) : null}
 
             {pendingDelete ? (
-              <div className="space-y-3 rounded-2xl border border-amber-300/20 bg-amber-300/10 p-4">
-                <p className="text-sm font-medium text-amber-100">
+              <div className="space-y-3 rounded-sm border border-amber-500/40 bg-background p-4">
+                <p className="text-sm font-medium text-amber-400">
                   Reassign before deleting “{pendingDelete.category.label}”
                 </p>
-                <p className="break-words text-xs text-amber-100/80">
+                <p className="break-words text-xs text-amber-400/80">
                   {pendingDelete.references.transactions} transaction(s) and{" "}
                   {pendingDelete.references.rules} rule(s) currently use this category. Pick a
                   replacement to move them to.
@@ -277,7 +277,7 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
             ) : null}
 
             {draft ? (
-              <div className="space-y-3 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+              <div className="space-y-3 rounded-sm border border-border bg-background p-4">
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-medium text-white">
                     {draft.categoryId ? "Edit category" : "New category"}
@@ -340,7 +340,7 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
                           current ? { ...current, color: event.target.value } : current,
                         )
                       }
-                      className="h-9 w-12 cursor-pointer rounded-lg border border-white/10 bg-transparent"
+                      className="h-9 w-12 cursor-pointer rounded-sm border border-border bg-transparent"
                       aria-label="Category color"
                     />
                     <Input
@@ -395,7 +395,7 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
                     {items.map((category) => (
                       <div
                         key={category.id}
-                        className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-2.5"
+                        className="flex items-center gap-3 rounded-sm border border-border bg-background px-3 py-2.5"
                       >
                         <span
                           className="size-3 shrink-0 rounded-full ring-1 ring-white/20"
@@ -413,7 +413,7 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
                         <button
                           type="button"
                           aria-label={`Edit ${category.label}`}
-                          className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-white/10 hover:text-white"
+                          className="rounded-sm p-1.5 text-slate-400 transition-colors hover:bg-white/10 hover:text-white"
                           onClick={() => {
                             setFeedback(null);
                             setPendingDelete(null);
@@ -424,7 +424,7 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
                         </button>
                         {category.isSystem ? (
                           <span
-                            className="rounded-lg p-1.5 text-slate-600"
+                            className="rounded-sm p-1.5 text-slate-600"
                             title="System category — cannot be deleted"
                           >
                             <Lock className="size-4" />
@@ -434,7 +434,7 @@ export function CategoryManager({ categories }: CategoryManagerProps) {
                             type="button"
                             aria-label={`Delete ${category.label}`}
                             disabled={isSaving}
-                            className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-rose-500/15 hover:text-rose-200 disabled:opacity-40"
+                            className="rounded-sm p-1.5 text-slate-400 transition-colors hover:bg-red-500/15 hover:text-red-400 disabled:opacity-40"
                             onClick={() => requestDelete(category)}
                           >
                             <Trash2 className="size-4" />

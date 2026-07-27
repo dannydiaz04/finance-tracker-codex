@@ -1,14 +1,17 @@
 @import "tailwindcss";
 
 :root {
-  --background: #020617;
-  --foreground: #f8fafc;
-  --card: #08111f;
-  --card-foreground: #e2e8f0;
-  --muted: #7c8aa0;
-  --border: rgba(148, 163, 184, 0.14);
-  --accent: #67e8f9;
-  --accent-strong: #8b5cf6;
+  /* Flat, terminal-style market palette. */
+  --background: #0a0d10;
+  --foreground: #e6ebf0;
+  --card: #0f1319;
+  --card-foreground: #dbe2ea;
+  --muted: #77828f;
+  --border: #1d242e;
+  --accent: #22c55e;
+  --accent-strong: #16a34a;
+  --up: #22c55e;
+  --down: #ef4444;
 }
 
 @theme inline {
@@ -20,6 +23,8 @@
   --color-border: var(--border);
   --color-accent: var(--accent);
   --color-accent-strong: var(--accent-strong);
+  --color-up: var(--up);
+  --color-down: var(--down);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -37,6 +42,7 @@ body {
   color: var(--foreground);
   font-family: var(--font-geist-sans), sans-serif;
   text-rendering: optimizeLegibility;
+  font-variant-numeric: tabular-nums;
 }
 
 a {
@@ -45,7 +51,7 @@ a {
 }
 
 ::selection {
-  background: rgb(103 232 249 / 0.25);
+  background: rgb(34 197 94 / 0.25);
   color: white;
 }
 
@@ -57,18 +63,18 @@ pre {
    falling back to the browser's default light list. */
 select option,
 select optgroup {
-  background-color: #0b1424;
+  background-color: #0f1319;
   color: var(--card-foreground);
 }
 
 select option:checked {
-  background-color: rgb(34 211 238 / 0.18);
-  color: #ecfeff;
+  background-color: rgb(34 197 94 / 0.18);
+  color: #f0fdf4;
 }
 
 .metric-grid {
   background-image:
-    linear-gradient(to right, rgb(255 255 255 / 0.04) 1px, transparent 1px),
-    linear-gradient(to bottom, rgb(255 255 255 / 0.04) 1px, transparent 1px);
+    linear-gradient(to right, rgb(255 255 255 / 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(255 255 255 / 0.03) 1px, transparent 1px);
   background-size: 28px 28px;
 }

@@ -30,14 +30,14 @@ type OverrideFormProps = {
 };
 
 const toneClass: Record<SaveResultTone, string> = {
-  success: "text-sm text-emerald-200",
-  partial: "text-sm text-amber-200",
+  success: "text-sm text-emerald-400",
+  partial: "text-sm text-amber-400",
   local: "text-sm text-slate-300",
-  error: "text-sm text-rose-200",
+  error: "text-sm text-red-400",
 };
 
 const ADD_CATEGORY_VALUE = "__add_category__";
-const NEW_CATEGORY_COLOR = "#22d3ee";
+const NEW_CATEGORY_COLOR = "#22c55e";
 
 type NewCategoryDraft = {
   label: string;
@@ -212,17 +212,17 @@ export function OverrideForm({
       </Select>
 
       {creatingCategory ? (
-        <div className="grid gap-2 rounded-2xl border border-cyan-300/20 bg-cyan-400/[0.06] p-3">
+        <div className="grid gap-2 rounded-sm border border-emerald-500/30 bg-background p-3">
           <div className="flex items-center justify-between">
             <p className="flex items-center gap-1.5 text-xs font-medium text-white">
-              <Plus className="size-3.5 text-cyan-300" />
+              <Plus className="size-3.5 text-emerald-500" />
               New category
             </p>
             <button
               type="button"
               aria-label="Cancel new category"
               onClick={cancelCreateCategory}
-              className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-white/10 hover:text-white"
+              className="rounded-sm p-1 text-slate-400 transition-colors hover:bg-white/10 hover:text-white"
             >
               <X className="size-3.5" />
             </button>
@@ -263,7 +263,7 @@ export function OverrideForm({
               onChange={(event) =>
                 setNewCategory((current) => ({ ...current, color: event.target.value }))
               }
-              className="h-9 w-10 shrink-0 cursor-pointer rounded-lg border border-white/10 bg-transparent"
+              className="h-9 w-10 shrink-0 cursor-pointer rounded-sm border border-border bg-transparent"
               aria-label="New category color"
             />
           </div>
@@ -283,7 +283,7 @@ export function OverrideForm({
             </Button>
           </div>
           {createError ? (
-            <p className="break-words text-xs text-rose-200">{createError}</p>
+            <p className="break-words text-xs text-red-400">{createError}</p>
           ) : null}
         </div>
       ) : null}

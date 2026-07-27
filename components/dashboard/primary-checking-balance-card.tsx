@@ -13,9 +13,9 @@ export function PrimaryCheckingBalanceCard({ balance }: PrimaryCheckingBalanceCa
     return (
       <Card tone="balance">
         <CardHeader className="flex-row items-center gap-3">
-          <Landmark className="size-5 text-cyan-300" />
+          <Landmark className="size-5 text-emerald-500" />
           <div>
-            <CardTitle className="text-base">Capital One checking</CardTitle>
+            <CardTitle>Capital One checking</CardTitle>
             <CardDescription>
               Link or sync a Capital One checking account to show its live current balance
               here. This figure is not affected by the time filter.
@@ -23,7 +23,7 @@ export function PrimaryCheckingBalanceCard({ balance }: PrimaryCheckingBalanceCa
           </div>
         </CardHeader>
         <CardContent>
-          <p className="text-3xl font-semibold text-slate-500">—</p>
+          <p className="font-mono text-3xl font-semibold text-slate-500">—</p>
         </CardContent>
       </Card>
     );
@@ -35,9 +35,9 @@ export function PrimaryCheckingBalanceCard({ balance }: PrimaryCheckingBalanceCa
   return (
     <Card tone="balance">
       <CardHeader className="flex-row items-center gap-3">
-        <Landmark className="size-5 text-cyan-300" />
+        <Landmark className="size-5 text-emerald-500" />
         <div>
-          <CardTitle className="text-base">{balance.accountName}</CardTitle>
+          <CardTitle>{balance.accountName}</CardTitle>
           <CardDescription>
             Live current balance from {balance.institution}
             {maskLabel}. Unchanged by the time filter — matches what your checking account
@@ -50,13 +50,13 @@ export function PrimaryCheckingBalanceCard({ balance }: PrimaryCheckingBalanceCa
           <p className="text-xs uppercase tracking-[0.22em] text-slate-500">
             Current balance
           </p>
-          <p className="mt-2 text-4xl font-semibold text-white">
+          <p className="mt-2 font-mono text-4xl font-semibold text-white">
             {formatCurrency(balance.currentBalance)}
           </p>
         </div>
         <div className="text-right">
           <p className="text-xs uppercase tracking-[0.22em] text-slate-500">Available</p>
-          <p className="mt-2 text-lg font-medium text-slate-300">
+          <p className="mt-2 font-mono text-lg font-medium text-slate-300">
             {formatCompactCurrency(balance.availableBalance)}
           </p>
         </div>

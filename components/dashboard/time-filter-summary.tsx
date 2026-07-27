@@ -10,9 +10,9 @@ type TimeFilterSummaryProps = {
 
 export function TimeFilterSummary({ filter, fields }: TimeFilterSummaryProps) {
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-slate-300 md:flex-row md:items-center md:justify-between">
+    <div className="flex flex-col gap-3 rounded-sm border border-border bg-card px-4 py-3 text-sm text-slate-300 md:flex-row md:items-center md:justify-between">
       <div className="flex items-start gap-3">
-        <CalendarRange className="mt-0.5 size-4 shrink-0 text-cyan-300" />
+        <CalendarRange className="mt-0.5 size-4 shrink-0 text-emerald-500" />
         <div>
           <p className="font-medium text-white">
             Time scope: {formatTimeFilterLabel(filter)}
@@ -23,7 +23,7 @@ export function TimeFilterSummary({ filter, fields }: TimeFilterSummaryProps) {
       <div className="flex flex-wrap gap-2">
         <Badge className="w-fit">URL params: from / to</Badge>
         {filter.excludePlaid ? (
-          <Badge className="w-fit border-amber-400/20 bg-amber-400/10 text-amber-100">
+          <Badge className="w-fit border-amber-500/40 text-amber-400">
             CSV only (Plaid hidden)
           </Badge>
         ) : null}

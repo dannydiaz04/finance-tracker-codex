@@ -75,9 +75,9 @@ export function AuthForm({ mode }: AuthFormProps) {
   };
 
   return (
-    <div className="w-full max-w-md space-y-6 rounded-3xl border border-white/10 bg-white/[0.03] p-8 backdrop-blur">
+    <div className="w-full max-w-md space-y-6 rounded-sm border border-border bg-card p-8">
       <div className="space-y-2 text-center">
-        <p className="text-xs uppercase tracking-[0.32em] text-cyan-300/80">
+        <p className="font-mono text-xs uppercase tracking-[0.2em] text-emerald-500">
           Finance Tracker
         </p>
         <h1 className="text-2xl font-semibold text-white">
@@ -104,9 +104,9 @@ export function AuthForm({ mode }: AuthFormProps) {
       </Button>
 
       <div className="flex items-center gap-3 text-xs uppercase tracking-widest text-slate-500">
-        <span className="h-px flex-1 bg-white/10" />
+        <span className="h-px flex-1 bg-border" />
         or
-        <span className="h-px flex-1 bg-white/10" />
+        <span className="h-px flex-1 bg-border" />
       </div>
 
       <form className="space-y-4" onSubmit={handleSubmit}>
@@ -156,7 +156,7 @@ export function AuthForm({ mode }: AuthFormProps) {
           />
         </div>
 
-        {error ? <p className="text-sm text-rose-300">{error}</p> : null}
+        {error ? <p className="text-sm text-red-400">{error}</p> : null}
 
         <Button type="submit" className="w-full" disabled={loading}>
           {loading ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
@@ -168,14 +168,14 @@ export function AuthForm({ mode }: AuthFormProps) {
         {isSignUp ? (
           <>
             Already have an account?{" "}
-            <Link className="text-cyan-300 hover:text-cyan-200" href="/sign-in">
+            <Link className="text-emerald-400 hover:text-emerald-300" href="/sign-in">
               Sign in
             </Link>
           </>
         ) : (
           <>
             Need an account?{" "}
-            <Link className="text-cyan-300 hover:text-cyan-200" href="/sign-up">
+            <Link className="text-emerald-400 hover:text-emerald-300" href="/sign-up">
               Create one
             </Link>
           </>

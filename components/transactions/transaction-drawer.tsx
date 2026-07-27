@@ -82,11 +82,11 @@ export function TransactionDrawer({
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: 480, opacity: 0 }}
             transition={{ type: "spring", stiffness: 260, damping: 28 }}
-            className="fixed right-0 top-0 z-40 h-screen w-full max-w-xl overflow-y-auto overflow-x-hidden border-l border-white/10 bg-slate-950/96 p-4 shadow-[0_0_120px_rgba(8,15,30,0.65)] sm:p-6"
+            className="fixed right-0 top-0 z-40 h-screen w-full max-w-xl overflow-y-auto overflow-x-hidden border-l border-border bg-card p-4 sm:p-6"
           >
             <div className="mb-6 flex items-start justify-between gap-4">
               <div className="min-w-0 flex-1">
-                <p className="text-xs uppercase tracking-[0.28em] text-cyan-300/80">
+                <p className="font-mono text-xs uppercase tracking-[0.2em] text-emerald-500">
                   Transaction detail
                 </p>
                 <h2 className="mt-2 break-words text-2xl font-semibold text-white">
@@ -105,7 +105,15 @@ export function TransactionDrawer({
               <div className="grid min-w-0 gap-4 [&>*]:min-w-0">
               <Card>
                 <CardHeader>
-                  <CardTitle>{formatCurrency(active.signedAmount)}</CardTitle>
+                  <CardTitle
+                    className={
+                      active.signedAmount < 0
+                        ? "font-mono text-xl normal-case tracking-normal text-red-400"
+                        : "font-mono text-xl normal-case tracking-normal text-emerald-400"
+                    }
+                  >
+                    {formatCurrency(active.signedAmount)}
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="min-w-0 grid gap-3 text-sm text-slate-300">
                   <div className="flex flex-wrap gap-2">
@@ -125,8 +133,8 @@ export function TransactionDrawer({
 
               <Card>
                 <CardHeader className="flex-row items-center gap-3">
-                  <Sparkles className="size-5 text-cyan-300" />
-                  <CardTitle className="text-base">Manual recategorization</CardTitle>
+                  <Sparkles className="size-5 text-emerald-500" />
+                  <CardTitle>Manual recategorization</CardTitle>
                 </CardHeader>
                 <CardContent className="min-w-0">
                   <OverrideForm
@@ -141,14 +149,14 @@ export function TransactionDrawer({
 
               <Card>
                 <CardHeader className="flex-row items-center gap-3">
-                  <GitCompareArrows className="size-5 text-fuchsia-300" />
-                  <CardTitle className="text-base">Classification history</CardTitle>
+                  <GitCompareArrows className="size-5 text-slate-400" />
+                  <CardTitle>Classification history</CardTitle>
                 </CardHeader>
                 <CardContent className="min-w-0 space-y-3">
                   {active.classificationHistory.map((entry) => (
                     <div
                       key={`${entry.timestamp}-${entry.source}`}
-                      className="min-w-0 rounded-2xl border border-white/10 bg-white/[0.03] p-4"
+                      className="min-w-0 rounded-sm border border-border bg-background p-4"
                     >
                       <div className="flex flex-wrap gap-2">
                         <Badge>{entry.categoryLabel}</Badge>
@@ -165,12 +173,12 @@ export function TransactionDrawer({
 
               <Card>
                 <CardHeader className="flex-row items-center gap-3">
-                  <Database className="size-5 text-emerald-300" />
-                  <CardTitle className="text-base">Raw payload and transfer links</CardTitle>
+                  <Database className="size-5 text-emerald-500" />
+                  <CardTitle>Raw payload and transfer links</CardTitle>
                 </CardHeader>
                 <CardContent className="min-w-0 space-y-4">
                   {relatedTransfers.length > 0 ? (
-                    <div className="break-words rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm text-slate-300">
+                    <div className="break-words rounded-sm border border-border bg-background p-4 text-sm text-slate-300">
                       {relatedTransfers.map((related) => (
                         <p key={related.transactionId} className="break-words">
                           {related.accountName}: {formatCurrency(related.signedAmount)} on{" "}
@@ -179,7 +187,7 @@ export function TransactionDrawer({
                       ))}
                     </div>
                   ) : null}
-                  <div className="overflow-hidden rounded-2xl border border-white/10 bg-slate-950/80">
+                  <div className="overflow-hidden rounded-sm border border-border bg-background">
                     <pre className="max-w-full overflow-x-auto p-4 text-xs text-slate-300 whitespace-pre">
                       {JSON.stringify(active.rawPayloadJson, null, 2)}
                     </pre>

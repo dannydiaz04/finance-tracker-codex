@@ -7,7 +7,6 @@ import {
   Card,
   CardContent,
   CardHeader,
-  CardTitle,
   type CardTone,
 } from "@/components/ui/card";
 import { formatTimeFilterLabel, type TimeFilter } from "@/lib/time-filter";
@@ -58,7 +57,7 @@ const kpis: KpiDefinition[] = [
   {
     key: "monthToDateIncome",
     tone: "income",
-    iconAccent: "border-emerald-400/30 bg-emerald-400/10 text-emerald-200",
+    iconAccent: "border-emerald-500/30 bg-emerald-500/10 text-emerald-400",
     label: (scope: string) => `Income (${scope})`,
     icon: ArrowUpRight,
     accessor: (overview: OverviewSnapshot) =>
@@ -69,7 +68,7 @@ const kpis: KpiDefinition[] = [
   {
     key: "monthToDateSpend",
     tone: "spend",
-    iconAccent: "border-fuchsia-400/30 bg-fuchsia-400/10 text-fuchsia-200",
+    iconAccent: "border-red-500/30 bg-red-500/10 text-red-400",
     label: (scope: string) => `Spend (${scope})`,
     icon: ArrowDownRight,
     accessor: (overview: OverviewSnapshot) =>
@@ -97,16 +96,23 @@ export function KpiCards({ overview, timeFilter }: KpiCardsProps) {
             <Card className="h-full" tone={item.tone}>
               <CardHeader className="flex-row items-start justify-between gap-4 pb-4">
                 <div>
-                  <p className="text-sm text-slate-400">{item.label(scope.label)}</p>
-                  <CardTitle className="mt-2 text-3xl">
+                  <p className="text-xs uppercase tracking-wider text-slate-500">
+                    {item.label(scope.label)}
+                  </p>
+                  <p
+                    className={cn(
+                      "mt-2 font-mono text-3xl font-semibold",
+                      item.tone === "income" ? "text-emerald-400" : "text-red-400",
+                    )}
+                  >
                     {item.accessor(overview)}
-                  </CardTitle>
+                  </p>
                 </div>
-                <div className={cn("rounded-2xl border p-3", item.iconAccent)}>
-                  <Icon className="size-5" />
+                <div className={cn("rounded-sm border p-2.5", item.iconAccent)}>
+                  <Icon className="size-4" />
                 </div>
               </CardHeader>
-              <CardContent className="pt-0 text-sm text-slate-400">
+              <CardContent className="pt-0 text-xs text-slate-500">
                 {item.helper(overview, scope)}
               </CardContent>
             </Card>

@@ -47,22 +47,28 @@ export function CashflowChart({
               transition={{ delay: index * 0.03, duration: 0.25 }}
               className="grid gap-3 md:grid-cols-[140px_1fr_100px]"
             >
-              <div className="text-sm text-slate-400">{formatDateLabel(point.date)}</div>
-              <div className="space-y-2">
-                <div className="h-2 overflow-hidden rounded-full bg-white/6">
+              <div className="font-mono text-xs text-slate-500">{formatDateLabel(point.date)}</div>
+              <div className="space-y-1.5">
+                <div className="h-1.5 overflow-hidden bg-white/5">
                   <div
-                    className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-blue-500"
+                    className="h-full bg-emerald-500"
                     style={{ width: `${(point.inflow / maxValue) * 100}%` }}
                   />
                 </div>
-                <div className="h-2 overflow-hidden rounded-full bg-white/6">
+                <div className="h-1.5 overflow-hidden bg-white/5">
                   <div
-                    className="h-full rounded-full bg-gradient-to-r from-fuchsia-400 to-violet-500"
+                    className="h-full bg-red-500"
                     style={{ width: `${(point.outflow / maxValue) * 100}%` }}
                   />
                 </div>
               </div>
-              <div className="text-right text-sm text-slate-300">
+              <div
+                className={
+                  point.net >= 0
+                    ? "text-right font-mono text-sm text-emerald-400"
+                    : "text-right font-mono text-sm text-red-400"
+                }
+              >
                 {formatCompactCurrency(point.net)}
               </div>
             </motion.div>

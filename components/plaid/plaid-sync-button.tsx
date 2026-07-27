@@ -99,7 +99,7 @@ export function PlaidSyncButton({ itemId, label, floatingMessage }: PlaidSyncBut
           {label ?? "Sync now"}
         </Button>
         {message ? (
-          <p className="absolute right-0 top-full z-50 mt-2 max-w-[16rem] rounded-xl border border-white/10 bg-slate-950/95 px-3 py-2 text-xs text-slate-300 shadow-2xl backdrop-blur">
+          <p className="absolute right-0 top-full z-50 mt-2 max-w-[16rem] rounded-sm border border-border bg-card px-3 py-2 text-xs text-slate-300 shadow-xl">
             {message}
           </p>
         ) : null}

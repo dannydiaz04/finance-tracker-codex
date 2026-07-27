@@ -57,7 +57,7 @@ export default async function CategoriesPage({
             />
           ))}
 
-          <div className="rounded-2xl border border-emerald-300/20 bg-emerald-300/10 p-4 text-sm text-emerald-50">
+          <div className="rounded-sm border border-emerald-500/30 bg-background p-4 text-sm text-emerald-400">
             <div className="flex items-center gap-2">
               <CircleCheckBig className="size-4" />
               User corrections land in `manual_overrides`, then replay into the

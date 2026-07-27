@@ -66,7 +66,7 @@ export default async function ConnectionsPage() {
               Add Plaid credentials to your environment to enable account linking.
               CSV import remains fully available in the meantime.
             </p>
-            <pre className="overflow-x-auto rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-xs text-slate-200">
+            <pre className="overflow-x-auto rounded-sm border border-border bg-background px-4 py-3 text-xs text-slate-200">
               {`PLAID_CLIENT_ID=your_client_id
 PLAID_SECRET=your_secret
 PLAID_ENV=sandbox
@@ -83,7 +83,7 @@ PLAID_WEBHOOK_URL=https://your-tunnel/api/plaid/webhook`}
             <CardTitle>BigQuery is required to store connections</CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-slate-300">
-            Set <code className="text-cyan-200">BIGQUERY_PROJECT_ID</code> so linked
+            Set <code className="text-emerald-400">BIGQUERY_PROJECT_ID</code> so linked
             Plaid Items and their sync cursors can be persisted.
           </CardContent>
         </Card>
@@ -92,7 +92,7 @@ PLAID_WEBHOOK_URL=https://your-tunnel/api/plaid/webhook`}
       <Card>
         <CardHeader className="flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <Landmark className="size-5 text-cyan-300" />
+            <Landmark className="size-5 text-emerald-500" />
             <CardTitle>Connected institutions</CardTitle>
           </div>
           <div className="flex items-center gap-3">
@@ -102,8 +102,8 @@ PLAID_WEBHOOK_URL=https://your-tunnel/api/plaid/webhook`}
             <Badge
               className={
                 plaidStatus.hasWebhook
-                  ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200"
-                  : "border-amber-400/30 bg-amber-400/10 text-amber-200"
+                  ? "border-emerald-500/40 text-emerald-400"
+                  : "border-amber-500/40 text-amber-400"
               }
             >
               {plaidStatus.hasWebhook ? "Auto-sync on" : "Auto-sync off"}
@@ -113,7 +113,7 @@ PLAID_WEBHOOK_URL=https://your-tunnel/api/plaid/webhook`}
         </CardHeader>
         <CardContent className="space-y-3">
           {items.length === 0 ? (
-            <p className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-6 text-sm text-slate-400">
+            <p className="rounded-sm border border-border bg-background px-4 py-6 text-sm text-slate-400">
               No institutions connected yet. Use “Connect a bank” to link your
               first account.
             </p>
@@ -121,7 +121,7 @@ PLAID_WEBHOOK_URL=https://your-tunnel/api/plaid/webhook`}
             items.map((item) => (
               <div
                 key={item.itemId}
-                className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4"
+                className="rounded-sm border border-border bg-background px-4 py-4"
               >
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
@@ -135,8 +135,8 @@ PLAID_WEBHOOK_URL=https://your-tunnel/api/plaid/webhook`}
                       <Badge
                         className={
                           item.status === "error"
-                            ? "border-rose-400/30 bg-rose-400/10 text-rose-200"
-                            : "border-emerald-400/30 bg-emerald-400/10 text-emerald-200"
+                            ? "border-red-500/40 text-red-400"
+                            : "border-emerald-500/40 text-emerald-400"
                         }
                       >
                         {item.status ?? "active"}
@@ -144,7 +144,7 @@ PLAID_WEBHOOK_URL=https://your-tunnel/api/plaid/webhook`}
                       <Badge>Last sync: {formatTimestamp(item.lastSyncedAt)}</Badge>
                     </div>
                     {item.error ? (
-                      <p className="mt-2 text-sm text-rose-300">{item.error}</p>
+                      <p className="mt-2 text-sm text-red-400">{item.error}</p>
                     ) : null}
                   </div>
                   <div className="flex flex-col items-end gap-2">
@@ -175,12 +175,12 @@ PLAID_WEBHOOK_URL=https://your-tunnel/api/plaid/webhook`}
 
       <Card>
         <CardHeader className="flex-row items-center gap-3">
-          <Landmark className="size-5 text-cyan-300" />
+          <Landmark className="size-5 text-emerald-500" />
           <CardTitle>Plaid-linked accounts</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           {plaidAccounts.length === 0 ? (
-            <p className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-6 text-sm text-slate-400">
+            <p className="rounded-sm border border-border bg-background px-4 py-6 text-sm text-slate-400">
               No Plaid-sourced accounts have been synced into the warehouse yet for
               your connections. Use “Sync now” on a connection above (or wait for the
               webhook), then refresh this page. Accounts and balances appear from
@@ -192,7 +192,7 @@ PLAID_WEBHOOK_URL=https://your-tunnel/api/plaid/webhook`}
               {plaidAccounts.map((account) => (
                 <div
                   key={account.id}
-                  className="rounded-2xl border border-white/10 bg-white/[0.03] p-4"
+                  className="rounded-sm border border-border bg-background p-4"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
@@ -203,19 +203,17 @@ PLAID_WEBHOOK_URL=https://your-tunnel/api/plaid/webhook`}
                       </p>
                     </div>
                     {account.mask && account.mask !== "unknown" ? (
-                      <Badge className="border-white/20 bg-white/5 font-mono text-xs text-slate-200">
+                      <Badge className="text-slate-200">
                         •••• {account.mask}
                       </Badge>
                     ) : (
-                      <Badge className="border-white/10 bg-white/5 text-xs text-slate-400">
-                        no mask
-                      </Badge>
+                      <Badge>no mask</Badge>
                     )}
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
                     <div>
                       <span className="text-slate-400">Current</span>
-                      <div className="font-medium text-white">
+                      <div className="font-mono font-medium text-white">
                         {account.currentBalance != null
                           ? new Intl.NumberFormat(undefined, {
                               style: "currency",
@@ -226,7 +224,7 @@ PLAID_WEBHOOK_URL=https://your-tunnel/api/plaid/webhook`}
                     </div>
                     <div>
                       <span className="text-slate-400">Available</span>
-                      <div className="font-medium text-white">
+                      <div className="font-mono font-medium text-white">
                         {account.availableBalance != null
                           ? new Intl.NumberFormat(undefined, {
                               style: "currency",
@@ -255,23 +253,23 @@ PLAID_WEBHOOK_URL=https://your-tunnel/api/plaid/webhook`}
 
       <Card>
         <CardHeader className="flex-row items-center gap-3">
-          <Workflow className="size-5 text-cyan-300" />
+          <Workflow className="size-5 text-emerald-500" />
           <CardTitle>How Plaid sync flows through the warehouse</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 text-sm text-slate-300">
           <p>
             1. Plaid Link returns a public token, which is exchanged for a durable
             access token stored in{" "}
-            <code className="text-cyan-200">ops_finance.plaid_items</code>.
+            <code className="text-emerald-400">ops_finance.plaid_items</code>.
           </p>
           <p>
-            2. <code className="text-cyan-200">/transactions/sync</code> pulls
+            2. <code className="text-emerald-400">/transactions/sync</code> pulls
             added, modified, and removed transactions using a per-item cursor.
           </p>
           <p>
             3. Each change is written to{" "}
-            <code className="text-cyan-200">raw_finance.transaction_events</code>{" "}
-            with <code className="text-cyan-200">source_name = &quot;plaid&quot;</code>,
+            <code className="text-emerald-400">raw_finance.transaction_events</code>{" "}
+            with <code className="text-emerald-400">source_name = &quot;plaid&quot;</code>,
             reusing the exact normalization the CSV path uses.
           </p>
           <p>
@@ -279,8 +277,8 @@ PLAID_WEBHOOK_URL=https://your-tunnel/api/plaid/webhook`}
             immediately on Connections, Overview, and Transactions.
           </p>
           <p>
-            5. With <code className="text-cyan-200">PLAID_WEBHOOK_URL</code> set,
-            Plaid pushes <code className="text-cyan-200">SYNC_UPDATES_AVAILABLE</code>{" "}
+            5. With <code className="text-emerald-400">PLAID_WEBHOOK_URL</code> set,
+            Plaid pushes <code className="text-emerald-400">SYNC_UPDATES_AVAILABLE</code>{" "}
             and the app auto-syncs; otherwise use “Sync now”.
           </p>
           <p>

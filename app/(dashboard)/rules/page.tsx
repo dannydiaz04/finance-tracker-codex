@@ -47,14 +47,14 @@ export default async function RulesPage({ searchParams }: RulesPageProps) {
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <Card>
           <CardHeader className="flex-row items-center gap-3">
-            <ShieldCheck className="size-5 text-cyan-300" />
+            <ShieldCheck className="size-5 text-emerald-500" />
             <CardTitle>Category rules</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {rules.map((rule) => (
               <div
                 key={rule.id}
-                className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4"
+                className="rounded-sm border border-border bg-background px-4 py-4"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div>
@@ -75,14 +75,14 @@ export default async function RulesPage({ searchParams }: RulesPageProps) {
 
         <Card>
           <CardHeader className="flex-row items-center gap-3">
-            <Sparkles className="size-5 text-cyan-300" />
+            <Sparkles className="size-5 text-emerald-500" />
             <CardTitle>Learning suggestions</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {ruleSuggestions.map((suggestion) => (
               <div
                 key={suggestion.suggestionId}
-                className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4"
+                className="rounded-sm border border-border bg-background px-4 py-4"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div>
@@ -103,7 +103,7 @@ export default async function RulesPage({ searchParams }: RulesPageProps) {
               </div>
             ))}
             {ruleSuggestions.length === 0 ? (
-              <p className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-6 text-sm text-slate-400">
+              <p className="rounded-sm border border-border bg-background px-4 py-6 text-sm text-slate-400">
                 No pending learned rules.
               </p>
             ) : null}
@@ -114,7 +114,7 @@ export default async function RulesPage({ searchParams }: RulesPageProps) {
       <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
         <Card>
           <CardHeader className="flex-row items-center gap-3">
-            <GitPullRequestDraft className="size-5 text-fuchsia-300" />
+            <GitPullRequestDraft className="size-5 text-amber-400" />
             <CardTitle>Review queue</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -130,14 +130,14 @@ export default async function RulesPage({ searchParams }: RulesPageProps) {
 
         <Card>
           <CardHeader className="flex-row items-center gap-3">
-            <Repeat2 className="size-5 text-emerald-300" />
+            <Repeat2 className="size-5 text-emerald-500" />
             <CardTitle>Internal movement reconciliation</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {reconciliationItems.map((item) => (
               <div
                 key={item.transactionId}
-                className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-4"
+                className="rounded-sm border border-border bg-background px-4 py-4"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div>
@@ -146,7 +146,7 @@ export default async function RulesPage({ searchParams }: RulesPageProps) {
                       {item.accountName} · {item.description}
                     </p>
                   </div>
-                  <p className="shrink-0 font-medium text-white">
+                  <p className="shrink-0 font-mono font-medium text-white">
                     {formatCurrency(item.signedAmount)}
                   </p>
                 </div>
@@ -158,7 +158,7 @@ export default async function RulesPage({ searchParams }: RulesPageProps) {
               </div>
             ))}
             {reconciliationItems.length === 0 ? (
-              <p className="rounded-2xl border border-emerald-300/20 bg-emerald-300/10 px-4 py-6 text-sm text-emerald-50">
+              <p className="rounded-sm border border-emerald-500/30 bg-background px-4 py-6 text-sm text-emerald-400">
                 All visible accounting-only movements have a matching leg.
               </p>
             ) : null}

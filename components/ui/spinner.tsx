@@ -16,7 +16,7 @@ export function Spinner({ className, label }: SpinnerProps) {
     >
       <Loader2
         aria-hidden
-        className={cn("size-4 animate-spin text-cyan-300", className)}
+        className={cn("size-4 animate-spin text-emerald-500", className)}
       />
       {label ? (
         <span className="text-xs text-slate-400">{label}</span>

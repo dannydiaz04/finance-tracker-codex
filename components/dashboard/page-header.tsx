@@ -16,16 +16,14 @@ export function PageHeader({
   action,
 }: PageHeaderProps) {
   return (
-    <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-      <div className="max-w-2xl space-y-3">
-        <Badge className="border-cyan-400/20 bg-cyan-400/10 text-cyan-200">
-          {eyebrow}
-        </Badge>
+    <div className="flex flex-col gap-4 border-b border-border pb-5 md:flex-row md:items-end md:justify-between">
+      <div className="max-w-2xl space-y-2">
+        <Badge>{eyebrow}</Badge>
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight text-white md:text-4xl">
+          <h1 className="text-2xl font-semibold tracking-tight text-white">
             {title}
           </h1>
-          <p className="mt-3 text-sm leading-7 text-slate-400 md:text-base">
+          <p className="mt-1.5 text-sm leading-6 text-slate-500">
             {description}
           </p>
         </div>

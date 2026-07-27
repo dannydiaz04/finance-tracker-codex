@@ -112,9 +112,9 @@ export function TransactionFilters({
   };
 
   return (
-    <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
-      <div className="mb-4 flex items-center gap-3 text-sm text-slate-300">
-        <SlidersHorizontal className="size-4 text-cyan-300" />
+    <div className="rounded-sm border border-border bg-card p-5">
+      <div className="mb-4 flex items-center gap-3 text-sm text-slate-400">
+        <SlidersHorizontal className="size-4 text-emerald-500" />
         Search and filter posted transactions; date fields use `postedAt` /
         warehouse `posted_at`.
       </div>
@@ -275,7 +275,7 @@ export function TransactionFilters({
           onChange={(event) =>
             updateField("excludePlaid", event.target.checked)
           }
-          className="size-4 rounded border-white/20 bg-white/5 text-cyan-400 focus:ring-cyan-400/40"
+          className="size-4 rounded-sm border-border bg-background accent-emerald-600 focus:ring-emerald-500/40"
         />
         <label
           htmlFor="exclude-plaid"
@@ -291,7 +291,7 @@ export function TransactionFilters({
             <button
               key={`${suggestion.type}-${suggestion.label}`}
               type="button"
-              className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-slate-300 transition-colors hover:border-cyan-300/40 hover:text-white"
+              className="rounded-sm border border-border bg-background px-3 py-1.5 text-xs text-slate-400 transition-colors hover:border-emerald-500/50 hover:text-white"
               onClick={() => {
                 const nextState = {
                   ...formState,

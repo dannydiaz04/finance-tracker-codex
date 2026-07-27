@@ -224,8 +224,8 @@ export function TransactionTable({
   const hasModifications = filterCount > 0 || sort !== null;
 
   return (
-    <div className="rounded-3xl border border-white/10 bg-slate-950/40">
-      <div className="hidden items-center gap-4 border-b border-white/10 px-5 py-4 text-xs uppercase tracking-[0.24em] text-slate-500 lg:grid lg:grid-cols-[1.2fr_0.72fr_1fr_0.8fr_0.8fr_0.8fr]">
+    <div className="rounded-sm border border-border bg-card">
+      <div className="hidden items-center gap-4 border-b border-border px-5 py-3 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-500 lg:grid lg:grid-cols-[1.2fr_0.72fr_1fr_0.8fr_0.8fr_0.8fr]">
         <ColumnHeader
           id="merchant"
           label="Merchant"
@@ -291,7 +291,7 @@ export function TransactionTable({
       </div>
 
       {hasModifications ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-white/[0.02] px-5 py-2 text-xs text-slate-400">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-white/[0.02] px-5 py-2 text-xs text-slate-400">
           <span>
             Showing {visibleTransactions.length} of {transactions.length} rows
             {filterCount > 0
@@ -307,17 +307,17 @@ export function TransactionTable({
               setSort(null);
               setFilters(INITIAL_FILTERS);
             }}
-            className="rounded-md px-2 py-1 text-cyan-300 transition-colors hover:bg-white/5 hover:text-cyan-100"
+            className="rounded-sm px-2 py-1 text-emerald-400 transition-colors hover:bg-white/5 hover:text-emerald-300"
           >
             Reset columns
           </button>
         </div>
       ) : null}
 
-      <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3 lg:hidden">
+      <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 lg:hidden">
         <label
           htmlFor="transaction-sort"
-          className="text-xs uppercase tracking-[0.24em] text-slate-500"
+          className="font-mono text-[11px] uppercase tracking-[0.14em] text-slate-500"
         >
           Sort
         </label>
@@ -348,8 +348,8 @@ export function TransactionTable({
         </Select>
       </div>
 
-      <div className="overflow-hidden rounded-b-[calc(1.5rem-1px)]">
-        <div className="grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 lg:grid-cols-1 lg:gap-0 lg:divide-y lg:divide-white/6 lg:p-0">
+      <div className="overflow-hidden">
+        <div className="grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 lg:grid-cols-1 lg:gap-0 lg:divide-y lg:divide-border lg:p-0">
           {visibleTransactions.map((transaction, index) => (
             <motion.button
               key={transaction.transactionId}
@@ -358,38 +358,38 @@ export function TransactionTable({
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: Math.min(index, 12) * 0.02, duration: 0.2 }}
               className={cn(
-                "w-full rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-4 text-left transition-colors hover:bg-white/[0.05]",
+                "w-full rounded-sm border border-border bg-background px-5 py-3 text-left transition-colors hover:bg-white/[0.04]",
                 "lg:rounded-none lg:border-0 lg:bg-transparent lg:hover:bg-white/[0.03]",
                 selectedId === transaction.transactionId &&
-                  "border-cyan-400/30 bg-cyan-400/[0.06] lg:border-0 lg:bg-cyan-400/6",
+                  "border-emerald-500/50 bg-emerald-500/[0.06] lg:border-0 lg:bg-emerald-500/5",
               )}
               onClick={() => openTransaction(transaction.transactionId)}
             >
               {/* Desktop table row (lg+) */}
               <div className="hidden lg:grid lg:w-full lg:grid-cols-[1.2fr_0.72fr_1fr_0.8fr_0.8fr_0.8fr] lg:gap-4">
                 <div>
-                  <p className="font-medium text-white">
+                  <p className="text-sm font-medium text-white">
                     {transaction.merchantRaw}
                   </p>
-                  <p className="mt-1 text-sm text-slate-400">
+                  <p className="mt-1 text-xs text-slate-500">
                     {transaction.descriptionRaw}
                   </p>
                 </div>
-                <div className="flex items-center text-sm text-slate-300">
+                <div className="flex items-center font-mono text-xs text-slate-400">
                   {formatTransactionDate(transaction.postedAt)}
                 </div>
                 <div className="flex items-center">
                   <Badge>{transaction.categoryLabel}</Badge>
                 </div>
-                <div className="flex items-center text-sm text-slate-300">
+                <div className="flex items-center text-xs text-slate-400">
                   {transaction.accountName}
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge
                     className={cn(
                       transaction.pending
-                        ? "border-amber-300/20 bg-amber-300/10 text-amber-100"
-                        : "border-emerald-300/20 bg-emerald-300/10 text-emerald-100",
+                        ? "border-amber-500/40 text-amber-400"
+                        : "border-emerald-500/40 text-emerald-400",
                     )}
                   >
                     {transaction.pending ? "Pending" : "Posted"}
@@ -400,10 +400,10 @@ export function TransactionTable({
                 </div>
                 <div
                   className={cn(
-                    "flex items-center justify-end text-right font-medium",
+                    "flex items-center justify-end text-right font-mono text-sm font-medium",
                     transaction.signedAmount < 0
-                      ? "text-white"
-                      : "text-emerald-300",
+                      ? "text-red-400"
+                      : "text-emerald-400",
                   )}
                 >
                   {formatCurrency(transaction.signedAmount)}
@@ -418,10 +418,10 @@ export function TransactionTable({
                   </p>
                   <p
                     className={cn(
-                      "shrink-0 font-semibold",
+                      "shrink-0 font-mono font-semibold",
                       transaction.signedAmount < 0
-                        ? "text-white"
-                        : "text-emerald-300",
+                        ? "text-red-400"
+                        : "text-emerald-400",
                     )}
                   >
                     {formatCurrency(transaction.signedAmount)}
@@ -437,8 +437,8 @@ export function TransactionTable({
                   <Badge
                     className={cn(
                       transaction.pending
-                        ? "border-amber-300/20 bg-amber-300/10 text-amber-100"
-                        : "border-emerald-300/20 bg-emerald-300/10 text-emerald-100",
+                        ? "border-amber-500/40 text-amber-400"
+                        : "border-emerald-500/40 text-emerald-400",
                     )}
                   >
                     {transaction.pending ? "Pending" : "Posted"}
@@ -446,7 +446,7 @@ export function TransactionTable({
                   <Badge>
                     {transaction.classificationSource.replace("_", " ")}
                   </Badge>
-                  <span className="ml-auto text-xs text-slate-400">
+                  <span className="ml-auto font-mono text-xs text-slate-500">
                     {formatTransactionDate(transaction.postedAt)} ·{" "}
                     {transaction.accountName}
                   </span>
@@ -534,8 +534,8 @@ function ColumnHeader(props: ColumnHeaderProps) {
         aria-haspopup="dialog"
         onClick={() => setOpen((value) => !value)}
         className={cn(
-          "inline-flex items-center gap-1.5 rounded-md px-1 py-0.5 transition-colors hover:bg-white/5 hover:text-slate-300",
-          (isSorted || hasFilter) && "text-cyan-200",
+          "inline-flex items-center gap-1.5 rounded-sm px-1 py-0.5 transition-colors hover:bg-white/5 hover:text-slate-300",
+          (isSorted || hasFilter) && "text-emerald-400",
         )}
       >
         <span>{label}</span>
@@ -554,7 +554,7 @@ function ColumnHeader(props: ColumnHeaderProps) {
         <div
           role="dialog"
           className={cn(
-            "absolute top-full z-30 mt-2 w-72 rounded-2xl border border-white/10 bg-slate-950/95 p-3 text-left text-xs normal-case tracking-normal text-slate-200 shadow-2xl backdrop-blur",
+            "absolute top-full z-30 mt-2 w-72 rounded-sm border border-border bg-card p-3 text-left font-sans text-xs normal-case tracking-normal text-slate-200 shadow-xl",
             popoverAlign === "right" ? "right-0" : "left-0",
           )}
         >
@@ -617,8 +617,8 @@ function SortRow({ current, onSort, ascLabel, descLabel }: SortRowProps) {
         type="button"
         onClick={() => onSort("asc")}
         className={cn(
-          "inline-flex items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1.5 text-xs text-slate-200 transition-colors hover:bg-white/10",
-          current === "asc" && "border-cyan-300/40 bg-cyan-400/10 text-cyan-100",
+          "inline-flex items-center justify-center gap-1.5 rounded-sm border border-border bg-background px-2 py-1.5 text-xs text-slate-200 transition-colors hover:bg-white/5",
+          current === "asc" && "border-emerald-500/50 bg-emerald-500/10 text-emerald-400",
         )}
       >
         <ArrowUp className="size-3" />
@@ -628,8 +628,8 @@ function SortRow({ current, onSort, ascLabel, descLabel }: SortRowProps) {
         type="button"
         onClick={() => onSort("desc")}
         className={cn(
-          "inline-flex items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1.5 text-xs text-slate-200 transition-colors hover:bg-white/10",
-          current === "desc" && "border-cyan-300/40 bg-cyan-400/10 text-cyan-100",
+          "inline-flex items-center justify-center gap-1.5 rounded-sm border border-border bg-background px-2 py-1.5 text-xs text-slate-200 transition-colors hover:bg-white/5",
+          current === "desc" && "border-emerald-500/50 bg-emerald-500/10 text-emerald-400",
         )}
       >
         <ArrowDown className="size-3" />
@@ -763,11 +763,11 @@ function TextFilterPanel({
           type="checkbox"
           checked={allSelected}
           onChange={toggleAll}
-          className="size-4 rounded border-white/20 bg-slate-900 accent-cyan-400"
+          className="size-4 rounded-sm border-border bg-background accent-emerald-600"
         />
         <span className="font-medium">(Select all)</span>
       </label>
-      <div className="max-h-56 overflow-y-auto rounded-xl border border-white/5 bg-white/[0.02]">
+      <div className="max-h-56 overflow-y-auto rounded-sm border border-border bg-background">
         {visibleValues.length === 0 ? (
           <p className="px-3 py-6 text-center text-slate-400">No matches</p>
         ) : (
@@ -780,7 +780,7 @@ function TextFilterPanel({
                 type="checkbox"
                 checked={selectedSet.has(value)}
                 onChange={() => toggleValue(value)}
-                className="size-4 rounded border-white/20 bg-slate-900 accent-cyan-400"
+                className="size-4 rounded-sm border-border bg-background accent-emerald-600"
               />
               <span className="truncate text-slate-100">
                 {formatValue ? formatValue(value) : value}

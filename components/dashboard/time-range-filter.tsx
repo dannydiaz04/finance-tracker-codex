@@ -141,7 +141,7 @@ export function TimeRangeFilter() {
       <Button
         type="button"
         size="sm"
-        className="fixed bottom-4 right-3 z-40 h-9 w-9 justify-center p-0 shadow-[0_10px_40px_rgba(34,211,238,0.2)] md:bottom-auto md:right-4 md:top-4"
+        className="fixed bottom-4 right-3 z-40 h-9 w-9 justify-center p-0 md:bottom-auto md:right-4 md:top-4"
         onClick={() => setOpen(true)}
         aria-label={isPending ? "Loading new time range" : "Time filters"}
         aria-busy={isPending}
@@ -173,14 +173,14 @@ export function TimeRangeFilter() {
 
         <aside
           className={cn(
-            "absolute right-0 top-0 flex h-full w-full max-w-md flex-col border-l border-white/10 bg-slate-950 shadow-[-24px_0_80px_rgba(2,6,23,0.55)] transition-transform duration-300",
+            "absolute right-0 top-0 flex h-full w-full max-w-md flex-col border-l border-border bg-card transition-transform duration-300",
             open ? "translate-x-0" : "translate-x-full",
           )}
           aria-label="Time filter parameters"
         >
-          <div className="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-5">
+          <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-5">
             <div className="flex items-start gap-3">
-              <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 p-2.5 text-cyan-200">
+              <div className="rounded-sm border border-border bg-background p-2.5 text-emerald-500">
                 <CalendarRange className="size-5" />
               </div>
               <div>
@@ -209,7 +209,7 @@ export function TimeRangeFilter() {
 
           <div className="flex-1 overflow-y-auto px-5 py-5">
             <div className="space-y-5">
-              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+              <div className="rounded-sm border border-border bg-background p-4">
                 <p className="text-xs uppercase tracking-[0.22em] text-slate-500">
                   Filter fields
                 </p>
@@ -221,10 +221,10 @@ export function TimeRangeFilter() {
                 </p>
               </div>
 
-              <label className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+              <label className="flex items-start gap-3 rounded-sm border border-border bg-background p-4">
                 <input
                   type="checkbox"
-                  className="mt-1 size-4 rounded border-white/20 bg-slate-950"
+                  className="mt-1 size-4 rounded-sm border-border bg-background accent-emerald-600"
                   checked={currentFilter.excludePlaid ?? false}
                   disabled={isPending}
                   onChange={(event) => {
@@ -261,10 +261,10 @@ export function TimeRangeFilter() {
                       type="button"
                       disabled={isPending}
                       className={cn(
-                        "h-10 rounded-xl border border-white/10 px-3 text-xs font-medium text-slate-400 transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+                        "h-9 rounded-sm border px-3 font-mono text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50",
                         currentFilter.preset === option.value
-                          ? "border-cyan-300/30 bg-cyan-400/15 text-cyan-100"
-                          : "bg-white/[0.03] hover:bg-white/[0.06] hover:text-white",
+                          ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-400"
+                          : "border-border text-slate-500 hover:bg-white/[0.04] hover:text-white",
                       )}
                       onClick={() => {
                         const nextFilter = getPresetRange(option.value);
@@ -315,7 +315,7 @@ export function TimeRangeFilter() {
             </div>
           </div>
 
-          <div className="grid grid-cols-[1fr_auto] gap-3 border-t border-white/10 px-5 py-4">
+          <div className="grid grid-cols-[1fr_auto] gap-3 border-t border-border px-5 py-4">
             <Button
               type="button"
               disabled={isPending}

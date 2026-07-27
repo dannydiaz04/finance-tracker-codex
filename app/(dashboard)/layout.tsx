@@ -16,7 +16,7 @@ export default async function DashboardLayout({
   const plaidConfigured = getPlaidStatus().configured;
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,#11203d,transparent_28%),linear-gradient(180deg,#030712,#020617_45%,#02050d)]">
+    <div className="min-h-screen bg-background">
       <div className="mx-auto flex min-h-screen max-w-[1600px]">
         <Suspense fallback={null}>
           <SidebarNav />
