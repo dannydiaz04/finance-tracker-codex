@@ -4,10 +4,16 @@ import test from "node:test";
 import {
   describePreview,
   describeSaveResult,
+  getCategoryGroups,
   resolveDefaultCategoryId,
+  resolveCategoryGroup,
 } from "../../lib/categorization/override-form-state.ts";
 
-const categories = [{ id: "groceries" }, { id: "dining" }];
+const categories = [
+  { id: "groceries", group: "Essential" },
+  { id: "dining", group: "Lifestyle" },
+  { id: "travel", group: "Lifestyle" },
+];
 
 // --- resolveDefaultCategoryId --------------------------------------------------
 
@@ -18,6 +24,25 @@ test("default category is the current one when it's a real option", () => {
 test("default category is empty when current is null or not an option", () => {
   assert.equal(resolveDefaultCategoryId(null, categories), "");
   assert.equal(resolveDefaultCategoryId("uncategorized", categories), "");
+});
+
+// --- category hierarchy --------------------------------------------------------
+
+test("category groups are unique, trimmed, and sorted", () => {
+  assert.deepEqual(
+    getCategoryGroups([...categories, { id: "fees", group: " Essential " }]),
+    ["Essential", "Lifestyle"],
+  );
+});
+
+test("selected category resolves to its parent group", () => {
+  assert.equal(resolveCategoryGroup("dining", categories), "Lifestyle");
+  assert.equal(
+    resolveCategoryGroup("fees", [{ id: "fees", group: " Essential " }]),
+    "Essential",
+  );
+  assert.equal(resolveCategoryGroup("uncategorized", categories), "");
+  assert.equal(resolveCategoryGroup(null, categories), "");
 });
 
 // --- describeSaveResult --------------------------------------------------------

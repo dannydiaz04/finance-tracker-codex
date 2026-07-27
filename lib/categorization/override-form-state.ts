@@ -45,6 +45,27 @@ export function resolveDefaultCategoryId(
     : "";
 }
 
+/** Return the catalog's parent category groups once each, in display order. */
+export function getCategoryGroups(
+  categories: ReadonlyArray<{ group: string }>,
+): string[] {
+  return [...new Set(categories.map((category) => category.group.trim()).filter(Boolean))].sort(
+    (left, right) => left.localeCompare(right),
+  );
+}
+
+/** Resolve the parent group that owns a selected category id. */
+export function resolveCategoryGroup(
+  categoryId: string | null | undefined,
+  categories: ReadonlyArray<{ id: string; group: string }>,
+): string {
+  if (!categoryId) {
+    return "";
+  }
+
+  return categories.find((category) => category.id === categoryId)?.group.trim() ?? "";
+}
+
 /** Map an override POST response to a tone + message (success / partial / sample / error). */
 export function describeSaveResult(input: {
   ok: boolean;
