@@ -313,3 +313,24 @@ export type CategoryInsight = {
   sparkline: CategorySparklinePoint[];
   topMerchants: CategoryTopMerchant[];
 };
+
+/** Cash flow for one category: unlike CategoryInsight this keeps inflow and outflow apart. */
+export type CashflowCategorySlice = {
+  categoryId: string;
+  label: string;
+  inflow: number;
+  outflow: number;
+  net: number;
+  transactionCount: number;
+  /** Outflow as a fraction of total outflow across the slices in scope. */
+  outflowShare: number;
+  averageOutflow: number;
+  topMerchants: CategoryTopMerchant[];
+};
+
+export type CashflowCategoryBreakdown = {
+  /** Categories left after the selected-category filter, shares renormalized to that subset. */
+  slices: CashflowCategorySlice[];
+  /** Every category with movement in the time scope, so the filter can list unselected ones. */
+  options: CashflowCategorySlice[];
+};
