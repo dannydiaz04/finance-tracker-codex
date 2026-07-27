@@ -27,6 +27,10 @@ are gitignored and never committed.
    npm run etl:dropbox -- --dry-run    # preview classification, change nothing
    ```
 
+   Set `WAREHOUSE_IMPORT_USER_ID` in `.env.local` (or pass
+   `--user-id <id>`) so imports belong to the app user and appear in the
+   default dashboard views.
+
 ## What happens
 
 Each file is uploaded to the GCS landing bucket under

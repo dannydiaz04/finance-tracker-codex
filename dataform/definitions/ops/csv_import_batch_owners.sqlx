@@ -1,0 +1,16 @@
+config {
+  type: "operations",
+  schema: "ops_finance",
+  name: "csv_import_batch_owners",
+  description: "Ownership assignments for historical CSV import batches created before CLI user attribution.",
+  hasOutput: true
+}
+
+create table if not exists ${self()} (
+  import_batch_id string not null,
+  user_id string not null,
+  assigned_at timestamp not null
+)
+options (
+  description = "Maps legacy anonymous CSV import batches to their application owner."
+)

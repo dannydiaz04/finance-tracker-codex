@@ -11,6 +11,7 @@
 #   scripts/process-dropbox.sh                 # upload + process + dataform refresh
 #   scripts/process-dropbox.sh --no-dataform   # upload + process only
 #   scripts/process-dropbox.sh --dry-run       # show what would happen, change nothing
+#   scripts/process-dropbox.sh --user-id <id>  # stamp imports for an app user
 #
 # Naming contract: prefix each file with its source, e.g.
 #   chase-activity.csv, discover-export.csv, american_express-2026.csv,
@@ -26,16 +27,26 @@ MAX_FILES="${ETL_MAX_FILES:-50}"
 
 RUN_DATAFORM=1
 DRY_RUN=0
-for arg in "$@"; do
-  case "$arg" in
+IMPORT_USER_ID="${WAREHOUSE_IMPORT_USER_ID:-}"
+while [[ $# -gt 0 ]]; do
+  case "$1" in
     --no-dataform) RUN_DATAFORM=0 ;;
     --dry-run) DRY_RUN=1 ;;
+    --user-id)
+      [[ $# -ge 2 && -n "$2" ]] || {
+        echo "--user-id requires a value." >&2
+        exit 2
+      }
+      IMPORT_USER_ID="$2"
+      shift
+      ;;
     -h|--help)
       grep '^#' "$0" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
-    *) echo "Unknown option: $arg" >&2; exit 2 ;;
+    *) echo "Unknown option: $1" >&2; exit 2 ;;
   esac
+  shift
 done
 
 # Known source systems (longest names first so e.g. apple_card wins over apple).
@@ -107,7 +118,9 @@ fi
 echo
 echo "Uploaded ${uploaded} file(s). Running ETL runner against the bucket..."
 cd "$REPO_ROOT"
-npm run etl:runner -- --gcs-bucket "$BUCKET" --max-files "$MAX_FILES"
+runner_args=(--gcs-bucket "$BUCKET" --max-files "$MAX_FILES")
+[[ -n "$IMPORT_USER_ID" ]] && runner_args+=(--user-id "$IMPORT_USER_ID")
+npm run etl:runner -- "${runner_args[@]}"
 
 if [[ "$RUN_DATAFORM" -eq 1 ]]; then
   echo

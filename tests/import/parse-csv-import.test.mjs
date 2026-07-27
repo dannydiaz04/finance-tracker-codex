@@ -47,7 +47,7 @@ const profileFixtures = [
     fixtureFile: "capital_one_360_checking_5980.csv",
     fileName: "2026-04-09_360Checking_5980.csv",
     profileId: "capital_one.360_checking_5980.csv.v1",
-    matchedBy: ["filename"],
+    matchedBy: ["header-signature"],
     expected: {
       sourceAccountId: "capital_one_360_checking_5980",
       accountName: "Capital One 360 Checking",
@@ -63,7 +63,7 @@ const profileFixtures = [
     fixtureFile: "apple_card_transactions.csv",
     fileName: "Apple Card Transactions Apr 01.csv",
     profileId: "apple_card.transactions.csv.v1",
-    matchedBy: ["filename"],
+    matchedBy: ["header-signature"],
     expected: {
       sourceAccountId: "apple_card",
       accountName: "Apple Card",
@@ -149,7 +149,7 @@ const profileFixtures = [
       accountMask: "7788",
     },
     profileId: "discover.all_available.csv.v1",
-    matchedBy: ["filename", "header-signature"],
+    matchedBy: ["header-signature"],
     expected: {
       sourceAccountId: "discover_card",
       accountName: "Discover Card",

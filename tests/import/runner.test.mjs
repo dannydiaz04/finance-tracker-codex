@@ -46,6 +46,7 @@ test("Runner archives a landed CSV after persisting through the shared import pa
 
   const summary = await runLandingImports({
     landingRoot,
+    userId: "user-123",
     persistImport: async (parsedImport) => {
       persistedImport = parsedImport;
       return {
@@ -61,6 +62,8 @@ test("Runner archives a landed CSV after persisting through the shared import pa
   assert.equal(summary.rejectedCount, 0);
   assert.ok(persistedImport);
   assert.equal(persistedImport.importBatch.status, "loaded");
+  assert.equal(persistedImport.importBatch.userId, "user-123");
+  assert.equal(persistedImport.events[0].userId, "user-123");
 
   const [result] = summary.results;
 
@@ -69,7 +72,7 @@ test("Runner archives a landed CSV after persisting through the shared import pa
   assert.equal(result.failureReason, null);
   assert.equal(result.mappingResolutionStrategy, "profile");
   assert.equal(result.mappingProfileId, "discover.all_available.csv.v1");
-  assert.deepEqual(result.matchedBy, ["filename", "header-signature"]);
+  assert.deepEqual(result.matchedBy, ["header-signature"]);
   assert.equal(result.importBatchId, persistedImport.importBatch.importBatchId);
   assert.equal(result.rowCount, persistedImport.importBatch.rowCount);
   assert.ok(result.fileChecksum.length > 0);

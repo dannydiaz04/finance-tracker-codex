@@ -16,7 +16,7 @@ Options:
   --gcs-prefix <prefix>   Optional prefix under --gcs-bucket
   --max-files <count>     Maximum number of incoming files to process. Defaults to 1
   --source-system <name>  Only process files under incoming/<name>/
-  --user-id <id>          Owning user id stamped on ingested rows (overridden by a per-file context.json userId)
+  --user-id <id>          Owning user id stamped on ingested rows (defaults to WAREHOUSE_IMPORT_USER_ID; overridden by a per-file context.json userId)
   --json                  Print the full run summary as JSON
   --help                  Show this help text
 
@@ -103,11 +103,14 @@ async function main() {
     ? buildGcsLandingRoot(values["gcs-bucket"], values["gcs-prefix"])
     : values["landing-root"];
 
+  const configuredUserId = process.env.WAREHOUSE_IMPORT_USER_ID?.trim();
+  const userId = values["user-id"] ?? (configuredUserId || undefined);
+
   const summary = await runLandingImports({
     landingRoot,
     maxFiles,
     sourceSystem: values["source-system"],
-    userId: values["user-id"],
+    userId,
   });
 
   if (values.json) {

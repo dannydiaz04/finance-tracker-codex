@@ -13,11 +13,11 @@ export function accountUserScopePredicate(alias?: string) {
 export function anonymousCsvDedupePredicate(alias?: string) {
   const prefix = alias ? `${alias}.` : "";
 
-  return `(${prefix}user_id IS NOT NULL OR ${prefix}source_name != 'csv' OR ROW_NUMBER() OVER (PARTITION BY ${prefix}canonical_group_id ORDER BY ${prefix}transaction_id) = 1)`;
+  return `(${prefix}source_name != 'csv' OR ROW_NUMBER() OVER (PARTITION BY ${prefix}user_id, ${prefix}source_name, ${prefix}canonical_group_id ORDER BY ${prefix}transaction_id) = 1)`;
 }
 
 export function plaidCanonicalDedupePredicate(alias?: string) {
   const prefix = alias ? `${alias}.` : "";
 
-  return `(${prefix}source_name != 'plaid' OR ROW_NUMBER() OVER (PARTITION BY ${prefix}user_id, ${prefix}source_name, ${prefix}canonical_group_id, ${prefix}signed_amount ORDER BY ${prefix}pending, ${prefix}transaction_id) = 1)`;
+  return `(${prefix}source_name != 'plaid' OR (COUNTIF(${prefix}source_name = 'csv') OVER (PARTITION BY ${prefix}user_id, ${prefix}canonical_group_id) = 0 AND ROW_NUMBER() OVER (PARTITION BY ${prefix}user_id, ${prefix}source_name, ${prefix}canonical_group_id, ${prefix}signed_amount ORDER BY ${prefix}pending, ${prefix}transaction_id) = 1))`;
 }
