@@ -1,8 +1,10 @@
 "use client";
 
+import { Pencil } from "lucide-react";
 import { useState } from "react";
 
 import { OverrideForm } from "@/components/transactions/override-form";
+import { Button } from "@/components/ui/button";
 import type {
   Category,
   CategoryGroup,
@@ -26,12 +28,30 @@ export function ReviewQueueCard({
   if (resolved) {
     return (
       <div className="rounded-sm border border-emerald-500/30 bg-background px-4 py-4 text-sm text-emerald-400">
-        <p className="font-medium">{item.merchant} — resolved</p>
-        <p className="mt-1 text-emerald-400/80">
-          {resolved.persisted
-            ? "Removed from the queue; reflected in reports on the next warehouse refresh."
-            : "Saved locally — connect a warehouse to persist this override."}
-        </p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="font-medium">{item.merchant} — resolved</p>
+            <p className="mt-1 text-emerald-400/80">
+              {resolved.persisted
+                ? "Removed from the queue; reflected in reports on the next warehouse refresh."
+                : "Saved locally — connect a warehouse to persist this override."}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              Editing appends a corrected category; it does not return this transaction to
+              the review queue.
+            </p>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="shrink-0 gap-1.5"
+            onClick={() => setResolved(null)}
+          >
+            <Pencil className="size-3.5" />
+            Edit review
+          </Button>
+        </div>
       </div>
     );
   }
