@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type {
   Category,
+  CategoryGroup,
   Transaction,
   TransactionDetail,
 } from "@/lib/types/finance";
@@ -28,12 +29,14 @@ type TransactionDrawerProps = {
    */
   transactions: Transaction[];
   categories: Category[];
+  categoryGroups: CategoryGroup[];
 };
 
 export function TransactionDrawer({
   detail,
   transactions,
   categories,
+  categoryGroups,
 }: TransactionDrawerProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -117,6 +120,7 @@ export function TransactionDrawer({
                 </CardHeader>
                 <CardContent className="min-w-0 grid gap-3 text-sm text-slate-300">
                   <div className="flex flex-wrap gap-2">
+                    <Badge>{active.categoryGroup}</Badge>
                     <Badge>{active.categoryLabel}</Badge>
                     <Badge>{active.transactionClass.replace("_", " ")}</Badge>
                     <Badge>{active.accountName}</Badge>
@@ -142,6 +146,7 @@ export function TransactionDrawer({
                     transactionId={active.transactionId}
                     currentCategoryId={active.derivedCategoryId}
                     categories={categories}
+                    categoryGroups={categoryGroups}
                     onResolved={() => router.refresh()}
                   />
                 </CardContent>

@@ -3,13 +3,16 @@ import { z } from "zod";
 
 import { resolveRouteUserId } from "@/lib/auth/session";
 import {
+  buildCategoryDefinitionRow,
   isSystemCategoryId,
   slugifyCategoryId,
 } from "@/lib/categorization/category-catalog";
+import { normalizeCategoryGroupLabel } from "@/lib/categorization/category-group-catalog";
 import { insertBigQueryRows, isBigQueryConfigured } from "@/lib/bigquery/client";
 import {
   countCategoryReferences,
   getCategories,
+  getCategoryGroups,
   getTransactionIdsForCategory,
 } from "@/lib/queries/catalog";
 import { getRules } from "@/lib/queries/rules";
@@ -37,29 +40,6 @@ const archiveSchema = z.object({
 });
 
 const DEFAULT_COLOR = "#64748b";
-
-function definitionRow(input: {
-  userId: string;
-  category: Category;
-  status: "active" | "archived";
-  isSystem: boolean;
-  now: string;
-}) {
-  return {
-    user_id: input.userId,
-    category_id: input.category.id,
-    label: input.category.label,
-    category_l1: input.category.group,
-    category_l2: input.category.sublabel,
-    color: input.category.color,
-    sort_order: input.category.sortOrder ?? null,
-    status: input.status,
-    is_system: input.isSystem,
-    change_source: "user",
-    updated_at: input.now,
-    created_at: input.now,
-  };
-}
 
 // Reassign a deterministic rule to a different category by appending a new version that
 // shares rule_id (fact_classification keeps the latest row per rule_id).
@@ -90,7 +70,20 @@ export async function POST(request: NextRequest) {
     }
 
     const payload = upsertSchema.parse(await request.json());
-    const categories = await getCategories();
+    const categories = await getCategories({ strict: true });
+    const categoryGroups = await getCategoryGroups(categories, { strict: true });
+    const parentCategory = categoryGroups.find(
+      (group) =>
+        normalizeCategoryGroupLabel(group.label) ===
+        normalizeCategoryGroupLabel(payload.group),
+    );
+
+    if (!parentCategory) {
+      return NextResponse.json(
+        { error: "Choose an existing category before saving the subcategory." },
+        { status: 400 },
+      );
+    }
 
     const isUpdate = Boolean(payload.categoryId);
     const existing = payload.categoryId
@@ -98,19 +91,22 @@ export async function POST(request: NextRequest) {
       : undefined;
 
     if (isUpdate && !existing) {
-      return NextResponse.json({ error: "Unknown category." }, { status: 404 });
+      return NextResponse.json({ error: "Unknown subcategory." }, { status: 404 });
     }
 
-    // Guard against accidental duplicate labels within the same group on create.
+    // Guard against accidental duplicate subcategory labels within the same category.
     if (!isUpdate) {
       const clash = categories.find(
         (item) =>
-          item.label.toLowerCase() === payload.label.toLowerCase() &&
-          item.group.toLowerCase() === payload.group.toLowerCase(),
+          item.label.trim().toLowerCase() === payload.label.toLowerCase() &&
+          normalizeCategoryGroupLabel(item.group) ===
+            normalizeCategoryGroupLabel(parentCategory.label),
       );
       if (clash) {
         return NextResponse.json(
-          { error: `A "${payload.label}" category already exists in ${payload.group}.` },
+          {
+            error: `A "${payload.label}" subcategory already exists in ${parentCategory.label}.`,
+          },
           { status: 409 },
         );
       }
@@ -126,13 +122,13 @@ export async function POST(request: NextRequest) {
     const category: Category = {
       id: categoryId,
       label: payload.label,
-      group: payload.group,
+      group: parentCategory.label,
       sublabel: payload.sublabel ?? "",
       color: payload.color ?? existing?.color ?? DEFAULT_COLOR,
       sortOrder: payload.sortOrder ?? existing?.sortOrder ?? null,
     };
 
-    const row = definitionRow({
+    const row = buildCategoryDefinitionRow({
       userId,
       category,
       status: "active",
@@ -151,7 +147,10 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Invalid category payload." },
+      {
+        error:
+          error instanceof Error ? error.message : "Invalid subcategory payload.",
+      },
       { status: 400 },
     );
   }
@@ -165,16 +164,16 @@ export async function DELETE(request: NextRequest) {
     }
 
     const payload = archiveSchema.parse(await request.json());
-    const categories = await getCategories();
+    const categories = await getCategories({ strict: true });
     const target = categories.find((item) => item.id === payload.categoryId);
 
     if (!target) {
-      return NextResponse.json({ error: "Unknown category." }, { status: 404 });
+      return NextResponse.json({ error: "Unknown subcategory." }, { status: 404 });
     }
 
     if (target.isSystem || isSystemCategoryId(target.id)) {
       return NextResponse.json(
-        { error: "System categories can be renamed but not deleted." },
+        { error: "System subcategories can be renamed but not deleted." },
         { status: 400 },
       );
     }
@@ -189,7 +188,7 @@ export async function DELETE(request: NextRequest) {
           status: "reassignment_required",
           references,
           error:
-            "This category is still in use. Choose a category to reassign its transactions and rules to before deleting.",
+            "This subcategory is still in use. Choose a subcategory to reassign its transactions and rules to before deleting.",
         },
         { status: 409 },
       );
@@ -201,13 +200,16 @@ export async function DELETE(request: NextRequest) {
 
       if (!reassignTarget) {
         return NextResponse.json(
-          { error: "Reassignment target category not found." },
+          { error: "Reassignment target subcategory not found." },
           { status: 400 },
         );
       }
       if (reassignTarget.id === target.id) {
         return NextResponse.json(
-          { error: "Reassignment target must differ from the category being deleted." },
+          {
+            error:
+              "Reassignment target must differ from the subcategory being deleted.",
+          },
           { status: 400 },
         );
       }
@@ -247,7 +249,7 @@ export async function DELETE(request: NextRequest) {
             user_id: userId,
             transaction_id: transactionId,
             category_id: reassignTarget!.id,
-            reason: `Reassigned from archived category "${target.label}".`,
+            reason: `Reassigned from archived subcategory "${target.label}".`,
             updated_at: now,
           })),
         );
@@ -255,7 +257,7 @@ export async function DELETE(request: NextRequest) {
       }
     }
 
-    const tombstone = definitionRow({
+    const tombstone = buildCategoryDefinitionRow({
       userId,
       category: target,
       status: "archived",
@@ -276,7 +278,12 @@ export async function DELETE(request: NextRequest) {
     });
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Invalid delete payload." },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Invalid subcategory delete payload.",
+      },
       { status: 400 },
     );
   }

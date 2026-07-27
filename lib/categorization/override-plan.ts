@@ -350,7 +350,10 @@ export function planOverride(input: {
   // spawn a rule/suggestion (overrides also feed AI manualExamples — see Agent C 3.5).
   const effectiveAction: RuleAction = categoryChanged ? input.action : "none";
   if (effectiveAction === "none") {
-    return empty("none", categoryChanged ? null : "Category unchanged — no rule learned.");
+    return empty(
+      "none",
+      categoryChanged ? null : "Subcategory unchanged — no rule learned.",
+    );
   }
 
   const draft = buildRuleSuggestionDraft({
@@ -360,7 +363,7 @@ export function planOverride(input: {
   });
   if (!draft) {
     // Internal categories (transfers / credit-card payments) cannot generalize.
-    return empty("none", "This category can’t be turned into a rule.");
+    return empty("none", "This subcategory can’t be turned into a rule.");
   }
 
   const guard = applyRuleGuardrails({

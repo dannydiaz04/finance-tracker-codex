@@ -17,10 +17,26 @@ export type ClassificationSource =
   | "ai_suggestion"
   | "fallback";
 
+/** User-visible parent category (the warehouse's historical category_l1/group field). */
+export type CategoryGroup = {
+  id: string;
+  label: string;
+  color: string;
+  /** Seed parent categories can be renamed/recolored but not archived. */
+  isSystem?: boolean;
+  /** User-controlled display ordering; null/undefined sorts after ordered rows. */
+  sortOrder?: number | null;
+};
+
+/**
+ * Assignable subcategory. Warehouse and API field names retain "category" for
+ * backwards compatibility because transaction classification persists this id.
+ */
 export type Category = {
   id: string;
   label: string;
   group: string;
+  /** Optional third-level descriptor retained from the warehouse's category_l2 field. */
   sublabel: string;
   color: string;
   /** Seed/system categories carry warehouse semantics and cannot be archived. */
@@ -92,6 +108,7 @@ export type Transaction = {
   derivedCategoryId: string;
   categoryGroup: string;
   categoryLabel: string;
+  /** Legacy category_l2 descriptor; this is not the assignable subcategory id. */
   subcategoryId: string | null;
   confidenceScore: number;
   classificationSource: ClassificationSource;
@@ -117,7 +134,10 @@ export type TransactionDetail = Transaction & {
 export type TransactionFilters = {
   query?: string;
   accountIds?: string[];
-  categoryGroups?: string[];
+  /** Stable parent-category ids used by URL and UI state. */
+  categoryGroupIds?: string[];
+  /** Current parent-category labels resolved server-side for warehouse filtering. */
+  categoryGroupLabels?: string[];
   categoryIds?: string[];
   merchant?: string;
   direction?: TransactionDirection | "all";

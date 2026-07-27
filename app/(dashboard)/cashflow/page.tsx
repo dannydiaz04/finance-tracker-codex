@@ -37,7 +37,7 @@ export default async function CashflowPage({ searchParams }: CashflowPageProps) 
   const hasCategoryScope = categoryIds.length > 0;
   const isSeriesTruncated = cashflow.length >= CASHFLOW_SERIES_DAY_LIMIT;
   const seriesSource = hasCategoryScope
-    ? "Daily inflow and outflow for the selected categories, rebuilt from transactions."
+    ? "Daily inflow and outflow for the selected subcategories, rebuilt from transactions."
     : "Daily inflow and outflow bars using the warehouse mart grain.";
   const seriesWindow = isSeriesTruncated
     ? ` Showing the ${CASHFLOW_SERIES_DAY_LIMIT} most recent days with movement (${cashflow[cashflow.length - 1].date} to ${cashflow[0].date}), so these bars cover less than the totals above.`
@@ -48,7 +48,7 @@ export default async function CashflowPage({ searchParams }: CashflowPageProps) 
       <PageHeader
         eyebrow="Cash flow"
         title="Watch inflow, outflow, and net movement as separate signals."
-        description="This view is designed to make transfer-cleaned movement obvious, first as a category breakdown of where the money went, then across daily windows."
+        description="This view is designed to make transfer-cleaned movement obvious, first as a subcategory breakdown of where the money went, then across daily windows."
       />
 
       <TimeFilterSummary
@@ -113,7 +113,7 @@ export default async function CashflowPage({ searchParams }: CashflowPageProps) 
         tone="flow"
         description={
           hasCategoryScope
-            ? "Abnormal spending, drawdown streaks, and outlier charges across every category in the current time scope — deliberately unfiltered, since a drawdown only makes sense against total money movement."
+            ? "Abnormal spending, drawdown streaks, and outlier charges across every subcategory in the current time scope — deliberately unfiltered, since a drawdown only makes sense against total money movement."
             : undefined
         }
       />

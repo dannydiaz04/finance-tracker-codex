@@ -22,7 +22,7 @@ export function CategoryHitRateList({ categories }: CategoryHitRateListProps) {
         <CardTitle>Rule hit-rate snapshot</CardTitle>
         <CardDescription>
           Share of classified spend with daily cadence and recent trend per
-          category.
+          subcategory.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">

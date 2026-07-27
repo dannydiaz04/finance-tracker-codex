@@ -6,10 +6,16 @@ import {
   mergeCategoryDefinitions,
   type CategoryDefinitionRow,
 } from "@/lib/categorization/category-catalog";
+import {
+  deriveCategoryGroups,
+  mergeCategoryGroupDefinitions,
+  slugifyCategoryGroupId,
+  type CategoryGroupDefinitionRow,
+} from "@/lib/categorization/category-group-catalog";
 import { coerceNullableNumber, coerceNumber } from "@/lib/queries/coerce";
 import { accountUserScopePredicate } from "@/lib/queries/user-scope";
 import { sampleAccounts, sampleCategories } from "@/lib/sample-data";
-import type { Account, Category } from "@/lib/types/finance";
+import type { Account, Category, CategoryGroup } from "@/lib/types/finance";
 
 type RawAccount = Omit<Account, "currentBalance" | "availableBalance"> & {
   currentBalance: unknown;
@@ -159,6 +165,32 @@ type RawCategoryDefinition = {
   isSystem: unknown;
 };
 
+type RawCategoryGroupSeed = {
+  label: string;
+  color: string | null;
+};
+
+type RawCategoryGroupDefinition = {
+  id: string;
+  label: string;
+  color: string;
+  sortOrder: unknown;
+  status: string;
+  isSystem: unknown;
+};
+
+type CatalogQueryOptions = {
+  /** Mutation paths fail closed instead of silently substituting fallback catalogs. */
+  strict?: boolean;
+};
+
+function withCatalogFallback<T>(
+  query: Promise<T[] | null>,
+  strict: boolean,
+): Promise<T[] | null> {
+  return strict ? query : query.catch(() => null);
+}
+
 /**
  * Effective catalog for the current user: the immutable seed dimension overlaid with the
  * user's latest active definitions from the append-only ops_finance.category_definitions
@@ -166,7 +198,9 @@ type RawCategoryDefinition = {
  * immediately without waiting for a Dataform rebuild, and so a not-yet-deployed ops table
  * degrades gracefully to the seed.
  */
-export async function getCategories(): Promise<Category[]> {
+export async function getCategories(
+  options: CatalogQueryOptions = {},
+): Promise<Category[]> {
   const projectId = getBigQueryProjectId();
 
   if (!projectId) {
@@ -175,8 +209,9 @@ export async function getCategories(): Promise<Category[]> {
 
   const userId = await getCurrentUserId();
 
-  const seed = await runBigQueryQuery<Category>(
-    `
+  const seed = await withCatalogFallback(
+    runBigQueryQuery<Category>(
+      `
       SELECT
         category_id AS id,
         label,
@@ -186,11 +221,14 @@ export async function getCategories(): Promise<Category[]> {
       FROM \`${projectId}.core_finance.dim_category\`
       ORDER BY label
     `,
-  ).catch(() => null);
+    ),
+    Boolean(options.strict),
+  );
 
   const userRows = userId
-    ? await runBigQueryQuery<RawCategoryDefinition>(
-        `
+    ? await withCatalogFallback(
+        runBigQueryQuery<RawCategoryDefinition>(
+          `
           SELECT
             category_id AS id,
             label,
@@ -207,8 +245,10 @@ export async function getCategories(): Promise<Category[]> {
             ORDER BY updated_at DESC
           ) = 1
         `,
-        { userId },
-      ).catch(() => null)
+          { userId },
+        ),
+        Boolean(options.strict),
+      )
     : null;
 
   if (!seed && !userRows) {
@@ -227,6 +267,105 @@ export async function getCategories(): Promise<Category[]> {
   }));
 
   return mergeCategoryDefinitions(seed ?? sampleCategories, definitions);
+}
+
+/**
+ * Effective parent-category catalog. Seed groups and legacy groups inferred from
+ * subcategories are overlaid with the user's dedicated append-only group definitions.
+ */
+export async function getCategoryGroups(
+  effectiveSubcategories?: Category[],
+  options: CatalogQueryOptions = {},
+): Promise<CategoryGroup[]> {
+  const projectId = getBigQueryProjectId();
+
+  if (!projectId) {
+    return deriveCategoryGroups(sampleCategories).map((group) => ({
+      ...group,
+      isSystem: true,
+    }));
+  }
+
+  const userId = await getCurrentUserId();
+  const [seedRows, userRows, subcategories] = await Promise.all([
+    withCatalogFallback(
+      runBigQueryQuery<RawCategoryGroupSeed>(
+        `
+        SELECT
+          category_l1 AS label,
+          COALESCE(
+            (ARRAY_AGG(color IGNORE NULLS ORDER BY category_id LIMIT 1))[SAFE_OFFSET(0)],
+            '#64748b'
+          ) AS color
+        FROM \`${projectId}.core_finance.dim_category\`
+        WHERE TRIM(category_l1) != ''
+        GROUP BY category_l1
+        ORDER BY label
+      `,
+      ),
+      Boolean(options.strict),
+    ),
+    userId
+      ? withCatalogFallback(
+          runBigQueryQuery<RawCategoryGroupDefinition>(
+            `
+            SELECT
+              category_group_id AS id,
+              label,
+              color,
+              sort_order AS sortOrder,
+              status,
+              COALESCE(is_system, FALSE) AS isSystem
+            FROM \`${projectId}.ops_finance.category_group_definitions\`
+            WHERE user_id = @userId
+            QUALIFY ROW_NUMBER() OVER (
+              PARTITION BY category_group_id
+              ORDER BY updated_at DESC
+            ) = 1
+          `,
+            { userId },
+          ),
+          Boolean(options.strict),
+        )
+      : Promise.resolve(null),
+    effectiveSubcategories
+      ? Promise.resolve(effectiveSubcategories)
+      : getCategories(),
+  ]);
+
+  const seedGroups: CategoryGroup[] = (
+    seedRows ??
+    deriveCategoryGroups(sampleCategories).map((group) => ({
+      label: group.label,
+      color: group.color,
+    }))
+  ).map((row) => ({
+    id: slugifyCategoryGroupId(row.label),
+    label: row.label.trim(),
+    color: row.color || "#64748b",
+    isSystem: true,
+    sortOrder: null,
+  }));
+  const seedLabels = new Set(
+    seedGroups.map((group) => group.label.trim().toLowerCase()),
+  );
+  const inferredGroups = deriveCategoryGroups(subcategories)
+    .filter(
+      (group) => !seedLabels.has(group.label.trim().toLowerCase()),
+    )
+    .map((group) => ({ ...group, isSystem: false }));
+  const definitions: CategoryGroupDefinitionRow[] = (userRows ?? []).map(
+    (row) => ({
+      id: row.id,
+      label: row.label,
+      color: row.color,
+      sortOrder: coerceNullableNumber(row.sortOrder),
+      status: row.status === "archived" ? "archived" : "active",
+      isSystem: Boolean(row.isSystem),
+    }),
+  );
+
+  return mergeCategoryGroupDefinitions(seedGroups, inferredGroups, definitions);
 }
 
 /**
@@ -253,7 +392,7 @@ export async function countCategoryReferences(
           AND derived_category_id = @categoryId
       `,
       { userId, categoryId },
-    ).catch(() => null),
+    ),
     runBigQueryQuery<{ total: unknown }>(
       `
         SELECT COUNT(*) AS total
@@ -267,7 +406,7 @@ export async function countCategoryReferences(
           AND COALESCE(enabled, TRUE)
       `,
       { userId, categoryId },
-    ).catch(() => null),
+    ),
   ]);
 
   return {
@@ -295,7 +434,7 @@ export async function getTransactionIdsForCategory(
         AND derived_category_id = @categoryId
     `,
     { userId, categoryId },
-  ).catch(() => null);
+  );
 
   return rows ? rows.map((row) => row.transactionId) : [];
 }

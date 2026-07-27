@@ -7,7 +7,7 @@ import { RuleCard } from "@/components/rules/rule-card";
 import { RuleSuggestionPanel } from "@/components/rules/rule-suggestion-panel";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getCategories } from "@/lib/queries/catalog";
+import { getCategories, getCategoryGroups } from "@/lib/queries/catalog";
 import {
   getInternalMovementReconciliationItems,
   getLowConfidenceReviewItems,
@@ -31,6 +31,7 @@ export default async function RulesPage({ searchParams }: RulesPageProps) {
       getInternalMovementReconciliationItems(timeFilter),
       getCategories(),
     ]);
+  const categoryGroups = await getCategoryGroups(categoryOptions);
 
   return (
     <div className="space-y-6">
@@ -67,7 +68,7 @@ export default async function RulesPage({ searchParams }: RulesPageProps) {
             ))}
             {rules.length === 0 ? (
               <p className="rounded-sm border border-border bg-background px-4 py-6 text-sm text-slate-400">
-                No active category rules yet.
+                No active categorization rules yet.
               </p>
             ) : null}
           </CardContent>
@@ -92,6 +93,7 @@ export default async function RulesPage({ searchParams }: RulesPageProps) {
                 key={item.transactionId}
                 item={item}
                 categories={categoryOptions}
+                categoryGroups={categoryGroups}
               />
             ))}
           </CardContent>

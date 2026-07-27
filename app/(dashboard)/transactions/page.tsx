@@ -9,8 +9,13 @@ import { TransactionFilters } from "@/components/transactions/transaction-filter
 import { TransactionTable } from "@/components/transactions/transaction-table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { normalizeTransactionFilters } from "@/lib/bigquery/params";
+import { resolveCategoryGroupFilterRefs } from "@/lib/categorization/category-group-catalog";
 import { resolvePrimaryCheckingBalance } from "@/lib/queries/account-balances";
-import { getAccounts, getCategories } from "@/lib/queries/catalog";
+import {
+  getAccounts,
+  getCategories,
+  getCategoryGroups,
+} from "@/lib/queries/catalog";
 import {
   getTransactionById,
   getTransactions,
@@ -27,16 +32,30 @@ export default async function TransactionsPage({
   searchParams,
 }: TransactionsPageProps) {
   const rawSearchParams = await searchParams;
-  const filters = normalizeTransactionFilters(rawSearchParams);
+  const urlFilters = normalizeTransactionFilters(rawSearchParams);
   const timeFilter = normalizeTimeFilter(rawSearchParams);
-  const [accounts, categories, transactions, suggestions, selectedTransaction] =
+  const [accounts, categories, suggestions, selectedTransaction] =
     await Promise.all([
       getAccounts(),
       getCategories(),
-      getTransactions(filters),
-      getTransactionSearchSuggestions(filters.query ?? ""),
-      filters.selectedId ? getTransactionById(filters.selectedId) : null,
+      getTransactionSearchSuggestions(urlFilters.query ?? ""),
+      urlFilters.selectedId ? getTransactionById(urlFilters.selectedId) : null,
     ]);
+  const categoryGroups = await getCategoryGroups(categories);
+  const categoryGroupFilter = resolveCategoryGroupFilterRefs(
+    urlFilters.categoryGroupIds,
+    categoryGroups,
+  );
+  const filters = {
+    ...urlFilters,
+    categoryGroupIds:
+      categoryGroupFilter.ids.length > 0 ? categoryGroupFilter.ids : undefined,
+    categoryGroupLabels:
+      categoryGroupFilter.labels.length > 0
+        ? categoryGroupFilter.labels
+        : undefined,
+  };
+  const transactions = await getTransactions(filters);
 
   const net = transactions.reduce(
     (sum, transaction) => sum + transaction.signedAmount,
@@ -123,6 +142,7 @@ export default async function TransactionsPage({
       <TransactionFilters
         accounts={accounts}
         categories={categories}
+        categoryGroups={categoryGroups}
         initialFilters={filters}
         suggestions={suggestions}
       />
@@ -136,6 +156,7 @@ export default async function TransactionsPage({
         detail={selectedTransaction}
         transactions={transactions}
         categories={categories}
+        categoryGroups={categoryGroups}
       />
     </div>
   );

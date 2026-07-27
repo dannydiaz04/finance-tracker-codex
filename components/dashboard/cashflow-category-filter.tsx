@@ -29,11 +29,11 @@ export function CashflowCategoryFilter({
           <div>
             <p className="font-medium text-white">
               {selectedCount === 0
-                ? "All categories"
-                : `${selectedCount} of ${options.length} categories`}
+                ? "All subcategories"
+                : `${selectedCount} of ${options.length} subcategories`}
             </p>
             <p className="mt-1 text-slate-400">
-              Category scope applies to the totals, the daily chart, and the
+              Subcategory scope applies to the totals, the daily chart, and the
               breakdown below, on top of the active time range.
             </p>
           </div>

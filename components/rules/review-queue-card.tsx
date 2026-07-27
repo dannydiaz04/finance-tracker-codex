@@ -3,15 +3,24 @@
 import { useState } from "react";
 
 import { OverrideForm } from "@/components/transactions/override-form";
-import type { Category, ReviewQueueItem } from "@/lib/types/finance";
+import type {
+  Category,
+  CategoryGroup,
+  ReviewQueueItem,
+} from "@/lib/types/finance";
 import { formatCurrency } from "@/lib/utils";
 
 type ReviewQueueCardProps = {
   item: ReviewQueueItem;
   categories: Category[];
+  categoryGroups: CategoryGroup[];
 };
 
-export function ReviewQueueCard({ item, categories }: ReviewQueueCardProps) {
+export function ReviewQueueCard({
+  item,
+  categories,
+  categoryGroups,
+}: ReviewQueueCardProps) {
   const [resolved, setResolved] = useState<{ persisted: boolean } | null>(null);
 
   if (resolved) {
@@ -49,6 +58,7 @@ export function ReviewQueueCard({ item, categories }: ReviewQueueCardProps) {
           currentCategoryId={item.currentCategoryId}
           suggestedCategoryLabel={item.suggestedCategory}
           categories={categories}
+          categoryGroups={categoryGroups}
           onResolved={(outcome) => setResolved(outcome)}
         />
       </div>

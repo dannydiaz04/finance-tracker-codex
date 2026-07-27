@@ -94,7 +94,7 @@ export function buildAssistantWelcomeMessage(context: DashboardAssistantContext)
 
   return [
     "I can explain the dashboard, summarize the current finance picture, and walk through imports, rules, overrides, and review workflows.",
-    `Right now I see ${formatCurrency(context.overview.availableCash)} in available cash, ${context.reviewQueue.length} items in the review queue, and ${topCategory ? `${topCategory.label} at ${formatPercent(topCategory.share)} of spend` : "no category concentration yet"}.`,
+    `Right now I see ${formatCurrency(context.overview.availableCash)} in available cash, ${context.reviewQueue.length} items in the review queue, and ${topCategory ? `${topCategory.label} at ${formatPercent(topCategory.share)} of spend` : "no subcategory concentration yet"}.`,
     `The current largest expense is ${context.overview.largestExpense.merchant} at ${formatCurrency(-Math.abs(context.overview.largestExpense.amount))}, and ${topMerchant ? `${topMerchant.merchant} is the top merchant concentration.` : "merchant insight data is light right now."}`,
     `The assistant is reading ${sampleLabel}. ${context.sourceDetail} Ask for a quick read, page walkthrough, or an explanation of how the internal classification flow works.`,
   ].join("\n\n");

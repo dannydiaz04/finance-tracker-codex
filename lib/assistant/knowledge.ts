@@ -11,7 +11,7 @@ export const dashboardGuides: AssistantGuide[] = [
   {
     title: "Overview",
     summary:
-      "The landing page combines current balance posture, month-to-date movement, category concentration, top merchants, and the active review queue.",
+      "The landing page combines current balance posture, month-to-date movement, subcategory concentration, top merchants, and the active review queue.",
     examples: [
       "What should I focus on from the overview page?",
       "What does the largest current mover card mean?",
@@ -29,7 +29,7 @@ export const dashboardGuides: AssistantGuide[] = [
   {
     title: "Cash Flow",
     summary:
-      "Cash Flow separates inflow, outflow, and net so transfer-cleaned movement is visible before drilling into merchants or categories.",
+      "Cash Flow separates inflow, outflow, and net so transfer-cleaned movement is visible before drilling into merchants or subcategories.",
     examples: [
       "What does the net card tell me?",
       "How should I use the daily movement chart?",
@@ -38,9 +38,9 @@ export const dashboardGuides: AssistantGuide[] = [
   {
     title: "Categories",
     summary:
-      "Categories shows spend mix, per-category transaction counts, trend, and the rows that still need confirmation.",
+      "Categories manages the category hierarchy and shows subcategory spend mix, transaction counts, trend, and rows that still need confirmation.",
     examples: [
-      "Why is one category dominating spend?",
+      "Why is one subcategory dominating spend?",
       "What does the review queue on the categories page represent?",
     ],
   },

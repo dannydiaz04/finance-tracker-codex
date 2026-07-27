@@ -83,9 +83,9 @@ export function CategoryTreemap({
   return (
     <Card tone={tone}>
       <CardHeader>
-        <CardTitle>Category distribution</CardTitle>
+        <CardTitle>Subcategory distribution</CardTitle>
         <CardDescription>
-          High-signal category mix with trend, share, and top merchants per card.
+          High-signal subcategory mix with trend, share, and top merchants per card.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

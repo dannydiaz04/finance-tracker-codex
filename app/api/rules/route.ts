@@ -38,7 +38,7 @@ async function resolveRuleCategory(categoryId: string) {
   const categories = await getCategories();
   const category = categories.find((item) => item.id === categoryId);
   if (!category) {
-    throw new Error("Unknown category.");
+    throw new Error("Unknown subcategory.");
   }
 
   return category;

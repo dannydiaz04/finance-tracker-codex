@@ -1,5 +1,6 @@
 import { CircleCheckBig } from "lucide-react";
 
+import { CategoryGroupManager } from "@/components/categories/category-group-manager";
 import { CategoryManager } from "@/components/categories/category-manager";
 import { CategoryHitRateList } from "@/components/dashboard/category-hit-rate-list";
 import { CategoryTreemap } from "@/components/dashboard/category-treemap";
@@ -7,7 +8,7 @@ import { PageHeader } from "@/components/dashboard/page-header";
 import { TimeFilterSummary } from "@/components/dashboard/time-filter-summary";
 import { ReviewQueueCard } from "@/components/rules/review-queue-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getCategories } from "@/lib/queries/catalog";
+import { getCategories, getCategoryGroups } from "@/lib/queries/catalog";
 import { getCategoryInsights, getReviewQueue } from "@/lib/queries/categories";
 import { normalizeTimeFilter } from "@/lib/time-filter";
 
@@ -24,19 +25,31 @@ export default async function CategoriesPage({
     getReviewQueue(timeFilter),
     getCategories(),
   ]);
+  const categoryGroups = await getCategoryGroups(categoryOptions);
 
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Categories"
         title="Deterministic categorization first, review queue second."
-        description="Categories are derived from warehouse rules, institution hints, and user overrides, with low-confidence rows isolated for fast correction."
-        action={<CategoryManager categories={categoryOptions} />}
+        description="Subcategories are assigned by warehouse rules, institution hints, and user overrides, with low-confidence rows isolated for fast correction."
+        action={
+          <div className="flex flex-wrap gap-2">
+            <CategoryGroupManager
+              categoryGroups={categoryGroups}
+              subcategories={categoryOptions}
+            />
+            <CategoryManager
+              categories={categoryOptions}
+              categoryGroups={categoryGroups}
+            />
+          </div>
+        }
       />
 
       <TimeFilterSummary
         filter={timeFilter}
-        fields="Category spend and review rows use transaction `postedAt` / warehouse `posted_at`."
+        fields="Subcategory spend and review rows use transaction `postedAt` / warehouse `posted_at`."
       />
 
       <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
@@ -54,6 +67,7 @@ export default async function CategoriesPage({
               key={item.transactionId}
               item={item}
               categories={categoryOptions}
+              categoryGroups={categoryGroups}
             />
           ))}
 

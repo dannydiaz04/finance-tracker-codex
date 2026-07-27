@@ -96,7 +96,7 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
     <div className="space-y-6">
       <PageHeader
         eyebrow="Overview"
-        title="Monthly income, spend, categories, and weekday behavior."
+        title="Monthly income, spend, subcategories, and weekday behavior."
         description="The overview centers on posted transaction months so inflow, outflow, spending mix, and weekday patterns answer the same time-scoped question."
         action={
           <div className="rounded-sm border border-border bg-card px-5 py-4 text-right">
@@ -233,8 +233,9 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
             <div className="rounded-sm border border-amber-500/40 bg-background p-4 text-sm text-amber-400">
               <div className="flex items-center gap-2">
                 <CircleAlert className="size-4" />
-                Transfer and fee categories still share one placeholder bucket in the
-                sample dataset. The rules pipeline is ready to split those cleanly.
+                Transfer and fee subcategories still share one placeholder bucket in
+                the sample dataset. The rules pipeline is ready to split those
+                cleanly.
               </div>
             </div>
           </CardContent>
