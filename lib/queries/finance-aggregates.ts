@@ -1,6 +1,8 @@
 import type {
+  CashflowCategorySlice,
   CashflowPoint,
   CategoryInsight,
+  CategoryTopMerchant,
   MerchantInsight,
   MonthlyFinanceSummary,
   OverviewSnapshot,
@@ -55,6 +57,96 @@ export function deriveCashflowFromTransactions(
   return Array.from(byDate.values()).sort((left, right) =>
     right.date.localeCompare(left.date),
   );
+}
+
+type CashflowCategoryBucket = {
+  categoryId: string;
+  label: string;
+  inflow: number;
+  outflow: number;
+  transactionCount: number;
+  outflowTransactionCount: number;
+  byMerchant: Map<string, CategoryTopMerchant>;
+};
+
+/**
+ * Splits cash flow by category while keeping inflow and outflow separate, so an income or
+ * refund category reads as money arriving rather than as negative spend. Internal movement is
+ * dropped for the same reason `deriveCashflowFromTransactions` drops it: moving money between
+ * your own accounts is not money entering or leaving.
+ */
+export function deriveCashflowByCategoryFromTransactions(
+  transactions: Transaction[],
+): CashflowCategorySlice[] {
+  const byCategory = new Map<string, CashflowCategoryBucket>();
+
+  transactions.forEach((transaction) => {
+    if (isInternalMovement(transaction)) {
+      return;
+    }
+
+    const bucket =
+      byCategory.get(transaction.derivedCategoryId) ??
+      ({
+        categoryId: transaction.derivedCategoryId,
+        label: transaction.categoryLabel,
+        inflow: 0,
+        outflow: 0,
+        transactionCount: 0,
+        outflowTransactionCount: 0,
+        byMerchant: new Map<string, CategoryTopMerchant>(),
+      } satisfies CashflowCategoryBucket);
+
+    const value = Math.abs(transaction.signedAmount);
+    bucket.transactionCount += 1;
+
+    if (transaction.signedAmount >= 0) {
+      bucket.inflow += value;
+    } else {
+      bucket.outflow += value;
+      bucket.outflowTransactionCount += 1;
+
+      const merchantKey =
+        transaction.merchantRaw || transaction.merchantNorm || "Unknown";
+      const merchantEntry = bucket.byMerchant.get(merchantKey) ?? {
+        merchant: merchantKey,
+        amount: 0,
+        transactionCount: 0,
+      };
+      merchantEntry.amount += value;
+      merchantEntry.transactionCount += 1;
+      bucket.byMerchant.set(merchantKey, merchantEntry);
+    }
+
+    byCategory.set(transaction.derivedCategoryId, bucket);
+  });
+
+  const totalOutflow = Array.from(byCategory.values()).reduce(
+    (sum, bucket) => sum + bucket.outflow,
+    0,
+  );
+
+  return Array.from(byCategory.values())
+    .map((bucket) => ({
+      categoryId: bucket.categoryId,
+      label: bucket.label,
+      inflow: bucket.inflow,
+      outflow: bucket.outflow,
+      net: bucket.inflow - bucket.outflow,
+      transactionCount: bucket.transactionCount,
+      outflowShare: totalOutflow > 0 ? bucket.outflow / totalOutflow : 0,
+      averageOutflow:
+        bucket.outflowTransactionCount > 0
+          ? bucket.outflow / bucket.outflowTransactionCount
+          : 0,
+      topMerchants: Array.from(bucket.byMerchant.values())
+        .sort((left, right) => right.amount - left.amount)
+        .slice(0, 3),
+    }))
+    .sort(
+      (left, right) =>
+        right.outflow - left.outflow || right.inflow - left.inflow,
+    );
 }
 
 type CategoryBucket = {
