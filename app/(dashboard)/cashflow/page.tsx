@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { normalizeCategoryScope } from "@/lib/category-scope";
 import { getCashflowAlerts } from "@/lib/queries/alerts";
 import {
+  CASHFLOW_SERIES_DAY_LIMIT,
   getCashflowCategoryBreakdown,
   getCashflowSeries,
 } from "@/lib/queries/cashflow";
@@ -30,10 +31,17 @@ export default async function CashflowPage({ searchParams }: CashflowPageProps) 
     getCashflowCategoryBreakdown(timeFilter, { categoryIds }),
   ]);
 
-  const inflow = cashflow.reduce((sum, point) => sum + point.inflow, 0);
-  const outflow = cashflow.reduce((sum, point) => sum + point.outflow, 0);
-  const net = cashflow.reduce((sum, point) => sum + point.net, 0);
+  // Totals come from the category breakdown rather than the series: the series is capped at
+  // CASHFLOW_SERIES_DAY_LIMIT days, so summing it would understate any wider scope.
+  const { inflow, outflow, net } = breakdown.totals;
   const hasCategoryScope = categoryIds.length > 0;
+  const isSeriesTruncated = cashflow.length >= CASHFLOW_SERIES_DAY_LIMIT;
+  const seriesSource = hasCategoryScope
+    ? "Daily inflow and outflow for the selected categories, rebuilt from transactions."
+    : "Daily inflow and outflow bars using the warehouse mart grain.";
+  const seriesWindow = isSeriesTruncated
+    ? ` Showing the ${CASHFLOW_SERIES_DAY_LIMIT} most recent days with movement (${cashflow[cashflow.length - 1].date} to ${cashflow[0].date}), so these bars cover less than the totals above.`
+    : "";
 
   return (
     <div className="space-y-6">
@@ -97,11 +105,7 @@ export default async function CashflowPage({ searchParams }: CashflowPageProps) 
       <CashflowChart
         data={cashflow}
         title="Daily movement"
-        description={
-          hasCategoryScope
-            ? "Daily inflow and outflow bars, rebuilt from transactions in the selected categories."
-            : "Daily inflow and outflow bars using the warehouse mart grain."
-        }
+        description={`${seriesSource}${seriesWindow}`}
       />
 
       <CashflowAlerts

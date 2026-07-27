@@ -333,4 +333,14 @@ export type CashflowCategoryBreakdown = {
   slices: CashflowCategorySlice[];
   /** Every category with movement in the time scope, so the filter can list unselected ones. */
   options: CashflowCategorySlice[];
+  /**
+   * Totals across `slices` for the whole time scope. The daily series is capped for
+   * readability, so summing it would understate any scope wider than that cap.
+   */
+  totals: {
+    inflow: number;
+    outflow: number;
+    net: number;
+    transactionCount: number;
+  };
 };
