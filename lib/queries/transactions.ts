@@ -172,15 +172,71 @@ const transactionSelectFields = `
   classification_history AS classificationHistory
 `;
 
-const transactionBaseQuery = `
-  SELECT
-    ${transactionSelectFields}
-  FROM (
+// The canonical fact is batch-built, while manual overrides are written immediately.
+// Overlay each user's latest override at read time so saved category changes are visible
+// without waiting for the next Dataform refresh.
+const transactionCurrentReadQuery = `
+  WITH scoped_transactions AS (
     SELECT *
     FROM \`${projectId}.core_finance.fact_transaction_current\`
     WHERE ${transactionUserScopePredicate()}
     QUALIFY ${anonymousCsvDedupePredicate()}
       AND ${plaidCanonicalDedupePredicate()}
+  ),
+  latest_overrides AS (
+    SELECT
+      transaction_id,
+      category_id
+    FROM \`${projectId}.ops_finance.manual_overrides\`
+    WHERE user_id = @userId
+    QUALIFY ROW_NUMBER() OVER (
+      PARTITION BY transaction_id
+      ORDER BY updated_at DESC, category_id DESC
+    ) = 1
+  )
+  SELECT
+    scoped_transactions.* REPLACE (
+      COALESCE(
+        latest_overrides.category_id,
+        scoped_transactions.derived_category_id
+      ) AS derived_category_id,
+      COALESCE(
+        override_user_category.label,
+        override_seed_category.label,
+        scoped_transactions.category_label
+      ) AS category_label,
+      COALESCE(
+        override_user_category.category_l2,
+        override_seed_category.category_l2,
+        scoped_transactions.subcategory_id
+      ) AS subcategory_id,
+      IF(
+        latest_overrides.category_id IS NOT NULL,
+        CAST(1 AS FLOAT64),
+        scoped_transactions.confidence_score
+      ) AS confidence_score,
+      IF(
+        latest_overrides.category_id IS NOT NULL,
+        "manual_override",
+        scoped_transactions.classification_source
+      ) AS classification_source
+    )
+  FROM scoped_transactions
+  LEFT JOIN latest_overrides
+    ON latest_overrides.transaction_id = scoped_transactions.transaction_id
+  LEFT JOIN \`${projectId}.core_finance.dim_category_effective\` AS override_user_category
+    ON override_user_category.user_id = @userId
+   AND override_user_category.category_id = latest_overrides.category_id
+  LEFT JOIN \`${projectId}.core_finance.dim_category_effective\` AS override_seed_category
+    ON override_seed_category.user_id IS NULL
+   AND override_seed_category.category_id = latest_overrides.category_id
+`;
+
+const transactionBaseQuery = `
+  SELECT
+    ${transactionSelectFields}
+  FROM (
+    ${transactionCurrentReadQuery}
   )
   WHERE TRUE
     AND (
@@ -280,11 +336,7 @@ export async function getTransactionById(transactionId: string) {
       SELECT
         ${transactionSelectFields}
       FROM (
-        SELECT *
-        FROM \`${projectId}.core_finance.fact_transaction_current\`
-        WHERE ${transactionUserScopePredicate()}
-        QUALIFY ${anonymousCsvDedupePredicate()}
-          AND ${plaidCanonicalDedupePredicate()}
+        ${transactionCurrentReadQuery}
       )
       WHERE transaction_id = @transactionId
       LIMIT 1
