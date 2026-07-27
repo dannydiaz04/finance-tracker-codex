@@ -675,6 +675,7 @@ export const sampleRuleSuggestions: RuleSuggestion[] = [
   {
     suggestionId: "sample-rule-suggestion-1",
     transactionId: "txn-grocery",
+    priority: 110,
     categoryId: "groceries",
     categoryLabel: "Groceries",
     matchStrategy: "merchant_contains",

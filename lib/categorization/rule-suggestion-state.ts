@@ -14,6 +14,7 @@ export type RuleSuggestionActionResponse = {
 };
 
 export type RuleSuggestionResolution = {
+  state: "accepted" | "dismissed";
   headline: string;
   detail: string;
 };
@@ -32,7 +33,8 @@ export function describeSuggestionResolution(input: {
 
   if (action === "dismiss") {
     return {
-      headline: "dismissed",
+      state: "dismissed",
+      headline: "Dismissed",
       detail: persisted
         ? "This suggestion won’t come back to the queue."
         : "Dismissed locally — connect a warehouse to persist this.",
@@ -41,23 +43,27 @@ export function describeSuggestionResolution(input: {
 
   if (!persisted) {
     return {
-      headline: "accepted",
+      state: "accepted",
+      headline: "Accepted locally",
       detail: "Saved locally — connect a warehouse to persist this rule.",
     };
   }
 
   if (payload?.dedupe === "exists") {
     return {
-      headline: "accepted",
-      detail: "A matching rule already exists, so nothing was duplicated.",
+      state: "accepted",
+      headline: "Already active",
+      detail:
+        "A matching rule already exists under Active rules, so nothing was duplicated.",
     };
   }
 
   return {
-    headline: "rule saved",
+    state: "accepted",
+    headline: "Moved to Active rules",
     detail:
       payload?.dedupe === "conflict"
-        ? "The conflicting rule was replaced; similar transactions are recategorized on the next warehouse refresh."
-        : "Similar transactions are categorized on the next warehouse refresh.",
+        ? "The conflicting rule was replaced. This no longer needs review and matching transactions are refreshing in the background."
+        : "This no longer needs review. You can edit it anytime under Active rules while matching transactions are refreshing in the background.",
   };
 }

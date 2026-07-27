@@ -11,6 +11,7 @@ create table if not exists ${self()} (
   user_id string,
   suggestion_id string,
   transaction_id string,
+  priority int64,
   category_id string,
   category_label string,
   match_strategy string,
@@ -26,4 +27,7 @@ create table if not exists ${self()} (
 )
 options (
   description = "User-reviewed rule suggestions learned from manual transaction categorization."
-)
+);
+
+alter table ${self()}
+  add column if not exists priority int64

@@ -69,9 +69,19 @@ export async function getRules() {
         confidence_boost AS confidenceBoost,
         hit_rate AS hitRate,
         last_matched_at AS lastMatchedAt
-      FROM \`${projectId}.ops_finance.category_rules\`
-      WHERE user_id = @userId
-      ORDER BY priority DESC
+      FROM (
+        SELECT
+          *,
+          ROW_NUMBER() OVER (
+            PARTITION BY rule_id
+            ORDER BY created_at DESC
+          ) AS rule_rank
+        FROM \`${projectId}.ops_finance.category_rules\`
+        WHERE user_id = @userId
+      )
+      WHERE rule_rank = 1
+        AND COALESCE(enabled, TRUE)
+      ORDER BY priority DESC, name
     `,
         { userId },
       )
@@ -135,6 +145,7 @@ export async function getRuleSuggestions() {
         SELECT
           suggestion_id AS suggestionId,
           transaction_id AS transactionId,
+          COALESCE(priority, 110) AS priority,
           category_id AS categoryId,
           category_label AS categoryLabel,
           match_strategy AS matchStrategy,
@@ -282,6 +293,7 @@ export async function countRuleMatches(input: {
 export type RawPendingSuggestion = {
   suggestion_id: string;
   transaction_id: string | null;
+  priority: number;
   category_id: string;
   category_label: string;
   match_strategy: string;
@@ -309,6 +321,7 @@ export async function getPendingSuggestionsForTransaction(input: {
       SELECT
         suggestion_id,
         transaction_id,
+        COALESCE(priority, 110) AS priority,
         category_id,
         category_label,
         match_strategy,

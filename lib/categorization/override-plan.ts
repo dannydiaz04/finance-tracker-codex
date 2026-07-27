@@ -258,6 +258,7 @@ export type CategoryRuleSuggestionRow = {
   user_id: string;
   suggestion_id: string;
   transaction_id: string;
+  priority: number;
   category_id: string;
   category_label: string;
   match_strategy: MatchStrategy;
@@ -392,6 +393,7 @@ export function planOverride(input: {
             user_id: input.userId,
             suggestion_id: input.suggestionId,
             transaction_id: input.transaction.transactionId,
+            priority: LEARNED_RULE_PRIORITY,
             category_id: finalDraft.categoryId,
             category_label: finalDraft.categoryLabel,
             match_strategy: finalDraft.matchStrategy,

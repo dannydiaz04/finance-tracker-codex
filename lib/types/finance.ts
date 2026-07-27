@@ -239,6 +239,7 @@ export type Rule = {
 export type RuleSuggestion = {
   suggestionId: string;
   transactionId: string;
+  priority: number;
   categoryId: string;
   categoryLabel: string;
   matchStrategy: Rule["matchStrategy"];

@@ -217,6 +217,7 @@ test("planOverride: suggest on a real correction emits a pending suggestion, no 
   assert.equal(plan.ruleRow, null);
   assert.ok(plan.ruleSuggestion);
   assert.equal(plan.ruleSuggestion.match_value, "wholefoods");
+  assert.equal(plan.ruleSuggestion.priority, 110);
   assert.equal(plan.ruleSuggestion.status, "pending");
   assert.equal(plan.ruleSuggestion.suggestion_id, "sug-1");
   assert.equal(plan.overrideRow.category_id, "groceries");
