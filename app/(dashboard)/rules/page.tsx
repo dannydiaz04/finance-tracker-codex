@@ -3,7 +3,7 @@ import { GitPullRequestDraft, Repeat2, ShieldCheck, Sparkles } from "lucide-reac
 import { PageHeader } from "@/components/dashboard/page-header";
 import { TimeFilterSummary } from "@/components/dashboard/time-filter-summary";
 import { ReviewQueueCard } from "@/components/rules/review-queue-card";
-import { RuleSuggestionActions } from "@/components/rules/rule-suggestion-actions";
+import { RuleSuggestionCard } from "@/components/rules/rule-suggestion-card";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCategories } from "@/lib/queries/catalog";
@@ -80,27 +80,10 @@ export default async function RulesPage({ searchParams }: RulesPageProps) {
           </CardHeader>
           <CardContent className="space-y-3">
             {ruleSuggestions.map((suggestion) => (
-              <div
+              <RuleSuggestionCard
                 key={suggestion.suggestionId}
-                className="rounded-sm border border-border bg-background px-4 py-4"
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="font-medium text-white">{suggestion.ruleName}</p>
-                    <p className="mt-1 text-sm text-slate-400">
-                      {suggestion.ruleDescription}
-                    </p>
-                  </div>
-                  <Badge>{suggestion.categoryLabel}</Badge>
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <Badge>{suggestion.matchStrategy.replace("_", " ")}</Badge>
-                  <Badge>{suggestion.matchValue}</Badge>
-                </div>
-                <div className="mt-4">
-                  <RuleSuggestionActions suggestionId={suggestion.suggestionId} />
-                </div>
-              </div>
+                suggestion={suggestion}
+              />
             ))}
             {ruleSuggestions.length === 0 ? (
               <p className="rounded-sm border border-border bg-background px-4 py-6 text-sm text-slate-400">
