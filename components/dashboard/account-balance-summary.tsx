@@ -1,4 +1,4 @@
-import { CreditCard, Wallet2 } from "lucide-react";
+import { ChevronDown, CreditCard, Wallet2 } from "lucide-react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -79,43 +79,59 @@ export function AccountBalanceSummary({
       </Card>
 
       {scoped.length > 0 ? (
-        <div className="md:col-span-2 divide-y divide-border rounded-sm border border-border bg-card">
-          {scoped.map((account) => {
-            const isCredit = account.type === "credit";
+        <details className="group overflow-hidden rounded-sm border border-border bg-card md:col-span-2">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-white/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-500/60 [&::-webkit-details-marker]:hidden">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-white">Account and card balances</p>
+              <p className="truncate text-xs text-slate-500">
+                {scoped.length} {scoped.length === 1 ? "account" : "accounts"} · {context}
+              </p>
+            </div>
+            <ChevronDown
+              aria-hidden
+              className="size-4 shrink-0 text-slate-400 transition-transform group-open:rotate-180"
+            />
+          </summary>
+          <div className="divide-y divide-border border-t border-border">
+            {scoped.map((account) => {
+              const isCredit = account.type === "credit";
 
-            return (
-              <div
-                key={account.id}
-                className="flex items-center justify-between px-4 py-3"
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-white">{account.name}</p>
-                  <p className="truncate text-xs text-slate-500">
-                    {account.institution}
-                    {account.mask && account.mask !== "unknown" ? ` · •••• ${account.mask}` : ""}
-                  </p>
+              return (
+                <div
+                  key={account.id}
+                  className="flex items-center justify-between px-4 py-3"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-white">{account.name}</p>
+                    <p className="truncate text-xs text-slate-500">
+                      {account.institution}
+                      {account.mask && account.mask !== "unknown"
+                        ? ` · •••• ${account.mask}`
+                        : ""}
+                    </p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p
+                      className={
+                        isCredit
+                          ? "font-mono text-sm font-medium text-red-400"
+                          : "font-mono text-sm font-medium text-white"
+                      }
+                    >
+                      {isCredit
+                        ? `${formatCompactCurrency(account.currentBalance)} owed`
+                        : formatCompactCurrency(account.currentBalance)}
+                    </p>
+                    <p className="font-mono text-xs text-slate-500">
+                      {isCredit ? "avail credit " : "avail "}
+                      {formatCompactCurrency(account.availableBalance)}
+                    </p>
+                  </div>
                 </div>
-                <div className="shrink-0 text-right">
-                  <p
-                    className={
-                      isCredit
-                        ? "font-mono text-sm font-medium text-red-400"
-                        : "font-mono text-sm font-medium text-white"
-                    }
-                  >
-                    {isCredit
-                      ? `${formatCompactCurrency(account.currentBalance)} owed`
-                      : formatCompactCurrency(account.currentBalance)}
-                  </p>
-                  <p className="font-mono text-xs text-slate-500">
-                    {isCredit ? "avail credit " : "avail "}
-                    {formatCompactCurrency(account.availableBalance)}
-                  </p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        </details>
       ) : null}
     </div>
   );
