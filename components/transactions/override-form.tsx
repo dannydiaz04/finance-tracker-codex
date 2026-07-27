@@ -14,7 +14,9 @@ import {
   type SaveResultTone,
   describePreview,
   describeSaveResult,
+  getCategoryGroups,
   resolveDefaultCategoryId,
+  resolveCategoryGroup,
 } from "@/lib/categorization/override-form-state";
 import type { Category } from "@/lib/types/finance";
 
@@ -60,8 +62,10 @@ export function OverrideForm({
   onResolved,
 }: OverrideFormProps) {
   const router = useRouter();
-  const [categoryId, setCategoryId] = useState(() =>
-    resolveDefaultCategoryId(currentCategoryId, categories),
+  const initialCategoryId = resolveDefaultCategoryId(currentCategoryId, categories);
+  const [categoryId, setCategoryId] = useState(initialCategoryId);
+  const [categoryGroup, setCategoryGroup] = useState(() =>
+    resolveCategoryGroup(initialCategoryId, categories),
   );
   const [note, setNote] = useState("");
   const [action, setAction] = useState<RuleAction>("suggest");
@@ -90,9 +94,32 @@ export function OverrideForm({
     return [...byId.values()];
   }, [categories, addedCategories]);
 
+  const categoryGroups = useMemo(
+    () => getCategoryGroups(categoryOptions),
+    [categoryOptions],
+  );
+
+  const subcategoryOptions = useMemo(
+    () =>
+      categoryOptions.filter((category) => category.group.trim() === categoryGroup),
+    [categoryOptions, categoryGroup],
+  );
+
+  const handleCategoryGroupChange = (value: string) => {
+    setCategoryGroup(value);
+    setCategoryId((current) =>
+      categoryOptions.some(
+        (category) => category.id === current && category.group.trim() === value,
+      )
+        ? current
+        : "",
+    );
+  };
+
   const handleCategoryChange = (value: string) => {
     if (value === ADD_CATEGORY_VALUE) {
       setCreateError(null);
+      setNewCategory((current) => ({ ...current, group: categoryGroup }));
       setCreatingCategory(true);
       return;
     }
@@ -109,7 +136,7 @@ export function OverrideForm({
     const label = newCategory.label.trim();
     const group = newCategory.group.trim();
     if (!label || !group) {
-      setCreateError("Label and group are required.");
+      setCreateError("Category and subcategory are required.");
       return;
     }
     startCreating(async () => {
@@ -126,6 +153,7 @@ export function OverrideForm({
       }
       const created = payload.category as Category;
       setAddedCategories((current) => [...current, created]);
+      setCategoryGroup(created.group);
       setCategoryId(created.id);
       setCreatingCategory(false);
       setNewCategory(EMPTY_NEW_CATEGORY);
@@ -197,26 +225,50 @@ export function OverrideForm({
         </p>
       ) : null}
 
-      <Select
-        value={categoryId}
-        onChange={(event) => handleCategoryChange(event.target.value)}
-        aria-label="Category"
-      >
-        <option value="">Choose category…</option>
-        {categoryOptions.map((category) => (
-          <option key={category.id} value={category.id}>
-            {category.label}
-          </option>
-        ))}
-        <option value={ADD_CATEGORY_VALUE}>＋ Add new category…</option>
-      </Select>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <label className="grid gap-1.5 text-xs uppercase tracking-[0.18em] text-slate-500">
+          Category
+          <Select
+            value={categoryGroup}
+            onChange={(event) => handleCategoryGroupChange(event.target.value)}
+            aria-label="Category"
+          >
+            <option value="">Choose category…</option>
+            {categoryGroups.map((group) => (
+              <option key={group} value={group}>
+                {group}
+              </option>
+            ))}
+          </Select>
+        </label>
+
+        <label className="grid gap-1.5 text-xs uppercase tracking-[0.18em] text-slate-500">
+          Subcategory
+          <Select
+            value={categoryId}
+            onChange={(event) => handleCategoryChange(event.target.value)}
+            aria-label="Subcategory"
+          >
+            <option value="">
+              {categoryGroup ? "Choose subcategory…" : "Choose category first…"}
+            </option>
+            {subcategoryOptions.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.label}
+                {category.sublabel ? ` — ${category.sublabel}` : ""}
+              </option>
+            ))}
+            <option value={ADD_CATEGORY_VALUE}>＋ Add new subcategory…</option>
+          </Select>
+        </label>
+      </div>
 
       {creatingCategory ? (
         <div className="grid gap-2 rounded-sm border border-emerald-500/30 bg-background p-3">
           <div className="flex items-center justify-between">
             <p className="flex items-center gap-1.5 text-xs font-medium text-white">
               <Plus className="size-3.5 text-emerald-500" />
-              New category
+              New subcategory
             </p>
             <button
               type="button"
@@ -238,8 +290,8 @@ export function OverrideForm({
                 createCategory();
               }
             }}
-            placeholder="Label (e.g. Dining)"
-            aria-label="New category label"
+            placeholder="Subcategory (e.g. Dining)"
+            aria-label="New subcategory"
           />
           <div className="flex items-center gap-2">
             <Input
@@ -253,8 +305,8 @@ export function OverrideForm({
                   createCategory();
                 }
               }}
-              placeholder="Group (e.g. Lifestyle)"
-              aria-label="New category group"
+              placeholder="Category (e.g. Lifestyle)"
+              aria-label="New category"
               className="min-w-0 flex-1"
             />
             <input
