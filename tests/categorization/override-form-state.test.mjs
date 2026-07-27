@@ -4,10 +4,12 @@ import test from "node:test";
 import {
   describePreview,
   describeSaveResult,
-  getCategoryGroups,
   resolveDefaultCategoryId,
-  resolveCategoryGroup,
 } from "../../lib/categorization/override-form-state.ts";
+import {
+  getCategoryGroups,
+  resolveCategoryGroup,
+} from "../../lib/categorization/category-catalog.ts";
 
 const categories = [
   { id: "groceries", group: "Essential" },

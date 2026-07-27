@@ -10,13 +10,15 @@ import { Select } from "@/components/ui/select";
 
 import { cn } from "@/lib/utils";
 import {
+  getCategoryGroups,
+  resolveCategoryGroup,
+} from "@/lib/categorization/category-catalog";
+import {
   type RuleAction,
   type SaveResultTone,
   describePreview,
   describeSaveResult,
-  getCategoryGroups,
   resolveDefaultCategoryId,
-  resolveCategoryGroup,
 } from "@/lib/categorization/override-form-state";
 import type { Category } from "@/lib/types/finance";
 
