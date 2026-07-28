@@ -6,7 +6,7 @@ import { CategoryHitRateList } from "@/components/dashboard/category-hit-rate-li
 import { CategoryTreemap } from "@/components/dashboard/category-treemap";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { TimeFilterSummary } from "@/components/dashboard/time-filter-summary";
-import { ReviewQueueCard } from "@/components/rules/review-queue-card";
+import { ReviewQueue } from "@/components/rules/review-queue";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCategories, getCategoryGroups } from "@/lib/queries/catalog";
 import { getCategoryInsights, getReviewQueue } from "@/lib/queries/categories";
@@ -62,14 +62,11 @@ export default async function CategoriesPage({
           <CardTitle>Review queue</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          {reviewQueue.map((item) => (
-            <ReviewQueueCard
-              key={item.transactionId}
-              item={item}
-              categories={categoryOptions}
-              categoryGroups={categoryGroups}
-            />
-          ))}
+          <ReviewQueue
+            items={reviewQueue}
+            categories={categoryOptions}
+            categoryGroups={categoryGroups}
+          />
 
           <div className="rounded-sm border border-emerald-500/30 bg-background p-4 text-sm text-emerald-400">
             <div className="flex items-center gap-2">

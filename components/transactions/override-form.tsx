@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Plus, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 
@@ -16,9 +17,10 @@ import { normalizeCategoryGroupLabel } from "@/lib/categorization/category-group
 import {
   type RuleAction,
   type SaveResultTone,
+  type OverrideDraft,
+  createOverrideDraft,
   describePreview,
   describeSaveResult,
-  resolveDefaultCategoryId,
 } from "@/lib/categorization/override-form-state";
 import type { Category, CategoryGroup } from "@/lib/types/finance";
 
@@ -31,6 +33,12 @@ type OverrideFormProps = {
   categories: Category[];
   categoryGroups: CategoryGroup[];
   variant?: "drawer" | "inline";
+  saveMode?: "individual" | "batch";
+  draft?: OverrideDraft;
+  isStaged?: boolean;
+  batchError?: string | null;
+  onDraftChange?: (draft: OverrideDraft) => void;
+  onStage?: () => void;
   onResolved?: (result: { persisted: boolean }) => void;
 };
 
@@ -63,10 +71,17 @@ export function OverrideForm({
   categories,
   categoryGroups,
   variant = "drawer",
+  saveMode = "individual",
+  draft: batchDraft,
+  isStaged = false,
+  batchError,
+  onDraftChange,
+  onStage,
   onResolved,
 }: OverrideFormProps) {
   const router = useRouter();
-  const initialCategoryId = resolveDefaultCategoryId(currentCategoryId, categories);
+  const initialDraft = createOverrideDraft(currentCategoryId, categories);
+  const initialCategoryId = initialDraft.categoryId;
   const resolvedCategoryGroup = resolveCategoryGroup(
     initialCategoryId,
     categories,
@@ -77,10 +92,8 @@ export function OverrideForm({
         normalizeCategoryGroupLabel(group.label) ===
         normalizeCategoryGroupLabel(resolvedCategoryGroup),
     )?.label ?? resolvedCategoryGroup;
-  const [categoryId, setCategoryId] = useState(initialCategoryId);
+  const [localDraft, setLocalDraft] = useState(initialDraft);
   const [categoryGroup, setCategoryGroup] = useState(initialCategoryGroup);
-  const [note, setNote] = useState("");
-  const [action, setAction] = useState<RuleAction>("suggest");
   const [preview, setPreview] = useState<{ key: string; text: string | null } | null>(null);
   const [result, setResult] = useState<{ tone: SaveResultTone; message: string } | null>(null);
   const [isSaving, startTransition] = useTransition();
@@ -95,6 +108,18 @@ export function OverrideForm({
   const [isCreating, startCreating] = useTransition();
 
   const inline = variant === "inline";
+  const activeDraft =
+    saveMode === "batch" && batchDraft ? batchDraft : localDraft;
+  const { categoryId, note, ruleAction: action } = activeDraft;
+
+  const updateDraft = (next: Partial<OverrideDraft>) => {
+    const updated = { ...activeDraft, ...next };
+    if (saveMode === "batch") {
+      onDraftChange?.(updated);
+      return;
+    }
+    setLocalDraft(updated);
+  };
 
   const categoryOptions = useMemo(() => {
     const byId = new Map<string, Category>();
@@ -119,16 +144,16 @@ export function OverrideForm({
 
   const handleCategoryGroupChange = (value: string) => {
     setCategoryGroup(value);
-    setCategoryId((current) =>
-      categoryOptions.some(
+    updateDraft({
+      categoryId: categoryOptions.some(
         (category) =>
-          category.id === current &&
+          category.id === categoryId &&
           normalizeCategoryGroupLabel(category.group) ===
             normalizeCategoryGroupLabel(value),
       )
-        ? current
+        ? categoryId
         : "",
-    );
+    });
   };
 
   const handleCategoryChange = (value: string) => {
@@ -138,7 +163,7 @@ export function OverrideForm({
       setCreatingSubcategory(true);
       return;
     }
-    setCategoryId(value);
+    updateDraft({ categoryId: value });
   };
 
   const cancelCreateSubcategory = () => {
@@ -169,7 +194,7 @@ export function OverrideForm({
       const created = payload.category as Category;
       setAddedCategories((current) => [...current, created]);
       setCategoryGroup(created.group);
-      setCategoryId(created.id);
+      updateDraft({ categoryId: created.id });
       setCreatingSubcategory(false);
       setNewSubcategory(EMPTY_NEW_SUBCATEGORY);
       router.refresh();
@@ -208,6 +233,9 @@ export function OverrideForm({
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (saveMode === "batch") {
+      return;
+    }
     if (!categoryId) {
       setResult({ tone: "error", message: "Choose a subcategory first." });
       return;
@@ -377,7 +405,7 @@ export function OverrideForm({
 
       <Input
         value={note}
-        onChange={(event) => setNote(event.target.value)}
+        onChange={(event) => updateDraft({ note: event.target.value })}
         placeholder="Note (optional)"
         aria-label="Override note"
       />
@@ -386,7 +414,9 @@ export function OverrideForm({
         <div className={inline ? "min-w-0 flex-1" : "min-w-0"}>
           <Select
             value={action}
-            onChange={(event) => setAction(event.target.value as RuleAction)}
+            onChange={(event) =>
+              updateDraft({ ruleAction: event.target.value as RuleAction })
+            }
             aria-label="Learning action"
           >
             <option value="suggest">Suggest a rule</option>
@@ -394,21 +424,41 @@ export function OverrideForm({
             <option value="none">Just this transaction</option>
           </Select>
         </div>
-        <Button
-          type="submit"
-          variant="secondary"
-          size={inline ? "sm" : "default"}
-          disabled={isSaving || !categoryId}
-          className={inline ? "shrink-0" : ""}
-        >
-          {isSaving ? "Saving…" : inline ? "Save" : "Save override"}
-        </Button>
+        {saveMode === "individual" ? (
+          <Button
+            type="submit"
+            variant="secondary"
+            size={inline ? "sm" : "default"}
+            disabled={isSaving || !categoryId}
+            className={inline ? "shrink-0" : ""}
+          >
+            {isSaving ? "Saving…" : inline ? "Save" : "Save override"}
+          </Button>
+        ) : isStaged ? (
+          <Badge className="shrink-0 border-amber-500/40 text-amber-400">
+            Pending save
+          </Badge>
+        ) : (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={!categoryId}
+            className="shrink-0"
+            onClick={onStage}
+          >
+            Keep current
+          </Button>
+        )}
       </div>
 
       {willLearn && preview?.key === `${categoryId}|${action}` && preview.text ? (
         <p className="break-words text-xs text-slate-400">{preview.text}</p>
       ) : null}
       {result ? <p className={cn("break-words", toneClass[result.tone])}>{result.message}</p> : null}
+      {batchError ? (
+        <p className="break-words text-xs text-red-400">{batchError}</p>
+      ) : null}
     </form>
   );
 }

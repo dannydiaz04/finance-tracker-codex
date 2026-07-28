@@ -6,6 +6,12 @@
 
 export type RuleAction = "none" | "suggest" | "create";
 
+export type OverrideDraft = {
+  categoryId: string;
+  note: string;
+  ruleAction: RuleAction;
+};
+
 export type OverrideSaveResponse = {
   persisted?: boolean;
   ruleAction?: RuleAction;
@@ -14,6 +20,17 @@ export type OverrideSaveResponse = {
   rulePersisted?: boolean;
   ruleError?: string | null;
   dedupe?: "new" | "exists" | "conflict";
+  error?: string;
+};
+
+export type OverrideBatchResult = OverrideSaveResponse & {
+  transactionId: string;
+};
+
+export type OverrideBatchSaveResponse = {
+  accepted?: number;
+  persisted?: boolean;
+  results?: OverrideBatchResult[];
   error?: string;
 };
 
@@ -43,6 +60,17 @@ export function resolveDefaultCategoryId(
   return categories.some((category) => category.id === currentCategoryId)
     ? currentCategoryId
     : "";
+}
+
+export function createOverrideDraft(
+  currentCategoryId: string | null | undefined,
+  categories: ReadonlyArray<{ id: string }>,
+): OverrideDraft {
+  return {
+    categoryId: resolveDefaultCategoryId(currentCategoryId, categories),
+    note: "",
+    ruleAction: "suggest",
+  };
 }
 
 /** Map an override POST response to a tone + message (success / partial / sample / error). */

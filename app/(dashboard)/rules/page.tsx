@@ -2,7 +2,7 @@ import { GitPullRequestDraft, Repeat2, ShieldCheck } from "lucide-react";
 
 import { PageHeader } from "@/components/dashboard/page-header";
 import { TimeFilterSummary } from "@/components/dashboard/time-filter-summary";
-import { ReviewQueueCard } from "@/components/rules/review-queue-card";
+import { ReviewQueue } from "@/components/rules/review-queue";
 import { RuleCard } from "@/components/rules/rule-card";
 import { RuleSuggestionPanel } from "@/components/rules/rule-suggestion-panel";
 import { Badge } from "@/components/ui/badge";
@@ -88,14 +88,11 @@ export default async function RulesPage({ searchParams }: RulesPageProps) {
             <CardTitle>Review queue</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {reviewItems.map((item) => (
-              <ReviewQueueCard
-                key={item.transactionId}
-                item={item}
-                categories={categoryOptions}
-                categoryGroups={categoryGroups}
-              />
-            ))}
+            <ReviewQueue
+              items={reviewItems}
+              categories={categoryOptions}
+              categoryGroups={categoryGroups}
+            />
           </CardContent>
         </Card>
 

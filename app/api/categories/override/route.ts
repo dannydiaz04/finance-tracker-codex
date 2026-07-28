@@ -1,9 +1,9 @@
 import { after, NextRequest, NextResponse } from "next/server";
-import { createHash } from "node:crypto";
 import { z } from "zod";
 
 import { resolveRouteUserId } from "@/lib/auth/session";
-import { insertBigQueryRows, isBigQueryConfigured } from "@/lib/bigquery/client";
+import { buildOverrideIdentity } from "@/lib/categorization/override-identity";
+import { persistOverridePlans } from "@/lib/categorization/override-persistence";
 import {
   RuleGuardrailError,
   planOverride,
@@ -13,7 +13,6 @@ import {
 import { getCategories } from "@/lib/queries/catalog";
 import {
   countRuleMatches,
-  getPendingSuggestionsForTransaction,
   getRules,
 } from "@/lib/queries/rules";
 import { getTransactionById } from "@/lib/queries/transactions";
@@ -70,66 +69,6 @@ function toExistingRule(rule: Rule): ExistingRule {
   };
 }
 
-function disabledTombstone(rule: Rule, userId: string, now: string) {
-  return {
-    user_id: userId,
-    rule_id: rule.id,
-    name: rule.name,
-    description: rule.description,
-    priority: rule.priority,
-    enabled: false,
-    category_id: rule.categoryId,
-    category_label: rule.categoryLabel,
-    match_strategy: rule.matchStrategy,
-    match_value: rule.matchValue,
-    confidence_boost: rule.confidenceBoost,
-    hit_rate: rule.hitRate,
-    last_matched_at: rule.lastMatchedAt ?? null,
-    created_at: now,
-  };
-}
-
-// A fresh override for a transaction makes any earlier pending suggestion stale.
-async function supersedePriorSuggestions(input: {
-  userId: string;
-  transactionId: string;
-  keepSuggestionId: string;
-  now: string;
-}) {
-  const pending = await getPendingSuggestionsForTransaction({
-    userId: input.userId,
-    transactionId: input.transactionId,
-  });
-  const stale = pending.filter((row) => row.suggestion_id !== input.keepSuggestionId);
-
-  if (stale.length === 0) {
-    return;
-  }
-
-  await insertBigQueryRows(
-    "ops_finance",
-    "category_rule_suggestions",
-    stale.map((row) => ({
-      user_id: input.userId,
-      suggestion_id: row.suggestion_id,
-      transaction_id: row.transaction_id,
-      priority: row.priority,
-      category_id: row.category_id,
-      category_label: row.category_label,
-      match_strategy: row.match_strategy,
-      match_value: row.match_value,
-      rule_name: row.rule_name,
-      rule_description: row.rule_description,
-      source: row.source,
-      status: "superseded",
-      note: row.note,
-      created_at: row.created_at,
-      updated_at: input.now,
-      reviewed_at: input.now,
-    })),
-  );
-}
-
 export async function POST(request: NextRequest) {
   try {
     const { userId, response } = await resolveRouteUserId();
@@ -165,10 +104,11 @@ export async function POST(request: NextRequest) {
     const now = new Date().toISOString();
     // Deterministic identity → retries collide instead of duplicating, and duplicate
     // rule rows share a rule_id (fact_classification keeps the latest per rule_id).
-    const identity = createHash("sha1")
-      .update([userId, payload.transactionId, payload.categoryId].join("|"))
-      .digest("hex")
-      .slice(0, 24);
+    const identity = buildOverrideIdentity({
+      userId,
+      transactionId: payload.transactionId,
+      categoryId: payload.categoryId,
+    });
 
     let plan;
     try {
@@ -207,64 +147,14 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const bigQueryConfigured = isBigQueryConfigured();
-    const overridePersisted = bigQueryConfigured
-      ? await insertBigQueryRows("ops_finance", "manual_overrides", [plan.overrideRow])
-      : false;
+    const [persistence] = await persistOverridePlans({
+      userId,
+      planned: [{ transactionId: payload.transactionId, plan }],
+      existingRules: rules,
+      now,
+    });
 
-    let rulePersisted = false;
-    let ruleError: string | null = null;
-
-    // Supersede a contradictory rule (disable tombstone) before writing the corrected one.
-    if (bigQueryConfigured && plan.supersedeRuleId) {
-      const conflict = rules.find((rule) => rule.id === plan.supersedeRuleId);
-      if (conflict) {
-        try {
-          await insertBigQueryRows("ops_finance", "category_rules", [
-            disabledTombstone(conflict, userId, now),
-          ]);
-        } catch (error) {
-          ruleError =
-            error instanceof Error ? error.message : "Unable to supersede the conflicting rule.";
-        }
-      }
-    }
-
-    if (bigQueryConfigured && plan.ruleRow) {
-      try {
-        rulePersisted = await insertBigQueryRows("ops_finance", "category_rules", [plan.ruleRow]);
-      } catch (error) {
-        ruleError = error instanceof Error ? error.message : "Unable to save the rule.";
-      }
-    }
-
-    let ruleSuggestionPersisted = false;
-    let ruleSuggestionError: string | null = null;
-
-    if (bigQueryConfigured && plan.ruleSuggestion) {
-      try {
-        await supersedePriorSuggestions({
-          userId,
-          transactionId: payload.transactionId,
-          keepSuggestionId: plan.ruleSuggestion.suggestion_id,
-          now,
-        });
-      } catch {
-        // Best-effort: a stale pending suggestion left behind is non-fatal.
-      }
-      try {
-        ruleSuggestionPersisted = await insertBigQueryRows(
-          "ops_finance",
-          "category_rule_suggestions",
-          [plan.ruleSuggestion],
-        );
-      } catch (error) {
-        ruleSuggestionError =
-          error instanceof Error ? error.message : "Unable to save rule suggestion.";
-      }
-    }
-
-    if (overridePersisted) {
+    if (persistence.persisted) {
       // The saved transaction is visible immediately through the live override overlay.
       // Rebuild the canonical facts after responding so active rules and downstream
       // reports catch up without making the user wait for Dataform.
@@ -278,7 +168,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       status: "accepted",
-      persisted: overridePersisted,
+      persisted: persistence.persisted,
       override: plan.overrideRow,
       ruleAction: plan.ruleAction,
       categoryChanged: plan.categoryChanged,
@@ -286,11 +176,11 @@ export async function POST(request: NextRequest) {
       matchPreview: plan.matchPreview,
       guardrailNote: plan.guardrailNote,
       ruleSuggestion: plan.ruleSuggestion,
-      ruleSuggestionPersisted,
-      ruleSuggestionError,
+      ruleSuggestionPersisted: persistence.ruleSuggestionPersisted,
+      ruleSuggestionError: persistence.ruleSuggestionError,
       rule: plan.ruleRow,
-      rulePersisted,
-      ruleError,
+      rulePersisted: persistence.rulePersisted,
+      ruleError: persistence.ruleError,
     });
   } catch (error) {
     return NextResponse.json(
