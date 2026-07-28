@@ -359,6 +359,41 @@ export async function getRecentTransactions(limit = 8, timeFilter?: TimeFilter) 
     .slice(0, boundedLimit);
 }
 
+export async function getTransactionsByIds(transactionIds: string[]) {
+  const uniqueIds = [...new Set(transactionIds)];
+  if (uniqueIds.length === 0) {
+    return [];
+  }
+
+  const userId = await getCurrentUserId();
+  const rows = userId
+    ? await runBigQueryQuery<RawTransaction>(
+        `
+      SELECT
+        ${transactionSelectFields}
+      FROM (
+        ${transactionCurrentReadQuery}
+      )
+      WHERE transaction_id IN UNNEST(@transactionIds)
+    `,
+        { transactionIds: uniqueIds, userId, excludePlaid: true },
+      )
+    : null;
+
+  if (rows) {
+    return rows.map(mapTransaction);
+  }
+
+  // An authenticated, warehouse-backed user with no matches gets no sample data.
+  if (userId) {
+    return [];
+  }
+
+  return uniqueIds
+    .map((transactionId) => sampleTransactionDetails[transactionId])
+    .filter((transaction): transaction is TransactionDetail => Boolean(transaction));
+}
+
 export async function getTransactionById(transactionId: string) {
   const userId = await getCurrentUserId();
   const rows = userId

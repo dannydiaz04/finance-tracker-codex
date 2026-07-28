@@ -10,6 +10,7 @@ import {
   planOverride,
   resolveRuleAction,
 } from "../../lib/categorization/override-plan.ts";
+import { planOverrideBatch } from "../../lib/categorization/override-batch.ts";
 
 const groceries = { id: "groceries", label: "Groceries" };
 
@@ -311,4 +312,55 @@ test("planOverride: a custom note becomes the override reason", () => {
     ...PLAN_IDS,
   });
   assert.equal(plan.overrideRow.reason, "split household run");
+});
+
+// --- planOverrideBatch ---------------------------------------------------------
+
+function batchItem({
+  transactionId,
+  category = groceries,
+  action = "create",
+}) {
+  return {
+    transaction: baseTransaction({ transactionId }),
+    category,
+    action,
+    suggestionId: `suggestion-${transactionId}`,
+    ruleId: `rule-${transactionId}`,
+  };
+}
+
+test("planOverrideBatch: later items see rules created earlier in the batch", () => {
+  const planned = planOverrideBatch({
+    userId: "user-1",
+    existingRules: [],
+    now: PLAN_IDS.now,
+    items: [
+      batchItem({ transactionId: "txn-1" }),
+      batchItem({ transactionId: "txn-2" }),
+    ],
+  });
+
+  assert.ok(planned[0].plan.ruleRow);
+  assert.equal(planned[1].plan.dedupe, "exists");
+  assert.equal(planned[1].plan.ruleRow, null);
+});
+
+test("planOverrideBatch: contradictory new rules fail before persistence", () => {
+  assert.throws(
+    () =>
+      planOverrideBatch({
+        userId: "user-1",
+        existingRules: [],
+        now: PLAN_IDS.now,
+        items: [
+          batchItem({ transactionId: "txn-1" }),
+          batchItem({
+            transactionId: "txn-2",
+            category: { id: "dining", label: "Dining" },
+          }),
+        ],
+      }),
+    /conflicting subcategories/,
+  );
 });

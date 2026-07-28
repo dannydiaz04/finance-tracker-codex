@@ -307,14 +307,14 @@ export type RawPendingSuggestion = {
   created_at: string;
 };
 
-/** Latest pending suggestions for one transaction — used to supersede stale ones. */
-export async function getPendingSuggestionsForTransaction(input: {
+/** Latest pending suggestions for transactions — used to supersede stale ones. */
+export async function getPendingSuggestionsForTransactions(input: {
   userId: string;
-  transactionId: string;
+  transactionIds: string[];
 }): Promise<RawPendingSuggestion[]> {
   const projectId = getBigQueryProjectId();
 
-  if (!projectId) {
+  if (!projectId || input.transactionIds.length === 0) {
     return [];
   }
 
@@ -335,15 +335,26 @@ export async function getPendingSuggestionsForTransaction(input: {
         CAST(created_at AS STRING) AS created_at
       FROM \`${projectId}.ops_finance.category_rule_suggestions\`
       WHERE user_id = @userId
+        AND transaction_id IN UNNEST(@transactionIds)
       QUALIFY ROW_NUMBER() OVER (
         PARTITION BY suggestion_id
         ORDER BY updated_at DESC
       ) = 1
-        AND transaction_id = @transactionId
         AND status = "pending"
     `,
-    { userId: input.userId, transactionId: input.transactionId },
+    { userId: input.userId, transactionIds: input.transactionIds },
   );
 
   return rows ?? [];
+}
+
+/** Latest pending suggestions for one transaction — retained for single-item callers. */
+export async function getPendingSuggestionsForTransaction(input: {
+  userId: string;
+  transactionId: string;
+}): Promise<RawPendingSuggestion[]> {
+  return getPendingSuggestionsForTransactions({
+    userId: input.userId,
+    transactionIds: [input.transactionId],
+  });
 }

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  createOverrideDraft,
   describePreview,
   describeSaveResult,
   resolveDefaultCategoryId,
@@ -26,6 +27,14 @@ test("default category is the current one when it's a real option", () => {
 test("default category is empty when current is null or not an option", () => {
   assert.equal(resolveDefaultCategoryId(null, categories), "");
   assert.equal(resolveDefaultCategoryId("uncategorized", categories), "");
+});
+
+test("batch draft starts from the current category and default learning action", () => {
+  assert.deepEqual(createOverrideDraft("dining", categories), {
+    categoryId: "dining",
+    note: "",
+    ruleAction: "suggest",
+  });
 });
 
 // --- category hierarchy --------------------------------------------------------
