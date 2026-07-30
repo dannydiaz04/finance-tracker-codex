@@ -9,7 +9,7 @@ import type {
   Transaction,
   WeekdaySpendInsight,
 } from "@/lib/types/finance";
-import { formatMonthLabel, getMonthRange } from "@/lib/time-filter";
+import { formatMonthLabel, getMonthRange } from "../time-filter.ts";
 
 function isInternalMovement(transaction: Transaction) {
   return (
