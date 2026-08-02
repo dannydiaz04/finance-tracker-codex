@@ -1,9 +1,7 @@
 import "server-only";
 
-import { insertBigQueryRows, isBigQueryConfigured } from "@/lib/bigquery/client";
-import type { PlannedOverride } from "@/lib/categorization/override-batch";
-import { getPendingSuggestionsForTransactions } from "@/lib/queries/rules";
-import type { Rule } from "@/lib/types/finance";
+import type { PlannedOverride } from "./override-batch.ts";
+import type { Rule } from "../types/finance.ts";
 
 export type OverridePersistenceResult = {
   transactionId: string;
@@ -12,6 +10,34 @@ export type OverridePersistenceResult = {
   ruleError: string | null;
   ruleSuggestionPersisted: boolean;
   ruleSuggestionError: string | null;
+};
+
+type RawPendingSuggestion = {
+  suggestion_id: string;
+  transaction_id: string | null;
+  priority: number;
+  category_id: string;
+  category_label: string;
+  match_strategy: string;
+  match_value: string;
+  rule_name: string;
+  rule_description: string;
+  source: string;
+  note: string | null;
+  created_at: string;
+};
+
+export type OverridePersistenceDependencies = {
+  isBigQueryConfigured: () => boolean;
+  insertBigQueryRows: (
+    datasetId: string,
+    tableId: string,
+    rows: Record<string, unknown>[],
+  ) => Promise<boolean>;
+  getPendingSuggestionsForTransactions: (input: {
+    userId: string;
+    transactionIds: string[];
+  }) => Promise<RawPendingSuggestion[]>;
 };
 
 function disabledTombstone(rule: Rule, userId: string, now: string) {
@@ -33,6 +59,19 @@ function disabledTombstone(rule: Rule, userId: string, now: string) {
   };
 }
 
+async function loadDefaultDependencies(): Promise<OverridePersistenceDependencies> {
+  const [bigQuery, rules] = await Promise.all([
+    import("../bigquery/client.ts"),
+    import("../queries/rules.ts"),
+  ]);
+
+  return {
+    isBigQueryConfigured: bigQuery.isBigQueryConfigured,
+    insertBigQueryRows: bigQuery.insertBigQueryRows,
+    getPendingSuggestionsForTransactions: rules.getPendingSuggestionsForTransactions,
+  };
+}
+
 /**
  * Persist an already-validated set of plans with one insert per warehouse table.
  * BigQuery streaming inserts are not cross-table transactions, so rule-side failures
@@ -44,9 +83,21 @@ export async function persistOverridePlans(input: {
   existingRules: Rule[];
   now: string;
 }): Promise<OverridePersistenceResult[]> {
-  const configured = isBigQueryConfigured();
+  return persistOverridePlansWithDependencies(input, await loadDefaultDependencies());
+}
+
+export async function persistOverridePlansWithDependencies(
+  input: {
+    userId: string;
+    planned: PlannedOverride[];
+    existingRules: Rule[];
+    now: string;
+  },
+  dependencies: OverridePersistenceDependencies,
+): Promise<OverridePersistenceResult[]> {
+  const configured = dependencies.isBigQueryConfigured();
   const overridePersisted = configured
-    ? await insertBigQueryRows(
+    ? await dependencies.insertBigQueryRows(
         "ops_finance",
         "manual_overrides",
         input.planned.map(({ plan }) => plan.overrideRow),
@@ -73,7 +124,7 @@ export async function persistOverridePlans(input: {
   let ruleError: string | null = null;
   if (configured && ruleRows.length > 0) {
     try {
-      ruleRowsPersisted = await insertBigQueryRows(
+      ruleRowsPersisted = await dependencies.insertBigQueryRows(
         "ops_finance",
         "category_rules",
         ruleRows,
@@ -97,7 +148,7 @@ export async function persistOverridePlans(input: {
     let staleRows: Record<string, unknown>[] = [];
 
     try {
-      const pending = await getPendingSuggestionsForTransactions({
+      const pending = await dependencies.getPendingSuggestionsForTransactions({
         userId: input.userId,
         transactionIds,
       });
@@ -132,7 +183,7 @@ export async function persistOverridePlans(input: {
     try {
       const suggestionRows = suggestionPlans.map(({ plan }) => plan.ruleSuggestion!);
 
-      suggestionRowsPersisted = await insertBigQueryRows(
+      suggestionRowsPersisted = await dependencies.insertBigQueryRows(
         "ops_finance",
         "category_rule_suggestions",
         [...staleRows, ...suggestionRows],
