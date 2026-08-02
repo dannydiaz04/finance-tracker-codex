@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { persistOverridePlansWithDependencies } from "../../lib/categorization/override-persistence.ts";
+import { persistOverridePlansWithDependencies } from "../../lib/categorization/override-persistence-core.ts";
 
 const NOW = "2026-07-28T00:00:00.000Z";
 
