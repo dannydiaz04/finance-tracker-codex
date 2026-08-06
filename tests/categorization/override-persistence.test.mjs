@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { buildOverrideIdentity } from "../../lib/categorization/override-identity.ts";
 import { createOverridePlanPersister } from "../../lib/categorization/override-persistence-core.ts";
 
 const NOW = "2026-07-27T20:00:00.000Z";
@@ -110,6 +111,27 @@ function pendingSuggestion(overrides = {}) {
     ...overrides,
   };
 }
+
+test("buildOverrideIdentity: stable retry IDs change when the override target changes", () => {
+  const base = {
+    userId: "user-1",
+    transactionId: "txn-1",
+    categoryId: "groceries",
+  };
+
+  const identity = buildOverrideIdentity(base);
+
+  assert.equal(identity, buildOverrideIdentity(base));
+  assert.match(identity, /^[a-f0-9]{24}$/);
+  assert.notEqual(
+    identity,
+    buildOverrideIdentity({ ...base, categoryId: "dining" }),
+  );
+  assert.notEqual(
+    identity,
+    buildOverrideIdentity({ ...base, transactionId: "txn-2" }),
+  );
+});
 
 test("persistOverridePlans: groups override, rule, tombstone, and suggestion writes", async () => {
   const calls = [];
