@@ -13,6 +13,8 @@
 #   scripts/process-dropbox.sh --dry-run       # show what would happen, change nothing
 #   scripts/process-dropbox.sh --user-id <id>  # stamp imports for an app user
 #
+# Real ingest requires WAREHOUSE_IMPORT_USER_ID in .env.local (or --user-id).
+#
 # Naming contract: prefix each file with its source, e.g.
 #   chase-activity.csv, discover-export.csv, american_express-2026.csv,
 #   apple_card-april.csv, capital_one-checking.csv, micro_center-card.csv
@@ -22,12 +24,35 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DROPBOX_DIR="${REPO_ROOT}/dropbox"
-BUCKET="${WAREHOUSE_LANDING_BUCKET:-finance-tracker-cdx-etl-landing}"
 MAX_FILES="${ETL_MAX_FILES:-50}"
 
 RUN_DATAFORM=1
 DRY_RUN=0
 IMPORT_USER_ID="${WAREHOUSE_IMPORT_USER_ID:-}"
+
+read_env_local_value() {
+  local key="$1"
+  local env_file="${REPO_ROOT}/.env.local"
+  [[ -f "$env_file" ]] || return 0
+  awk -F= -v k="$key" '
+    $1 == k {
+      sub(/^[^=]+=/, "")
+      gsub(/^["'\'']|["'\'']$/, "")
+      print
+      exit
+    }
+  ' "$env_file"
+}
+
+if [[ -z "$IMPORT_USER_ID" ]]; then
+  IMPORT_USER_ID="$(read_env_local_value WAREHOUSE_IMPORT_USER_ID)"
+fi
+if [[ -z "${WAREHOUSE_LANDING_BUCKET:-}" ]]; then
+  loaded_bucket="$(read_env_local_value WAREHOUSE_LANDING_BUCKET)"
+  [[ -n "$loaded_bucket" ]] && WAREHOUSE_LANDING_BUCKET="$loaded_bucket"
+fi
+BUCKET="${WAREHOUSE_LANDING_BUCKET:-finance-tracker-cdx-etl-landing}"
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --no-dataform) RUN_DATAFORM=0 ;;
@@ -48,6 +73,12 @@ while [[ $# -gt 0 ]]; do
   esac
   shift
 done
+
+if [[ "$DRY_RUN" -eq 0 && -z "$IMPORT_USER_ID" ]]; then
+  echo "Refusing to ingest without a user id. CSV rows would land with user_id NULL and not show in the app." >&2
+  echo "Set WAREHOUSE_IMPORT_USER_ID in .env.local or pass --user-id." >&2
+  exit 2
+fi
 
 # Known source systems (longest names first so e.g. apple_card wins over apple).
 KNOWN_SOURCES=(american_express apple_card capital_one micro_center chase discover manual)
