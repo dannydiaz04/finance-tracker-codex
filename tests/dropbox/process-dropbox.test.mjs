@@ -2,11 +2,12 @@ import assert from "node:assert/strict";
 import {
   chmodSync,
   existsSync,
+  mkdtempSync,
   mkdirSync,
   readFileSync,
   writeFileSync,
 } from "node:fs";
-import { mkdtempSync, tmpdir } from "node:os";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
