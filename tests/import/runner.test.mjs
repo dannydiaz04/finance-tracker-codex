@@ -99,6 +99,58 @@ test("Runner archives a landed CSV after persisting through the shared import pa
   assert.equal(manifest.importBatchId, persistedImport.importBatch.importBatchId);
 });
 
+test("Runner lets a context manifest user id override the run default", async () => {
+  const landingRoot = createLandingRoot();
+  const filePath = writeLandingFile(
+    landingRoot,
+    "discover/2026/04/13/Discover-AllAvailable-20260409.csv",
+    loadFixture("discover_all_available.csv"),
+  );
+
+  writeContextManifest(filePath, {
+    userId: " file-user-456 ",
+    sourceAccountId: "discover_card",
+    accountName: "Discover Card",
+    accountMask: "7788",
+  });
+
+  let persistedImport = null;
+
+  const summary = await runLandingImports({
+    landingRoot,
+    userId: "runner-default-user",
+    persistImport: async (parsedImport) => {
+      persistedImport = parsedImport;
+      return {
+        persisted: true,
+        reason: "Rows inserted into raw_finance datasets.",
+      };
+    },
+    now: () => new Date("2026-04-13T12:00:00.000Z"),
+  });
+
+  assert.equal(summary.processedCount, 1);
+  assert.equal(summary.archivedCount, 1);
+  assert.ok(persistedImport);
+  assert.equal(persistedImport.importBatch.userId, "file-user-456");
+  assert.deepEqual(
+    persistedImport.events.map((event) => event.userId),
+    Array.from({ length: persistedImport.events.length }, () => "file-user-456"),
+  );
+
+  const [result] = summary.results;
+  assert.equal(result.status, "archived");
+  assert.deepEqual(result.runtimeAccountContext, {
+    sourceAccountId: "discover_card",
+    accountName: "Discover Card",
+    accountMask: "7788",
+  });
+
+  const manifest = JSON.parse(readFileSync(result.resultManifestPath, "utf8"));
+  assert.equal(manifest.status, "archived");
+  assert.deepEqual(manifest.runtimeAccountContext, result.runtimeAccountContext);
+});
+
 test("Runner rejects unsupported landed files and writes a rejection manifest", async () => {
   const landingRoot = createLandingRoot();
 
