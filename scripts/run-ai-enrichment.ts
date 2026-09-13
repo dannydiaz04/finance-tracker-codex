@@ -1,11 +1,22 @@
 import { parseArgs } from "node:util";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import nextEnv from "@next/env";
 
 import { runAiCategoryEnrichment } from "../lib/ai-enrichment/category-classifier.ts";
 
 const { loadEnvConfig } = nextEnv;
-loadEnvConfig(process.cwd());
+
+type RunEnrichment = typeof runAiCategoryEnrichment;
+type Logger = Pick<typeof console, "log">;
+
+export type RunAiEnrichmentCliOptions = {
+  argv?: string[];
+  cwd?: string;
+  logger?: Logger;
+  runEnrichment?: RunEnrichment;
+};
 
 function printHelp() {
   console.log(`Usage: npm run etl:ai-enrich -- [options]
@@ -56,8 +67,16 @@ function parseThreshold(value: string | undefined) {
   return parsed;
 }
 
-async function main() {
+export async function runAiEnrichmentCli({
+  argv = process.argv.slice(2),
+  cwd = process.cwd(),
+  logger = console,
+  runEnrichment = runAiCategoryEnrichment,
+}: RunAiEnrichmentCliOptions = {}) {
+  loadEnvConfig(cwd);
+
   const { values } = parseArgs({
+    args: argv,
     options: {
       limit: {
         type: "string",
@@ -94,7 +113,7 @@ async function main() {
     return;
   }
 
-  const summary = await runAiCategoryEnrichment({
+  const summary = await runEnrichment({
     limit: parsePositiveInteger(values.limit, "--limit"),
     batchSize: parsePositiveInteger(values["batch-size"], "--batch-size"),
     model: values.model,
@@ -105,26 +124,32 @@ async function main() {
   });
 
   if (values.json) {
-    console.log(JSON.stringify(summary, null, 2));
+    logger.log(JSON.stringify(summary, null, 2));
     return;
   }
 
-  console.log(
+  logger.log(
     `AI enrichment run ${summary.runId} processed ${summary.enrichedCount} candidate transaction(s) with ${summary.modelProvider}/${summary.model}.`,
   );
-  console.log(
+  logger.log(
     `Inserted ${summary.insertedCount} result row(s): ${summary.acceptedCount} accepted, ${summary.needsReviewCount} needs review, ${summary.rejectedCount} rejected.`,
   );
-  console.log(
+  logger.log(
     `Skipped ${summary.skippedUnchangedCount} unchanged row(s); spent ${summary.tokensUsed} token(s) (${summary.inputTokens} in / ${summary.outputTokens} out)${
       summary.stoppedForBudget ? " — stopped early on token budget" : ""
     }.`,
   );
 }
 
-main().catch((error) => {
-  console.error(
-    error instanceof Error ? error.message : "AI enrichment runner failed.",
-  );
-  process.exitCode = 1;
-});
+function isDirectRun() {
+  return Boolean(process.argv[1]) && fileURLToPath(import.meta.url) === resolve(process.argv[1]);
+}
+
+if (isDirectRun()) {
+  runAiEnrichmentCli().catch((error) => {
+    console.error(
+      error instanceof Error ? error.message : "AI enrichment runner failed.",
+    );
+    process.exitCode = 1;
+  });
+}
