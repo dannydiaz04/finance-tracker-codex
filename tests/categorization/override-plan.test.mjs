@@ -346,12 +346,50 @@ test("planOverrideBatch: later items see rules created earlier in the batch", ()
   assert.equal(planned[1].plan.ruleRow, null);
 });
 
+test("planOverrideBatch: replacements for existing conflicts are visible to later items", () => {
+  const planned = planOverrideBatch({
+    userId: "user-1",
+    existingRules: [existing({ categoryId: "dining" })],
+    now: PLAN_IDS.now,
+    items: [
+      batchItem({ transactionId: "txn-1" }),
+      batchItem({ transactionId: "txn-2" }),
+    ],
+  });
+
+  assert.equal(planned[0].plan.dedupe, "conflict");
+  assert.equal(planned[0].plan.supersedeRuleId, "rule-existing");
+  assert.ok(planned[0].plan.ruleRow);
+  assert.equal(planned[1].plan.dedupe, "exists");
+  assert.equal(planned[1].plan.ruleRow, null);
+  assert.equal(planned[1].plan.supersedeRuleId, null);
+});
+
 test("planOverrideBatch: contradictory new rules fail before persistence", () => {
   assert.throws(
     () =>
       planOverrideBatch({
         userId: "user-1",
         existingRules: [],
+        now: PLAN_IDS.now,
+        items: [
+          batchItem({ transactionId: "txn-1" }),
+          batchItem({
+            transactionId: "txn-2",
+            category: { id: "dining", label: "Dining" },
+          }),
+        ],
+      }),
+    /conflicting subcategories/,
+  );
+});
+
+test("planOverrideBatch: cannot switch back to a rule superseded earlier in the batch", () => {
+  assert.throws(
+    () =>
+      planOverrideBatch({
+        userId: "user-1",
+        existingRules: [existing({ categoryId: "dining" })],
         now: PLAN_IDS.now,
         items: [
           batchItem({ transactionId: "txn-1" }),
