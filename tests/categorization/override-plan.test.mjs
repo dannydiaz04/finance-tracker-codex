@@ -364,3 +364,23 @@ test("planOverrideBatch: contradictory new rules fail before persistence", () =>
     /conflicting subcategories/,
   );
 });
+
+test("planOverrideBatch: superseded existing rule is replaced before later batch dedupe", () => {
+  const planned = planOverrideBatch({
+    userId: "user-1",
+    existingRules: [existing({ ruleId: "rule-dining", categoryId: "dining" })],
+    now: PLAN_IDS.now,
+    items: [
+      batchItem({ transactionId: "txn-1" }),
+      batchItem({ transactionId: "txn-2" }),
+    ],
+  });
+
+  assert.equal(planned[0].plan.dedupe, "conflict");
+  assert.equal(planned[0].plan.supersedeRuleId, "rule-dining");
+  assert.ok(planned[0].plan.ruleRow);
+
+  assert.equal(planned[1].plan.dedupe, "exists");
+  assert.equal(planned[1].plan.supersedeRuleId, null);
+  assert.equal(planned[1].plan.ruleRow, null);
+});
