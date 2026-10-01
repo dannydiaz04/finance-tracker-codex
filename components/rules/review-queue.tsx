@@ -3,10 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
-import {
-  ReviewQueueCard,
-  type ReviewQueueResolution,
-} from "@/components/rules/review-queue-card";
+import { ReviewQueueCard } from "@/components/rules/review-queue-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,8 +11,16 @@ import {
   type OverrideDraft,
   type SaveResultTone,
   createOverrideDraft,
-  describeSaveResult,
 } from "@/lib/categorization/override-form-state";
+import {
+  buildBatchResolutions,
+  buildInitialReviewDrafts,
+  clearReviewErrors,
+  describeBatchNotice,
+  getBatchResultIds,
+  removeReviewIds,
+  type ReviewQueueResolution,
+} from "@/lib/categorization/review-queue-state";
 import type {
   Category,
   CategoryGroup,
@@ -36,15 +41,6 @@ type Notice = {
   message: string;
 };
 
-function initialDrafts(items: ReviewQueueItem[], categories: Category[]) {
-  return Object.fromEntries(
-    items.map((item) => [
-      item.transactionId,
-      createOverrideDraft(item.currentCategoryId, categories),
-    ]),
-  ) as Record<string, OverrideDraft>;
-}
-
 const noticeClass: Record<SaveResultTone, string> = {
   success: "border-emerald-500/30 text-emerald-400",
   partial: "border-amber-500/30 text-amber-400",
@@ -59,7 +55,9 @@ export function ReviewQueue({
 }: ReviewQueueProps) {
   const router = useRouter();
   const [mode, setMode] = useState<ReviewMode>("individual");
-  const [drafts, setDrafts] = useState(() => initialDrafts(items, categories));
+  const [drafts, setDrafts] = useState(() =>
+    buildInitialReviewDrafts(items, categories),
+  );
   const [stagedIds, setStagedIds] = useState<Set<string>>(() => new Set());
   const [cardErrors, setCardErrors] = useState<Record<string, string>>({});
   const [resolutions, setResolutions] = useState<
@@ -108,7 +106,7 @@ export function ReviewQueue({
   };
 
   const discardBatch = () => {
-    setDrafts(initialDrafts(items, categories));
+    setDrafts(buildInitialReviewDrafts(items, categories));
     setStagedIds(new Set());
     setCardErrors({});
     setNotice(null);
@@ -166,42 +164,15 @@ export function ReviewQueue({
           return;
         }
 
-        const nextResolutions = Object.fromEntries(
-          payload.results.map((result) => [
-            result.transactionId,
-            {
-              persisted: Boolean(result.persisted),
-              ...describeSaveResult({ ok: true, payload: result }),
-            },
-          ]),
-        ) as Record<string, ReviewQueueResolution>;
-        const savedIds = new Set(payload.results.map((result) => result.transactionId));
-        const tones = Object.values(nextResolutions).map((result) => result.tone);
+        const nextResolutions = buildBatchResolutions(payload.results);
+        const savedIds = getBatchResultIds(payload.results);
 
         setResolutions((current) => ({ ...current, ...nextResolutions }));
         setStagedIds(
-          (current) =>
-            new Set([...current].filter((transactionId) => !savedIds.has(transactionId))),
+          (current) => removeReviewIds(current, savedIds),
         );
-        setCardErrors((current) =>
-          Object.fromEntries(
-            Object.entries(current).filter(
-              ([transactionId]) => !savedIds.has(transactionId),
-            ),
-          ),
-        );
-        setNotice({
-          tone: tones.includes("partial")
-            ? "partial"
-            : tones.every((tone) => tone === "local")
-              ? "local"
-              : "success",
-          message: tones.includes("partial")
-            ? `Saved ${payload.results.length} reviews; some rule actions need another attempt.`
-            : `Saved ${payload.results.length} review${
-                payload.results.length === 1 ? "" : "s"
-              } in one batch.`,
-        });
+        setCardErrors((current) => clearReviewErrors(current, savedIds));
+        setNotice(describeBatchNotice(payload.results, nextResolutions));
         router.refresh();
       } catch {
         setNotice({

@@ -5,22 +5,14 @@ import { useState } from "react";
 
 import { OverrideForm } from "@/components/transactions/override-form";
 import { Button } from "@/components/ui/button";
-import type {
-  OverrideDraft,
-  SaveResultTone,
-} from "@/lib/categorization/override-form-state";
+import type { OverrideDraft } from "@/lib/categorization/override-form-state";
+import type { ReviewQueueResolution } from "@/lib/categorization/review-queue-state";
 import type {
   Category,
   CategoryGroup,
   ReviewQueueItem,
 } from "@/lib/types/finance";
 import { cn, formatCurrency } from "@/lib/utils";
-
-export type ReviewQueueResolution = {
-  persisted: boolean;
-  tone: SaveResultTone;
-  message: string;
-};
 
 type ReviewQueueCardProps = {
   item: ReviewQueueItem;
