@@ -364,3 +364,22 @@ test("planOverrideBatch: contradictory new rules fail before persistence", () =>
     /conflicting subcategories/,
   );
 });
+
+test("planOverrideBatch: contradictions after superseding an existing rule fail before persistence", () => {
+  assert.throws(
+    () =>
+      planOverrideBatch({
+        userId: "user-1",
+        existingRules: [existing({ categoryId: "dining" })],
+        now: PLAN_IDS.now,
+        items: [
+          batchItem({ transactionId: "txn-1" }),
+          batchItem({
+            transactionId: "txn-2",
+            category: { id: "travel", label: "Travel" },
+          }),
+        ],
+      }),
+    /conflicting subcategories/,
+  );
+});
