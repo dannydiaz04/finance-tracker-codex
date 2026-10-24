@@ -256,6 +256,38 @@ test("planOverride: create when an identical rule exists writes no duplicate", (
   assert.equal(plan.ruleRow, null);
 });
 
+test("planOverride: suggest when an identical rule exists writes no duplicate pending suggestion", () => {
+  const plan = planOverride({
+    userId: "user-1",
+    transaction: baseTransaction(),
+    category: groceries,
+    action: "suggest",
+    existingRules: [existing()],
+    ...PLAN_IDS,
+  });
+  assert.equal(plan.ruleAction, "suggest");
+  assert.equal(plan.dedupe, "exists");
+  assert.equal(plan.ruleSuggestion, null);
+  assert.equal(plan.ruleRow, null);
+});
+
+test("planOverride: suggest against a contradictory rule leaves replacement for review", () => {
+  const plan = planOverride({
+    userId: "user-1",
+    transaction: baseTransaction(),
+    category: groceries,
+    action: "suggest",
+    existingRules: [existing({ categoryId: "dining" })],
+    ...PLAN_IDS,
+  });
+  assert.equal(plan.dedupe, "conflict");
+  assert.equal(plan.conflictCategoryId, "dining");
+  assert.equal(plan.supersedeRuleId, null);
+  assert.ok(plan.ruleSuggestion, "a reviewer should see the proposed correction");
+  assert.equal(plan.ruleSuggestion.category_id, "groceries");
+  assert.equal(plan.ruleRow, null);
+});
+
 test("planOverride: create against a contradictory rule supersedes it", () => {
   const plan = planOverride({
     userId: "user-1",
@@ -343,6 +375,25 @@ test("planOverrideBatch: later items see rules created earlier in the batch", ()
 
   assert.ok(planned[0].plan.ruleRow);
   assert.equal(planned[1].plan.dedupe, "exists");
+  assert.equal(planned[1].plan.ruleRow, null);
+});
+
+test("planOverrideBatch: a corrected conflicting rule is visible to later items", () => {
+  const planned = planOverrideBatch({
+    userId: "user-1",
+    existingRules: [existing({ categoryId: "dining" })],
+    now: PLAN_IDS.now,
+    items: [
+      batchItem({ transactionId: "txn-1" }),
+      batchItem({ transactionId: "txn-2" }),
+    ],
+  });
+
+  assert.equal(planned[0].plan.dedupe, "conflict");
+  assert.equal(planned[0].plan.supersedeRuleId, "rule-existing");
+  assert.ok(planned[0].plan.ruleRow, "the first item replaces the old rule");
+  assert.equal(planned[1].plan.dedupe, "exists");
+  assert.equal(planned[1].plan.supersedeRuleId, null);
   assert.equal(planned[1].plan.ruleRow, null);
 });
 
