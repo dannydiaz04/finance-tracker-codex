@@ -1,8 +1,9 @@
 import { after, NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
+import { ZodError } from "zod";
 
 import { resolveRouteUserId } from "@/lib/auth/session";
 import { planOverrideBatch } from "@/lib/categorization/override-batch";
+import { batchOverrideRequestSchema } from "@/lib/categorization/override-batch-request";
 import { buildOverrideIdentity } from "@/lib/categorization/override-identity";
 import { persistOverridePlans } from "@/lib/categorization/override-persistence";
 import {
@@ -23,34 +24,6 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
-const batchOverrideSchema = z
-  .object({
-    overrides: z
-      .array(
-        z.object({
-          transactionId: z.string().min(1),
-          categoryId: z.string().min(1),
-          note: z.string().optional(),
-          ruleAction: z.enum(["none", "suggest", "create"]).optional(),
-        }),
-      )
-      .min(1)
-      .max(100),
-  })
-  .superRefine(({ overrides }, context) => {
-    const seen = new Set<string>();
-    overrides.forEach((override, index) => {
-      if (seen.has(override.transactionId)) {
-        context.addIssue({
-          code: "custom",
-          path: ["overrides", index, "transactionId"],
-          message: "Each transaction can appear only once in a batch.",
-        });
-      }
-      seen.add(override.transactionId);
-    });
-  });
-
 function toExistingRule(rule: Rule): ExistingRule {
   return {
     ruleId: rule.id,
@@ -68,7 +41,7 @@ export async function POST(request: NextRequest) {
       return response;
     }
 
-    const payload = batchOverrideSchema.parse(await request.json());
+    const payload = batchOverrideRequestSchema.parse(await request.json());
     const transactionIds = payload.overrides.map((override) => override.transactionId);
     const [transactions, categories, rules] = await Promise.all([
       getTransactionsByIds(transactionIds),
@@ -173,7 +146,7 @@ export async function POST(request: NextRequest) {
       results,
     });
   } catch (error) {
-    const invalidRequest = error instanceof z.ZodError;
+    const invalidRequest = error instanceof ZodError;
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unable to save review batch." },
       { status: invalidRequest ? 400 : 500 },
